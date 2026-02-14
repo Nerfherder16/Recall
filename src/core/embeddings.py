@@ -30,7 +30,7 @@ class EmbeddingService:
 
     def __init__(self):
         self.settings = get_settings()
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.client = httpx.AsyncClient(timeout=120.0)  # Longer timeout for cold starts
         self._model_loaded = False
 
     async def ensure_model(self) -> bool:
