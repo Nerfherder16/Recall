@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6380"
 
     # Ollama (Embeddings)
-    ollama_host: str = "http://localhost:11434"
-    embedding_model: str = "bge-large-en-v1.5"
+    ollama_host: str = "http://192.168.50.62:11434"
+    embedding_model: str = "bge-large"
     embedding_dimensions: int = 1024  # BGE-large uses 1024 dims
 
     # Memory Settings
