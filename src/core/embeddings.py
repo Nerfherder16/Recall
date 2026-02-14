@@ -47,7 +47,9 @@ class EmbeddingService:
                 models = response.json().get("models", [])
                 model_names = [m.get("name", "") for m in models]
 
-                if self.settings.embedding_model in model_names:
+                # Check for exact match or match with :latest suffix
+                target_model = self.settings.embedding_model
+                if target_model in model_names or f"{target_model}:latest" in model_names:
                     self._model_loaded = True
                     return True
 
