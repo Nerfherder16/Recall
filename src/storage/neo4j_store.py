@@ -175,11 +175,14 @@ class Neo4jStore:
         self, source_id: str, target_id: str, max_depth: int = 5
     ) -> list[dict[str, Any]] | None:
         """Find shortest path between two memories."""
+        # Clamp max_depth to a safe range (Cypher literal, not parameterized)
+        max_depth = max(1, min(max_depth, 15))
+
         async with self.driver.session() as session:
             result = await session.run(
-                """
+                f"""
                 MATCH path = shortestPath(
-                    (source:Memory {id: $source_id})-[*..{max_depth}]-(target:Memory {id: $target_id})
+                    (source:Memory {{id: $source_id}})-[*..{max_depth}]-(target:Memory {{id: $target_id}})
                 )
                 RETURN [node in nodes(path) | node.id] as node_ids,
                        [rel in relationships(path) | type(rel)] as rel_types,
@@ -187,7 +190,6 @@ class Neo4jStore:
                 """,
                 source_id=source_id,
                 target_id=target_id,
-                max_depth=max_depth,
             )
 
             record = await result.single()

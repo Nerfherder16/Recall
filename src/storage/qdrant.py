@@ -68,6 +68,7 @@ class QdrantStore:
             ("domain", "keyword"),
             ("source", "keyword"),
             ("session_id", "keyword"),
+            ("content_hash", "keyword"),
         ]
 
         for field, field_type in indexes:
@@ -92,6 +93,7 @@ class QdrantStore:
             vector=embedding,
             payload={
                 "content": memory.content,
+                "content_hash": memory.content_hash,
                 "memory_type": memory.memory_type.value,
                 "source": memory.source.value,
                 "domain": memory.domain,
@@ -106,6 +108,7 @@ class QdrantStore:
                 "session_id": memory.session_id,
                 "superseded_by": memory.superseded_by,
                 "parent_ids": memory.parent_ids,
+                "metadata": memory.metadata,
             },
         )
 
@@ -203,6 +206,25 @@ class QdrantStore:
             return point.vector, point.payload
         return None
 
+    async def find_by_content_hash(self, hash_value: str) -> str | None:
+        """Find a memory by content_hash. Returns memory_id or None."""
+        results, _ = await self.client.scroll(
+            collection_name=self.collection,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="content_hash",
+                        match=MatchValue(value=hash_value),
+                    ),
+                ]
+            ),
+            limit=1,
+            with_payload=False,
+        )
+        if results:
+            return str(results[0].id)
+        return None
+
     async def update_importance(self, memory_id: str, importance: float):
         """Update the importance score of a memory."""
         await self.client.set_payload(
@@ -236,6 +258,54 @@ class QdrantStore:
             collection_name=self.collection,
             points_selector=[memory_id],
         )
+
+    async def scroll_all(
+        self,
+        include_superseded: bool = False,
+        batch_size: int = 100,
+        with_vectors: bool = False,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """
+        Iterate over ALL points using Qdrant scroll API.
+
+        Returns list of (memory_id, payload). Unlike search(), this is
+        unbiased and not capped — every point is returned.
+        """
+        conditions = []
+        if not include_superseded:
+            conditions.append(
+                IsNullCondition(
+                    is_null=PayloadField(key="superseded_by"),
+                )
+            )
+
+        scroll_filter = Filter(must=conditions) if conditions else None
+        all_points = []
+        offset = None
+
+        while True:
+            points, next_offset = await self.client.scroll(
+                collection_name=self.collection,
+                scroll_filter=scroll_filter,
+                limit=batch_size,
+                offset=offset,
+                with_payload=True,
+                with_vectors=with_vectors,
+            )
+
+            for point in points:
+                payload = point.payload or {}
+                vector = point.vector if with_vectors else None
+                if with_vectors:
+                    all_points.append((str(point.id), payload, vector))
+                else:
+                    all_points.append((str(point.id), payload))
+
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        return all_points
 
     async def count(self) -> int:
         """Get total number of memories."""

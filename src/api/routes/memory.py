@@ -109,12 +109,22 @@ async def store_memory(request: StoreMemoryRequest):
             metadata=request.metadata,
         )
 
+        # Dedup check: reject if identical content already exists
+        qdrant = await get_qdrant_store()
+        existing_id = await qdrant.find_by_content_hash(memory.content_hash)
+        if existing_id:
+            return StoreMemoryResponse(
+                id=existing_id,
+                content_hash=memory.content_hash,
+                created=False,
+                message="Duplicate memory — identical content already stored",
+            )
+
         # Generate embedding
         embedding_service = await get_embedding_service()
         embedding = await embedding_service.embed(request.content)
 
         # Store in Qdrant
-        qdrant = await get_qdrant_store()
         await qdrant.store(memory, embedding)
 
         # Create graph node

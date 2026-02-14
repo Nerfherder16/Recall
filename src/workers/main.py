@@ -8,6 +8,7 @@ Workers handle:
 - Event processing
 """
 
+import asyncio
 from datetime import timedelta
 
 import structlog
@@ -18,6 +19,9 @@ from src.core import get_settings
 
 logger = structlog.get_logger()
 settings = get_settings()
+
+# Lock prevents overlapping consolidation runs
+_consolidation_lock = asyncio.Lock()
 
 
 async def startup(ctx: dict):
@@ -51,23 +55,30 @@ async def run_consolidation(ctx: dict):
     Periodic memory consolidation.
 
     Finds similar memories and merges them into stronger, consolidated memories.
+    Uses a lock to prevent overlapping runs.
     """
-    logger.info("running_consolidation")
+    if _consolidation_lock.locked():
+        logger.info("consolidation_skipped_already_running")
+        return
 
-    try:
-        from src.core.consolidation import create_consolidator
+    async with _consolidation_lock:
+        logger.info("running_consolidation")
 
-        consolidator = await create_consolidator()
-        results = await consolidator.consolidate()
+        try:
+            from src.core.consolidation import create_consolidator
 
-        logger.info(
-            "consolidation_complete",
-            clusters_merged=len(results),
-            total_memories_merged=sum(len(r.source_memories) for r in results),
-        )
+            consolidator = await create_consolidator()
+            results = await consolidator.consolidate()
 
-    except Exception as e:
-        logger.error("consolidation_error", error=str(e))
+            logger.info(
+                "consolidation_complete",
+                clusters_merged=len(results),
+                total_memories_merged=sum(len(r.source_memories) for r in results),
+            )
+
+        except Exception as e:
+            logger.error("consolidation_error", error=str(e))
+            raise
 
 
 async def run_decay(ctx: dict):
@@ -93,6 +104,7 @@ async def run_decay(ctx: dict):
 
     except Exception as e:
         logger.error("decay_error", error=str(e))
+        raise
 
 
 async def run_pattern_extraction(ctx: dict):
@@ -117,6 +129,7 @@ async def run_pattern_extraction(ctx: dict):
 
     except Exception as e:
         logger.error("pattern_extraction_error", error=str(e))
+        raise
 
 
 async def process_event(ctx: dict, event_type: str, payload: dict):
@@ -153,23 +166,23 @@ class WorkerSettings:
     ]
 
     cron_jobs = [
-        # Run consolidation every hour
+        # Run consolidation every hour at :00
         cron(
             run_consolidation,
-            hour=None,  # Every hour
+            hour=None,
             minute=0,
         ),
-        # Run decay every 30 minutes
+        # Run decay every 30 minutes at :15/:45 (staggered from consolidation)
         cron(
             run_decay,
             hour=None,
-            minute={0, 30},
+            minute={15, 45},
         ),
-        # Run pattern extraction daily at 3am
+        # Run pattern extraction daily at 3:30am (staggered from midnight jobs)
         cron(
             run_pattern_extraction,
             hour=3,
-            minute=0,
+            minute=30,
         ),
     ]
 

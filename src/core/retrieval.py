@@ -237,12 +237,16 @@ class RetrievalPipeline:
             # Reinforce importance slightly
             memory.importance = min(1.0, memory.importance + 0.02)
 
-            # Update in storage
+            # Update access count and timestamps in Qdrant
             await self.qdrant.update_access(
                 memory.id,
                 memory.access_count,
                 now.isoformat(),
             )
+
+            # Persist the importance boost to both stores
+            await self.qdrant.update_importance(memory.id, memory.importance)
+            await self.neo4j.update_importance(memory.id, memory.importance)
 
     def _payload_to_memory(self, memory_id: str, payload: dict[str, Any]) -> Memory:
         """Convert Qdrant payload to Memory object."""

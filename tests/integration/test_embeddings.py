@@ -137,7 +137,7 @@ class TestEmbeddings:
     async def test_content_hash_deduplication(
         self, api_client, test_domain, cleanup
     ):
-        """Storing the same text twice should produce identical content hashes."""
+        """Storing the same text twice should be deduplicated by content hash."""
         text = "Exact duplicate content for hash test"
 
         m1 = await self._store_and_track(
@@ -150,8 +150,10 @@ class TestEmbeddings:
         assert m1["content_hash"] == m2["content_hash"], (
             f"Same content produced different hashes: {m1['content_hash']} vs {m2['content_hash']}"
         )
-        # But they should have different IDs (no dedup at storage level yet)
-        assert m1["id"] != m2["id"]
+        # Dedup: second store returns the existing memory's ID
+        assert m1["id"] == m2["id"]
+        assert m1["created"] is True
+        assert m2["created"] is False
 
     async def test_embedding_retrieves_despite_different_phrasing(
         self, api_client, test_domain, cleanup

@@ -98,46 +98,37 @@ class MemoryConsolidator:
         domain: str | None,
     ) -> list[tuple[Memory, list[float]]]:
         """Get memories eligible for consolidation with their embeddings."""
-        # Search with minimal filter to get candidates
-        # We need a query vector, so we'll use a generic one or iterate
-        # For simplicity, we'll get all memories by domain
-
-        # This is a simplified approach - in production, use pagination
         memories = []
 
-        # Use a generic query to get memories
-        embedding_service = await get_embedding_service()
-        generic_embedding = await embedding_service.embed("memory knowledge fact")
-
-        types = [memory_type] if memory_type else None
-        domains = [domain] if domain else None
-
-        results = await self.qdrant.search(
-            query_vector=generic_embedding,
-            limit=1000,  # Batch size
-            memory_types=types,
-            domains=domains,
-            min_importance=self.settings.min_importance_for_retrieval,
+        # Scroll through ALL non-superseded memories with vectors
+        results = await self.qdrant.scroll_all(
             include_superseded=False,
+            with_vectors=True,
         )
 
-        for memory_id, score, payload in results:
-            # Get the actual embedding
-            qdrant_result = await self.qdrant.get(memory_id)
-            if qdrant_result:
-                embedding, _ = qdrant_result
-                memory = Memory(
-                    id=memory_id,
-                    content=payload.get("content", ""),
-                    memory_type=MemoryType(payload.get("memory_type", "semantic")),
-                    domain=payload.get("domain", "general"),
-                    importance=payload.get("importance", 0.5),
-                    stability=payload.get("stability", 0.1),
-                    confidence=payload.get("confidence", 0.8),
-                    tags=payload.get("tags", []),
-                    parent_ids=payload.get("parent_ids", []),
-                )
-                memories.append((memory, embedding))
+        min_importance = self.settings.min_importance_for_retrieval
+
+        for memory_id, payload, embedding in results:
+            # Apply filters
+            if memory_type and payload.get("memory_type") != memory_type.value:
+                continue
+            if domain and payload.get("domain") != domain:
+                continue
+            if payload.get("importance", 0.5) < min_importance:
+                continue
+
+            memory = Memory(
+                id=memory_id,
+                content=payload.get("content", ""),
+                memory_type=MemoryType(payload.get("memory_type", "semantic")),
+                domain=payload.get("domain", "general"),
+                importance=payload.get("importance", 0.5),
+                stability=payload.get("stability", 0.1),
+                confidence=payload.get("confidence", 0.8),
+                tags=payload.get("tags", []),
+                parent_ids=payload.get("parent_ids", []),
+            )
+            memories.append((memory, embedding))
 
         return memories
 

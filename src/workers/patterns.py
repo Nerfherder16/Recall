@@ -224,7 +224,7 @@ class PatternExtractor:
             tags=common_tags + ["extracted_pattern"],
             importance=0.7,  # Start with moderate importance
             stability=0.5,  # Patterns are moderately stable
-            confidence=len(cluster) / 10,  # More occurrences = more confidence
+            confidence=min(1.0, len(cluster) / 10),  # More occurrences = more confidence, capped at 1.0
             parent_ids=[m["id"] for m in cluster],
         )
 

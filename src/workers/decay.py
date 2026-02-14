@@ -5,12 +5,12 @@ Implements the "forgetting curve" - memories lose importance over time
 unless they are accessed (reinforced) or have high stability.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 import structlog
 
-from src.core import MemoryType, get_settings
+from src.core import get_settings
 
 logger = structlog.get_logger()
 
@@ -51,25 +51,14 @@ class DecayWorker:
             "stable": 0,
         }
 
-        # Get all memories (in batches for production)
-        # For now, use a generic search to get candidates
-        from src.core import get_embedding_service
-
-        embedding_service = await get_embedding_service()
-        generic_embedding = await embedding_service.embed("memory")
-
-        results = await self.qdrant.search(
-            query_vector=generic_embedding,
-            limit=1000,
-            min_importance=0.0,  # Get all
-            include_superseded=False,
-        )
+        # Scroll through ALL memories (unbiased, no limit)
+        results = await self.qdrant.scroll_all(include_superseded=False)
 
         now = datetime.utcnow()
         archive_threshold = 0.05
         base_decay_rate = self.settings.importance_decay_rate
 
-        for memory_id, score, payload in results:
+        for memory_id, payload in results:
             stats["processed"] += 1
 
             importance = payload.get("importance", 0.5)
