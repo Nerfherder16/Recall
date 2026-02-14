@@ -15,8 +15,10 @@ from qdrant_client.models import (
     Distance,
     FieldCondition,
     Filter,
+    IsNullCondition,
     MatchAny,
     MatchValue,
+    PayloadField,
     PointStruct,
     Range,
     VectorParams,
@@ -159,9 +161,8 @@ class QdrantStore:
 
         if not include_superseded:
             conditions.append(
-                FieldCondition(
-                    key="superseded_by",
-                    match=MatchValue(value=None),
+                IsNullCondition(
+                    is_null=PayloadField(key="superseded_by"),
                 )
             )
 
