@@ -7,12 +7,12 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e .
-
-# Copy source code
+# Copy project files
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir .
 
 # Create non-root user
 RUN useradd --create-home appuser

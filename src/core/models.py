@@ -11,14 +11,14 @@ These models represent the fundamental concepts of living memory:
 from datetime import datetime
 from enum import Enum
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
-from ulid import ULID
 
 
 def generate_id() -> str:
-    """Generate a sortable unique ID."""
-    return str(ULID())
+    """Generate a unique ID compatible with Qdrant (UUID format)."""
+    return str(uuid4())
 
 
 class MemoryType(str, Enum):

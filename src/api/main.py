@@ -26,6 +26,10 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("starting_recall_api", env=settings.env)
 
+    qdrant = None
+    neo4j = None
+    redis = None
+
     # Initialize storage connections
     try:
         qdrant = await get_qdrant_store()
