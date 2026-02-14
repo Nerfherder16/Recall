@@ -176,9 +176,9 @@ class QdrantStore:
 
         search_filter = Filter(must=conditions) if conditions else None
 
-        results = await self.client.search(
+        results = await self.client.query_points(
             collection_name=self.collection,
-            query_vector=query_vector,
+            query=query_vector,
             limit=limit,
             query_filter=search_filter,
             with_payload=True,
@@ -186,7 +186,7 @@ class QdrantStore:
 
         return [
             (str(r.id), r.score, r.payload)
-            for r in results
+            for r in results.points
         ]
 
     async def get(self, memory_id: str) -> tuple[list[float], dict[str, Any]] | None:
