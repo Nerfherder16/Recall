@@ -34,9 +34,13 @@ class DecayWorker:
         self.neo4j = neo4j_store
         self.settings = get_settings()
 
-    async def run(self) -> dict[str, Any]:
+    async def run(self, hours_offset: float = 0.0) -> dict[str, Any]:
         """
         Run decay on all memories.
+
+        Args:
+            hours_offset: Extra hours to add to time-since-access, allowing
+                          tests to simulate time passing without waiting.
 
         Returns statistics about the decay run.
         """
@@ -76,7 +80,7 @@ class DecayWorker:
                 continue
 
             last_accessed = datetime.fromisoformat(last_accessed_str)
-            hours_since_access = (now - last_accessed).total_seconds() / 3600
+            hours_since_access = (now - last_accessed).total_seconds() / 3600 + hours_offset
 
             # Calculate effective decay rate (stability reduces decay)
             effective_decay = base_decay_rate * (1 - stability)

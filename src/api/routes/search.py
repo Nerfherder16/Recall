@@ -288,5 +288,8 @@ async def find_similar(memory_id: str, limit: int = 5):
     except HTTPException:
         raise
     except Exception as e:
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Memory not found")
         logger.error("find_similar_error", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

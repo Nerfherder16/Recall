@@ -7,7 +7,7 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.core import (
     Memory,
@@ -37,8 +37,8 @@ class StoreMemoryRequest(BaseModel):
     source: MemorySource = MemorySource.USER
     domain: str = "general"
     tags: list[str] = []
-    importance: float = 0.5
-    confidence: float = 0.8
+    importance: float = Field(default=0.5, ge=0.0, le=1.0)
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     session_id: str | None = None
     metadata: dict[str, Any] = {}
 
@@ -175,6 +175,10 @@ async def get_memory(memory_id: str):
     except HTTPException:
         raise
     except Exception as e:
+        # Qdrant rejects non-UUID IDs with a client error — surface as 404
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Memory not found")
         logger.error("get_memory_error", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -195,6 +199,9 @@ async def delete_memory(memory_id: str):
         return {"deleted": True, "id": memory_id}
 
     except Exception as e:
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Memory not found")
         logger.error("delete_memory_error", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
