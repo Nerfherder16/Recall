@@ -1,0 +1,68 @@
+[project]
+name = "recall"
+version = "0.1.0"
+description = "Living memory system for AI assistants - semantic, evolving, context-aware"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Tim", email = "tim@example.com"}
+]
+
+dependencies = [
+    # API
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+
+    # Storage
+    "qdrant-client>=1.7.0",
+    "neo4j>=5.15.0",
+    "asyncpg>=0.29.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "redis>=5.0.0",
+    "hiredis>=2.3.0",
+
+    # Embeddings
+    "httpx>=0.26.0",
+    "numpy>=1.26.0",
+
+    # Background tasks
+    "arq>=0.25.0",
+    "apscheduler>=3.10.0",
+
+    # Utilities
+    "python-ulid>=2.2.0",
+    "structlog>=24.1.0",
+    "tenacity>=8.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.26.0",
+    "ruff>=0.1.0",
+    "mypy>=1.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true

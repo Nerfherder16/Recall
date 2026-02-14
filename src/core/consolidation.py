@@ -1,0 +1,300 @@
+"""
+Memory consolidation - merging similar memories into stronger ones.
+
+Like sleep consolidation in biological memory:
+- Find semantically similar memories
+- Merge redundant information
+- Strengthen stable patterns
+- Extract generalizations
+"""
+
+from datetime import datetime
+from typing import Any
+
+import numpy as np
+import structlog
+
+from .config import get_settings
+from .embeddings import content_hash, get_embedding_service
+from .models import (
+    ConsolidationResult,
+    Memory,
+    MemorySource,
+    MemoryType,
+    Relationship,
+    RelationshipType,
+)
+
+logger = structlog.get_logger()
+
+
+class MemoryConsolidator:
+    """
+    Consolidate memories by merging similar ones.
+
+    The consolidation process:
+    1. Find clusters of similar memories
+    2. Merge each cluster into a single, stronger memory
+    3. Link the merged memory to its sources
+    4. Mark source memories as superseded (but don't delete)
+    """
+
+    def __init__(self, qdrant_store, neo4j_store, embedding_service):
+        self.qdrant = qdrant_store
+        self.neo4j = neo4j_store
+        self.embeddings = embedding_service
+        self.settings = get_settings()
+
+    async def consolidate(
+        self,
+        memory_type: MemoryType | None = None,
+        domain: str | None = None,
+        min_cluster_size: int = 2,
+        dry_run: bool = False,
+    ) -> list[ConsolidationResult]:
+        """
+        Run consolidation on memories.
+
+        Args:
+            memory_type: Only consolidate this type of memory
+            domain: Only consolidate this domain
+            min_cluster_size: Minimum memories needed to form a cluster
+            dry_run: If True, don't actually merge, just return what would happen
+
+        Returns:
+            List of consolidation results
+        """
+        results = []
+
+        # Get all eligible memories
+        memories = await self._get_eligible_memories(memory_type, domain)
+        if len(memories) < min_cluster_size:
+            logger.info("not_enough_memories_for_consolidation", count=len(memories))
+            return results
+
+        # Cluster by semantic similarity
+        clusters = await self._cluster_memories(memories)
+
+        for cluster in clusters:
+            if len(cluster) < min_cluster_size:
+                continue
+
+            logger.info(
+                "found_memory_cluster",
+                size=len(cluster),
+                preview=cluster[0].content[:50],
+            )
+
+            if not dry_run:
+                result = await self._merge_cluster(cluster)
+                if result:
+                    results.append(result)
+
+        return results
+
+    async def _get_eligible_memories(
+        self,
+        memory_type: MemoryType | None,
+        domain: str | None,
+    ) -> list[tuple[Memory, list[float]]]:
+        """Get memories eligible for consolidation with their embeddings."""
+        # Search with minimal filter to get candidates
+        # We need a query vector, so we'll use a generic one or iterate
+        # For simplicity, we'll get all memories by domain
+
+        # This is a simplified approach - in production, use pagination
+        memories = []
+
+        # Use a generic query to get memories
+        embedding_service = await get_embedding_service()
+        generic_embedding = await embedding_service.embed("memory knowledge fact")
+
+        types = [memory_type] if memory_type else None
+        domains = [domain] if domain else None
+
+        results = await self.qdrant.search(
+            query_vector=generic_embedding,
+            limit=1000,  # Batch size
+            memory_types=types,
+            domains=domains,
+            min_importance=self.settings.min_importance_for_retrieval,
+            include_superseded=False,
+        )
+
+        for memory_id, score, payload in results:
+            # Get the actual embedding
+            qdrant_result = await self.qdrant.get(memory_id)
+            if qdrant_result:
+                embedding, _ = qdrant_result
+                memory = Memory(
+                    id=memory_id,
+                    content=payload.get("content", ""),
+                    memory_type=MemoryType(payload.get("memory_type", "semantic")),
+                    domain=payload.get("domain", "general"),
+                    importance=payload.get("importance", 0.5),
+                    stability=payload.get("stability", 0.1),
+                    confidence=payload.get("confidence", 0.8),
+                    tags=payload.get("tags", []),
+                    parent_ids=payload.get("parent_ids", []),
+                )
+                memories.append((memory, embedding))
+
+        return memories
+
+    async def _cluster_memories(
+        self,
+        memories: list[tuple[Memory, list[float]]],
+    ) -> list[list[Memory]]:
+        """
+        Cluster memories by semantic similarity.
+
+        Uses a simple greedy clustering approach:
+        - For each memory, find others above similarity threshold
+        - Group them into clusters
+        """
+        threshold = self.settings.consolidation_threshold
+        clusters = []
+        clustered = set()
+
+        for i, (memory_i, embedding_i) in enumerate(memories):
+            if memory_i.id in clustered:
+                continue
+
+            cluster = [memory_i]
+            clustered.add(memory_i.id)
+
+            # Find similar memories
+            for j, (memory_j, embedding_j) in enumerate(memories):
+                if i == j or memory_j.id in clustered:
+                    continue
+
+                similarity = self._cosine_similarity(embedding_i, embedding_j)
+
+                if similarity >= threshold:
+                    cluster.append(memory_j)
+                    clustered.add(memory_j.id)
+
+            if len(cluster) > 1:
+                clusters.append(cluster)
+
+        return clusters
+
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
+        """Compute cosine similarity between two vectors."""
+        a = np.array(vec1)
+        b = np.array(vec2)
+        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+    async def _merge_cluster(
+        self,
+        cluster: list[Memory],
+    ) -> ConsolidationResult | None:
+        """
+        Merge a cluster of memories into one.
+
+        The merged memory:
+        - Combines content (or uses summary)
+        - Has higher stability (consolidated)
+        - Links to source memories
+        """
+        if not cluster:
+            return None
+
+        # Combine content
+        contents = [m.content for m in cluster]
+        merged_content = self._merge_contents(contents)
+
+        # Aggregate properties
+        avg_importance = sum(m.importance for m in cluster) / len(cluster)
+        max_confidence = max(m.confidence for m in cluster)
+        total_access = sum(m.access_count for m in cluster)
+
+        # Collect all tags
+        all_tags = set()
+        for m in cluster:
+            all_tags.update(m.tags)
+
+        # Create merged memory
+        merged = Memory(
+            content=merged_content,
+            content_hash=content_hash(merged_content),
+            memory_type=cluster[0].memory_type,  # Use first memory's type
+            source=MemorySource.CONSOLIDATION,
+            domain=cluster[0].domain,
+            tags=list(all_tags),
+            importance=min(1.0, avg_importance + 0.1),  # Boost importance
+            stability=min(1.0, max(m.stability for m in cluster) + 0.2),  # Increase stability
+            confidence=max_confidence,
+            access_count=total_access,
+            parent_ids=[m.id for m in cluster],
+        )
+
+        # Generate embedding for merged content
+        embedding = await self.embeddings.embed(merged_content)
+
+        # Store merged memory
+        await self.qdrant.store(merged, embedding)
+        await self.neo4j.create_memory_node(merged)
+
+        # Create relationships
+        for source_memory in cluster:
+            relationship = Relationship(
+                source_id=merged.id,
+                target_id=source_memory.id,
+                relationship_type=RelationshipType.DERIVED_FROM,
+                strength=0.9,
+            )
+            await self.neo4j.create_relationship(relationship)
+
+            # Mark source as superseded
+            await self.qdrant.mark_superseded(source_memory.id, merged.id)
+
+        logger.info(
+            "merged_memories",
+            merged_id=merged.id,
+            source_count=len(cluster),
+            content_preview=merged_content[:50],
+        )
+
+        return ConsolidationResult(
+            merged_memory=merged,
+            source_memories=[m.id for m in cluster],
+            relationships_created=len(cluster),
+            memories_superseded=len(cluster),
+        )
+
+    def _merge_contents(self, contents: list[str]) -> str:
+        """
+        Merge multiple content strings into one.
+
+        Simple approach: deduplicate and concatenate.
+        In production, use LLM to summarize.
+        """
+        # Remove near-duplicates
+        unique = []
+        for content in contents:
+            is_dup = False
+            for existing in unique:
+                # Simple check: if one is substring of other
+                if content in existing or existing in content:
+                    is_dup = True
+                    break
+            if not is_dup:
+                unique.append(content)
+
+        if len(unique) == 1:
+            return unique[0]
+
+        # Combine with separator
+        return " | ".join(unique)
+
+
+async def create_consolidator():
+    """Create consolidator with dependencies."""
+    from src.storage import get_neo4j_store, get_qdrant_store
+
+    qdrant = await get_qdrant_store()
+    neo4j = await get_neo4j_store()
+    embeddings = await get_embedding_service()
+
+    return MemoryConsolidator(qdrant, neo4j, embeddings)
