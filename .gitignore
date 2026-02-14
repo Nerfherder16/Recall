@@ -63,3 +63,14 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+node_modules/
+*.pyc
+__pycache__/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
