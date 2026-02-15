@@ -59,16 +59,23 @@ class PatternExtractor:
             "patterns_created": 0,
         }
 
-        # Get recent episodic memories
-        embedding_service = await get_embedding_service()
-        generic_embedding = await embedding_service.embed("error fix solution problem")
-
-        results = await self.qdrant.search(
-            query_vector=generic_embedding,
-            limit=500,
-            memory_types=[MemoryType.EPISODIC],
+        # Get ALL episodic memories (unbiased scroll, not semantic search)
+        all_points = await self.qdrant.scroll_all(
             include_superseded=False,
+            with_vectors=True,
         )
+
+        # Filter to episodic memories within the time window
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        results = []
+        for item in all_points:
+            memory_id, payload, embedding = item
+            if payload.get("memory_type") != MemoryType.EPISODIC.value:
+                continue
+            created = payload.get("created_at", "")
+            if created and created < cutoff.isoformat():
+                continue
+            results.append((memory_id, payload, embedding))
 
         if len(results) < min_occurrences:
             logger.info("not_enough_episodes", count=len(results))
@@ -76,19 +83,16 @@ class PatternExtractor:
 
         stats["episodes_analyzed"] = len(results)
 
-        # Get embeddings for clustering
+        # Build list with embeddings already loaded from scroll
         memories_with_embeddings = []
-        for memory_id, score, payload in results:
-            qdrant_result = await self.qdrant.get(memory_id)
-            if qdrant_result:
-                embedding, _ = qdrant_result
-                memories_with_embeddings.append({
-                    "id": memory_id,
-                    "content": payload.get("content", ""),
-                    "embedding": embedding,
-                    "domain": payload.get("domain", "general"),
-                    "tags": payload.get("tags", []),
-                })
+        for memory_id, payload, embedding in results:
+            memories_with_embeddings.append({
+                "id": memory_id,
+                "content": payload.get("content", ""),
+                "embedding": embedding,
+                "domain": payload.get("domain", "general"),
+                "tags": payload.get("tags", []),
+            })
 
         # Cluster by similarity
         clusters = self._cluster_by_similarity(
@@ -228,9 +232,14 @@ class PatternExtractor:
             parent_ids=[m["id"] for m in cluster],
         )
 
-        # Store pattern
+        # Store pattern — compensating delete on Neo4j failure
         await self.qdrant.store(pattern, pattern_embedding)
-        await self.neo4j.create_memory_node(pattern)
+        try:
+            await self.neo4j.create_memory_node(pattern)
+        except Exception as neo4j_err:
+            logger.error("neo4j_write_failed_compensating", id=pattern.id, error=str(neo4j_err))
+            await self.qdrant.delete(pattern.id)
+            return None
 
         # Link to source episodes
         for source in cluster:

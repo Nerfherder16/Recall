@@ -215,8 +215,14 @@ async def approve_signal(session_id: str, request: ApproveSignalRequest):
 
     await qdrant.store(memory, embedding)
 
-    neo4j = await get_neo4j_store()
-    await neo4j.create_memory_node(memory)
+    # Create graph node — compensating delete on failure
+    try:
+        neo4j = await get_neo4j_store()
+        await neo4j.create_memory_node(memory)
+    except Exception as neo4j_err:
+        logger.error("neo4j_write_failed_compensating", id=memory.id, error=str(neo4j_err))
+        await qdrant.delete(memory.id)
+        raise HTTPException(status_code=500, detail="Failed to create graph node")
 
     logger.info(
         "signal_approved",

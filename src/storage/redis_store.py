@@ -234,6 +234,7 @@ class RedisStore:
         """Add a medium-confidence signal to the pending review queue."""
         key = self._pending_key(session_id)
         await self.client.lpush(key, json.dumps(signal))
+        await self.client.ltrim(key, 0, 99)  # Cap at 100 pending signals
         await self.client.expire(key, timedelta(hours=self.settings.session_ttl_hours))
 
     async def get_pending_signals(self, session_id: str) -> list[dict]:
@@ -265,10 +266,21 @@ class RedisStore:
     # =============================================================
 
     async def get_active_sessions(self) -> int:
-        """Count active sessions."""
-        keys = await self.client.keys("recall:session:*")
-        # Filter out working memory keys
-        return len([k for k in keys if ":working" not in k])
+        """Count active sessions using SCAN (non-blocking, unlike KEYS)."""
+        count = 0
+        cursor = 0
+        while True:
+            cursor, keys = await self.client.scan(
+                cursor=cursor, match="recall:session:*", count=100
+            )
+            # Filter out sub-keys (working, turns)
+            count += sum(
+                1 for k in keys
+                if ":working" not in k and ":turns" not in k
+            )
+            if cursor == 0:
+                break
+        return count
 
     async def close(self):
         """Close the connection."""

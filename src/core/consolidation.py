@@ -223,9 +223,14 @@ class MemoryConsolidator:
         # Generate embedding for merged content
         embedding = await self.embeddings.embed(merged_content)
 
-        # Store merged memory
+        # Store merged memory — compensating delete on Neo4j failure
         await self.qdrant.store(merged, embedding)
-        await self.neo4j.create_memory_node(merged)
+        try:
+            await self.neo4j.create_memory_node(merged)
+        except Exception as neo4j_err:
+            logger.error("neo4j_write_failed_compensating", id=merged.id, error=str(neo4j_err))
+            await self.qdrant.delete(merged.id)
+            return None
 
         # Create relationships
         for source_memory in cluster:
@@ -237,8 +242,9 @@ class MemoryConsolidator:
             )
             await self.neo4j.create_relationship(relationship)
 
-            # Mark source as superseded
+            # Mark source as superseded in both stores
             await self.qdrant.mark_superseded(source_memory.id, merged.id)
+            await self.neo4j.mark_superseded(source_memory.id, merged.id)
 
         logger.info(
             "merged_memories",

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.core import (
@@ -127,9 +127,14 @@ async def store_memory(request: StoreMemoryRequest):
         # Store in Qdrant
         await qdrant.store(memory, embedding)
 
-        # Create graph node
-        neo4j = await get_neo4j_store()
-        await neo4j.create_memory_node(memory)
+        # Create graph node — compensating delete on failure
+        try:
+            neo4j = await get_neo4j_store()
+            await neo4j.create_memory_node(memory)
+        except Exception as neo4j_err:
+            logger.error("neo4j_write_failed_compensating", id=memory.id, error=str(neo4j_err))
+            await qdrant.delete(memory.id)
+            raise
 
         # Add to working memory if session provided
         if request.session_id:
@@ -251,8 +256,8 @@ async def create_relationship(request: CreateRelationshipRequest):
 @router.get("/{memory_id}/related")
 async def get_related_memories(
     memory_id: str,
-    max_depth: int = 2,
-    limit: int = 10,
+    max_depth: int = Query(default=2, ge=1, le=10),
+    limit: int = Query(default=10, ge=1, le=100),
 ):
     """Get memories related to a given memory via graph traversal."""
     try:

@@ -7,6 +7,7 @@ Neo4j handles:
 - Finding connected concepts
 """
 
+import re
 from typing import Any
 
 import structlog
@@ -86,11 +87,19 @@ class Neo4jStore:
 
         logger.debug("created_memory_node", id=memory.id)
 
+    @staticmethod
+    def _safe_rel_type(value: str) -> str:
+        """Validate relationship type is safe for Cypher interpolation."""
+        upper = value.upper()
+        if not re.match(r"^[A-Z_][A-Z0-9_]*$", upper):
+            raise ValueError(f"Invalid relationship type for Cypher: {value!r}")
+        return upper
+
     async def create_relationship(self, relationship: Relationship):
         """Create a relationship between two memories."""
         async with self.driver.session() as session:
             # Map relationship type to Neo4j relationship type
-            rel_type = relationship.relationship_type.value.upper()
+            rel_type = self._safe_rel_type(relationship.relationship_type.value)
 
             await session.run(
                 f"""
@@ -143,9 +152,12 @@ class Neo4jStore:
 
         Returns list of {id, relationship_type, distance, path}.
         """
+        # Clamp max_depth to prevent combinatorial explosion in Cypher
+        max_depth = max(1, min(max_depth, 10))
+
         async with self.driver.session() as session:
             if relationship_types:
-                rel_filter = "|".join(rt.value.upper() for rt in relationship_types)
+                rel_filter = "|".join(self._safe_rel_type(rt.value) for rt in relationship_types)
                 rel_pattern = f"[r:{rel_filter}*1..{max_depth}]"
             else:
                 rel_pattern = f"[r*1..{max_depth}]"
@@ -153,7 +165,7 @@ class Neo4jStore:
             result = await session.run(
                 f"""
                 MATCH path = (start:Memory {{id: $id}})-{rel_pattern}-(related:Memory)
-                WHERE start <> related
+                WHERE start <> related AND related.superseded_by IS NULL
                 RETURN DISTINCT
                     related.id as id,
                     related.memory_type as memory_type,
@@ -234,6 +246,19 @@ class Neo4jStore:
                     ],
                 }
             return {"memories": [], "relationships": []}
+
+    async def mark_superseded(self, memory_id: str, superseded_by: str):
+        """Mark a memory node as superseded in the graph."""
+        async with self.driver.session() as session:
+            await session.run(
+                """
+                MATCH (m:Memory {id: $id})
+                SET m.superseded_by = $superseded_by,
+                    m.importance = 0.0
+                """,
+                id=memory_id,
+                superseded_by=superseded_by,
+            )
 
     async def update_importance(self, memory_id: str, importance: float):
         """Update importance in graph node."""

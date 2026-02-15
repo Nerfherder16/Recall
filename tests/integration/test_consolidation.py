@@ -129,17 +129,20 @@ class TestConsolidation:
         merged_id = body["results"][0]["merged_id"]
         cleanup.track_memory(merged_id)
 
-        # Check related memories via graph
+        # Check relationships exist by traversing from source → merged.
+        # Source memories are now superseded (Phase 3 C2 fix), so
+        # find_related(merged_id) correctly filters them out.
+        # Instead, verify from a source: its related should include the
+        # merged memory (which is NOT superseded).
         rel_r = await api_client.get(
-            f"{API_BASE}/memory/{merged_id}/related",
+            f"{API_BASE}/memory/{source_ids[0]}/related",
             params={"max_depth": 1, "limit": 20},
         )
         assert rel_r.status_code == 200
         related = rel_r.json().get("related", [])
-        # The related list should contain at least one source ID
         related_ids = [r.get("id", r.get("memory_id", "")) for r in related]
-        assert any(sid in related_ids for sid in source_ids), (
-            f"Expected source IDs {source_ids} in related {related_ids}"
+        assert merged_id in related_ids, (
+            f"Expected merged ID {merged_id} in related {related_ids}"
         )
 
     async def test_merged_memory_has_boosted_stability(

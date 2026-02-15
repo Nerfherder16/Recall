@@ -174,5 +174,7 @@ async def get_embedding_service() -> EmbeddingService:
     global _embedding_service
     if _embedding_service is None:
         _embedding_service = EmbeddingService()
+    # Retry ensure_model if it failed on initial creation
+    if not _embedding_service._model_loaded:
         await _embedding_service.ensure_model()
     return _embedding_service

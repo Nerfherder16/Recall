@@ -6,7 +6,7 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.core import MemoryQuery, MemoryType, RelationshipType
 from src.core.retrieval import create_retrieval_pipeline
@@ -29,8 +29,8 @@ class SearchRequest(BaseModel):
     tags: list[str] | None = None
     min_importance: float = 0.0
     expand_relationships: bool = True
-    max_depth: int = 2
-    limit: int = 10
+    max_depth: int = Field(default=2, ge=1, le=10)
+    limit: int = Field(default=10, ge=1, le=100)
     session_id: str | None = None
     current_file: str | None = None
     current_task: str | None = None

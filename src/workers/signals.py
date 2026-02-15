@@ -34,7 +34,23 @@ async def process_signal_detection(session_id: str):
     3. Auto-store high-confidence signals as memories
     4. Queue medium-confidence signals for review
     5. Discard low-confidence signals
+
+    Wrapped in top-level error handling so BackgroundTask failures
+    are always logged via structlog (Starlette only logs to stderr).
     """
+    try:
+        await _run_signal_detection(session_id)
+    except Exception as e:
+        logger.error(
+            "signal_detection_background_task_failed",
+            session_id=session_id,
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+
+
+async def _run_signal_detection(session_id: str):
+    """Inner implementation of signal detection pipeline."""
     settings = get_settings()
     redis = await get_redis_store()
 
@@ -135,9 +151,14 @@ async def _store_signal_as_memory(session_id: str, signal) -> bool:
         # Store in Qdrant
         await qdrant.store(memory, embedding)
 
-        # Create graph node
-        neo4j = await get_neo4j_store()
-        await neo4j.create_memory_node(memory)
+        # Create graph node — compensating delete on failure
+        try:
+            neo4j = await get_neo4j_store()
+            await neo4j.create_memory_node(memory)
+        except Exception as neo4j_err:
+            logger.error("neo4j_write_failed_compensating", id=memory.id, error=str(neo4j_err))
+            await qdrant.delete(memory.id)
+            return False
 
         logger.info(
             "signal_auto_stored",

@@ -275,8 +275,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           query: args.query,
           limit: args.limit || 5,
         };
-        if (args.domain) body.domain = args.domain;
-        if (args.memory_type) body.memory_type = args.memory_type;
+        if (args.domain) body.domains = [args.domain];
+        if (args.memory_type) body.memory_types = [args.memory_type];
         if (args.min_similarity !== undefined) body.min_similarity = args.min_similarity;
 
         const result = await recallAPI("/search/query", "POST", body);
@@ -335,8 +335,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "recall_health": {
         const result = await recallAPI("/health");
         const status = result.status === "healthy" ? "✅ Healthy" : "⚠️ " + result.status;
-        const services = Object.entries(result.services || {})
-          .map(([name, s]) => `  ${s.status === "healthy" ? "✅" : "❌"} ${name}`)
+        const services = Object.entries(result.checks || {})
+          .map(([name, val]) => `  ${String(val).startsWith("ok") ? "✅" : "❌"} ${name}: ${val}`)
           .join("\n");
 
         return {
@@ -365,7 +365,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const limit = args.limit || 5;
         const result = await recallAPI(`/search/similar/${args.id}?limit=${limit}`);
 
-        const formatted = result.results.map((m, i) =>
+        const formatted = (result.similar || []).map((m, i) =>
           `${i + 1}. [${(m.similarity * 100).toFixed(1)}%] ${m.content}`
         ).join("\n\n");
 
