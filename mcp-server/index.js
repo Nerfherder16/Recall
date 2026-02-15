@@ -207,6 +207,39 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["id"],
         },
       },
+      {
+        name: "recall_ingest",
+        description: "Ingest conversation turns for automatic signal detection. Call this after each meaningful exchange to let Recall auto-detect and store important signals (error fixes, decisions, facts, workflows, etc.) as memories. Requires an active session.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            session_id: {
+              type: "string",
+              description: "Active Recall session ID",
+            },
+            turns: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  role: {
+                    type: "string",
+                    enum: ["user", "assistant", "system"],
+                    description: "Who sent this message",
+                  },
+                  content: {
+                    type: "string",
+                    description: "The message content",
+                  },
+                },
+                required: ["role", "content"],
+              },
+              description: "Conversation turns to analyze",
+            },
+          },
+          required: ["session_id", "turns"],
+        },
+      },
     ],
   };
 });
@@ -341,6 +374,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: `Similar memories:\n\n${formatted}`,
+            },
+          ],
+        };
+      }
+
+      case "recall_ingest": {
+        const result = await recallAPI("/ingest/turns", "POST", {
+          session_id: args.session_id,
+          turns: args.turns,
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Ingested ${result.turns_ingested} turns (${result.total_turns} total). Signal detection ${result.detection_queued ? "queued" : "skipped"}.`,
             },
           ],
         };

@@ -58,6 +58,7 @@ class RedisStore:
                 "current_task": session.current_task or "",
                 "memories_created": str(session.memories_created),
                 "memories_retrieved": str(session.memories_retrieved),
+                "signals_detected": "0",
             },
         )
         await self.client.expire(key, timedelta(hours=self.settings.session_ttl_hours))
@@ -182,6 +183,82 @@ class RedisStore:
         # For simple setup, we don't use consumer groups
         # In production, use XACK with consumer groups
         pass
+
+    # =============================================================
+    # TURN STORAGE (for signal detection)
+    # =============================================================
+
+    def _turns_key(self, session_id: str) -> str:
+        return f"recall:session:{session_id}:turns"
+
+    async def add_turns(self, session_id: str, turns: list[dict]) -> int:
+        """
+        Append conversation turns to a session.
+
+        Stores as JSON strings in a Redis list (newest at head).
+        Trims to signal_max_turns_stored.
+        Returns total turn count after insert.
+        """
+        key = self._turns_key(session_id)
+        pipe = self.client.pipeline()
+        for turn in turns:  # LPUSH puts each at head; last turn ends up leftmost
+            pipe.lpush(key, json.dumps(turn))
+        pipe.ltrim(key, 0, self.settings.signal_max_turns_stored - 1)
+        pipe.expire(key, timedelta(hours=self.settings.session_ttl_hours))
+        pipe.llen(key)
+        results = await pipe.execute()
+        return results[-1]  # llen result
+
+    async def get_recent_turns(self, session_id: str, count: int | None = None) -> list[dict]:
+        """
+        Get recent turns in chronological order (oldest first).
+
+        Args:
+            session_id: Session to fetch turns from
+            count: Number of turns to return (default: signal_context_window)
+        """
+        count = count or self.settings.signal_context_window
+        key = self._turns_key(session_id)
+        raw = await self.client.lrange(key, 0, count - 1)
+        # LPUSH stores newest first, so reverse for chronological
+        return [json.loads(item) for item in reversed(raw)]
+
+    # =============================================================
+    # PENDING SIGNALS
+    # =============================================================
+
+    def _pending_key(self, session_id: str) -> str:
+        return f"recall:signals:pending:{session_id}"
+
+    async def add_pending_signal(self, session_id: str, signal: dict):
+        """Add a medium-confidence signal to the pending review queue."""
+        key = self._pending_key(session_id)
+        await self.client.lpush(key, json.dumps(signal))
+        await self.client.expire(key, timedelta(hours=self.settings.session_ttl_hours))
+
+    async def get_pending_signals(self, session_id: str) -> list[dict]:
+        """Get all pending signals for a session."""
+        key = self._pending_key(session_id)
+        raw = await self.client.lrange(key, 0, -1)
+        return [json.loads(item) for item in raw]
+
+    async def remove_pending_signal(self, session_id: str, index: int) -> dict | None:
+        """Remove a specific pending signal by index. Returns the signal or None."""
+        key = self._pending_key(session_id)
+        raw = await self.client.lrange(key, 0, -1)
+        if index < 0 or index >= len(raw):
+            return None
+        signal = json.loads(raw[index])
+        # Remove by value (set to sentinel, then remove sentinel)
+        sentinel = "__REMOVED__"
+        await self.client.lset(key, index, sentinel)
+        await self.client.lrem(key, 1, sentinel)
+        return signal
+
+    async def clear_pending_signals(self, session_id: str):
+        """Delete all pending signals for a session."""
+        key = self._pending_key(session_id)
+        await self.client.delete(key)
 
     # =============================================================
     # STATISTICS

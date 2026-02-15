@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.core import get_settings
 from src.storage import get_neo4j_store, get_qdrant_store, get_redis_store
 
-from .routes import admin, memory, search, session
+from .routes import admin, ingest, memory, search, session
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -74,6 +74,7 @@ app.include_router(memory.router, prefix="/memory", tags=["memory"])
 app.include_router(search.router, prefix="/search", tags=["search"])
 app.include_router(session.router, prefix="/session", tags=["session"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(ingest.router, prefix="/ingest", tags=["ingest"])
 
 
 @app.get("/health")

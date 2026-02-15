@@ -1,5 +1,5 @@
 """API routes."""
 
-from . import admin, memory, search, session
+from . import admin, ingest, memory, search, session
 
-__all__ = ["admin", "memory", "search", "session"]
+__all__ = ["admin", "ingest", "memory", "search", "session"]

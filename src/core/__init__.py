@@ -2,6 +2,7 @@
 
 from .config import Settings, get_settings
 from .embeddings import EmbeddingService, get_embedding_service
+from .llm import LLMError, OllamaLLM, get_llm
 from .models import (
     AntiPattern,
     ConsolidationResult,
@@ -24,6 +25,10 @@ __all__ = [
     # Embeddings
     "EmbeddingService",
     "get_embedding_service",
+    # LLM
+    "OllamaLLM",
+    "LLMError",
+    "get_llm",
     # Models
     "Memory",
     "MemoryType",

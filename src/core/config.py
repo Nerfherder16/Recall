@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 24
     working_memory_limit: int = 20
 
+    # Signal Detection
+    signal_confidence_auto_store: float = 0.75
+    signal_confidence_pending: float = 0.4
+    signal_context_window: int = 10
+    signal_max_turns_stored: int = 50
+    signal_detection_model: str = "qwen3:14b"
+    signal_detection_timeout: float = 180.0
+
     # Background Jobs
     consolidation_interval_hours: int = 1
     decay_interval_minutes: int = 30
