@@ -16,6 +16,7 @@ import structlog
 
 from .config import get_settings
 from .embeddings import content_hash, get_embedding_service
+from .llm import LLMError, get_llm
 from .models import (
     ConsolidationResult,
     Memory,
@@ -191,9 +192,9 @@ class MemoryConsolidator:
         if not cluster:
             return None
 
-        # Combine content
+        # Combine content via LLM summarization
         contents = [m.content for m in cluster]
-        merged_content = self._merge_contents(contents)
+        merged_content = await self._merge_contents(contents)
 
         # Aggregate properties
         avg_importance = sum(m.importance for m in cluster) / len(cluster)
@@ -260,19 +261,17 @@ class MemoryConsolidator:
             memories_superseded=len(cluster),
         )
 
-    def _merge_contents(self, contents: list[str]) -> str:
+    async def _merge_contents(self, contents: list[str]) -> str:
         """
-        Merge multiple content strings into one.
+        Merge multiple content strings into one using LLM summarization.
 
-        Simple approach: deduplicate and concatenate.
-        In production, use LLM to summarize.
+        Falls back to simple dedup+join if LLM is unavailable.
         """
-        # Remove near-duplicates
+        # Remove near-duplicates first
         unique = []
         for content in contents:
             is_dup = False
             for existing in unique:
-                # Simple check: if one is substring of other
                 if content in existing or existing in content:
                     is_dup = True
                     break
@@ -282,7 +281,25 @@ class MemoryConsolidator:
         if len(unique) == 1:
             return unique[0]
 
-        # Combine with separator
+        # Try LLM-powered merge
+        try:
+            llm = await get_llm()
+            numbered = "\n".join(f"{i+1}. {c}" for i, c in enumerate(unique))
+            prompt = (
+                "Merge these overlapping memory fragments into a single, concise memory. "
+                "Preserve all unique facts and details. Do not add information that isn't present. "
+                "Return ONLY the merged text, no preamble.\n\n"
+                f"Fragments:\n{numbered}\n\nMerged memory:"
+            )
+            merged = await llm.generate(prompt, temperature=0.1)
+            merged = merged.strip()
+            if merged and len(merged) > 10:
+                logger.debug("llm_merge_success", fragments=len(unique), result_len=len(merged))
+                return merged
+        except (LLMError, Exception) as e:
+            logger.warning("llm_merge_failed_using_fallback", error=str(e))
+
+        # Fallback: join with separator
         return " | ".join(unique)
 
 

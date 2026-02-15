@@ -11,10 +11,13 @@ import structlog
 from src.core import (
     Memory,
     MemorySource,
+    Relationship,
+    RelationshipType,
     get_embedding_service,
     get_settings,
 )
 from src.core.embeddings import content_hash
+from src.core.models import SignalType
 from src.core.signal_detector import (
     SIGNAL_IMPORTANCE,
     SIGNAL_TO_MEMORY_TYPE,
@@ -72,9 +75,12 @@ async def _run_signal_detection(session_id: str):
     for signal in signals:
         if signal.confidence >= settings.signal_confidence_auto_store:
             # High confidence — auto-store as memory
-            stored = await _store_signal_as_memory(session_id, signal)
-            if stored:
+            memory_id = await _store_signal_as_memory(session_id, signal)
+            if memory_id:
                 auto_stored += 1
+                # Handle contradiction signals — find and supersede conflicting memory
+                if signal.signal_type == SignalType.CONTRADICTION:
+                    await _resolve_contradiction(memory_id, signal)
 
         elif signal.confidence >= settings.signal_confidence_pending:
             # Medium confidence — queue for review
@@ -108,11 +114,11 @@ async def _run_signal_detection(session_id: str):
     )
 
 
-async def _store_signal_as_memory(session_id: str, signal) -> bool:
+async def _store_signal_as_memory(session_id: str, signal) -> str | None:
     """
     Store a detected signal as a Memory in Qdrant + Neo4j.
 
-    Returns True if stored, False if duplicate.
+    Returns memory ID if stored, None if duplicate or error.
     """
     try:
         memory_type = SIGNAL_TO_MEMORY_TYPE.get(signal.signal_type)
@@ -129,7 +135,7 @@ async def _store_signal_as_memory(session_id: str, signal) -> bool:
                 signal_type=signal.signal_type.value,
                 existing_id=existing,
             )
-            return False
+            return None
 
         memory = Memory(
             content=signal.content,
@@ -158,7 +164,7 @@ async def _store_signal_as_memory(session_id: str, signal) -> bool:
         except Exception as neo4j_err:
             logger.error("neo4j_write_failed_compensating", id=memory.id, error=str(neo4j_err))
             await qdrant.delete(memory.id)
-            return False
+            return None
 
         logger.info(
             "signal_auto_stored",
@@ -166,7 +172,7 @@ async def _store_signal_as_memory(session_id: str, signal) -> bool:
             signal_type=signal.signal_type.value,
             confidence=signal.confidence,
         )
-        return True
+        return memory.id
 
     except Exception as e:
         logger.error(
@@ -174,4 +180,62 @@ async def _store_signal_as_memory(session_id: str, signal) -> bool:
             error=str(e),
             signal_type=signal.signal_type.value,
         )
-        return False
+        return None
+
+
+async def _resolve_contradiction(new_memory_id: str, signal) -> None:
+    """
+    Handle contradiction signals by finding and superseding the conflicting memory.
+
+    Searches for the most similar existing memory to the contradiction content,
+    creates a CONTRADICTS relationship, and marks the old one as superseded.
+    """
+    try:
+        qdrant = await get_qdrant_store()
+        neo4j = await get_neo4j_store()
+        embedding_service = await get_embedding_service()
+
+        # Search for the memory being contradicted
+        embedding = await embedding_service.embed(signal.content)
+        similar = await qdrant.search(
+            query_vector=embedding,
+            limit=5,
+        )
+
+        # Find the best match that isn't the new memory itself
+        for mem_id, similarity, payload in similar:
+            if mem_id == new_memory_id:
+                continue
+            if payload.get("superseded_by"):
+                continue
+            # Must be reasonably similar to be the contradicted memory
+            if similarity < 0.5:
+                continue
+
+            # Create CONTRADICTS relationship
+            relationship = Relationship(
+                source_id=new_memory_id,
+                target_id=mem_id,
+                relationship_type=RelationshipType.CONTRADICTS,
+                strength=signal.confidence,
+            )
+            await neo4j.create_relationship(relationship)
+
+            # Supersede the old memory
+            await qdrant.mark_superseded(mem_id, new_memory_id)
+            await neo4j.mark_superseded(mem_id, new_memory_id)
+
+            logger.info(
+                "contradiction_resolved",
+                new_memory=new_memory_id,
+                superseded_memory=mem_id,
+                similarity=round(similarity, 3),
+            )
+            return  # Only supersede the single best match
+
+    except Exception as e:
+        logger.error(
+            "contradiction_resolution_error",
+            new_memory=new_memory_id,
+            error=str(e),
+        )

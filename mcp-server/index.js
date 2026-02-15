@@ -213,6 +213,41 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "recall_session_start",
+        description: "Start a new Recall session. Call this at the beginning of a conversation or work session. Returns a session ID for use with recall_ingest and recall_session_end.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            working_directory: {
+              type: "string",
+              description: "Current working directory path",
+            },
+            current_task: {
+              type: "string",
+              description: "Description of the current task",
+            },
+          },
+        },
+      },
+      {
+        name: "recall_session_end",
+        description: "End a Recall session. Cleans up pending signals and optionally triggers consolidation of session memories.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            session_id: {
+              type: "string",
+              description: "Session ID to end",
+            },
+            trigger_consolidation: {
+              type: "boolean",
+              description: "Whether to trigger memory consolidation (default true)",
+            },
+          },
+          required: ["session_id"],
+        },
+      },
+      {
         name: "recall_ingest",
         description: "Ingest conversation turns for automatic signal detection. Call this after each meaningful exchange to let Recall auto-detect and store important signals (error fixes, decisions, facts, workflows, etc.) as memories. Requires an active session.",
         inputSchema: {
@@ -379,6 +414,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: `Similar memories:\n\n${formatted}`,
+            },
+          ],
+        };
+      }
+
+      case "recall_session_start": {
+        const body = {};
+        if (args.working_directory) body.working_directory = args.working_directory;
+        if (args.current_task) body.current_task = args.current_task;
+
+        const result = await recallAPI("/session/start", "POST", body);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Session started: ${result.session_id}\nStarted at: ${result.started_at}`,
+            },
+          ],
+        };
+      }
+
+      case "recall_session_end": {
+        const body = {
+          session_id: args.session_id,
+          trigger_consolidation: args.trigger_consolidation !== false,
+        };
+
+        const result = await recallAPI("/session/end", "POST", body);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Session ${result.session_id} ended. Memories: ${result.memories_in_session}. Consolidation: ${result.consolidation_queued ? "queued" : "skipped"}.`,
             },
           ],
         };

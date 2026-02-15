@@ -23,6 +23,7 @@ from src.core import (
     get_embedding_service,
 )
 from src.core.embeddings import content_hash
+from src.core.llm import LLMError, get_llm
 
 logger = structlog.get_logger()
 
@@ -195,9 +196,8 @@ class PatternExtractor:
             tag_counts[t] += 1
         common_tags = [t for t, c in tag_counts.items() if c >= len(cluster) // 2]
 
-        # Create pattern content
-        # In production, use LLM to summarize
-        pattern_content = self._extract_common_pattern(contents)
+        # Create pattern content via LLM summarization
+        pattern_content = await self._extract_common_pattern(contents)
 
         if not pattern_content:
             return None
@@ -260,34 +260,48 @@ class PatternExtractor:
 
         return pattern
 
-    def _extract_common_pattern(self, contents: list[str]) -> str | None:
+    async def _extract_common_pattern(self, contents: list[str]) -> str | None:
         """
-        Extract common pattern from multiple contents.
+        Extract common pattern from multiple contents using LLM.
 
-        Simple heuristic approach - in production use LLM.
+        Falls back to heuristic approach if LLM is unavailable.
         """
         if not contents:
             return None
 
-        # Find common words/phrases
+        # Try LLM-powered extraction
+        try:
+            llm = await get_llm()
+            numbered = "\n".join(f"{i+1}. {c}" for i, c in enumerate(contents))
+            prompt = (
+                "These episodic memories describe similar events that happened multiple times. "
+                "Extract the recurring pattern as a single, general statement. "
+                "Focus on WHAT keeps happening, not specific instances. "
+                "Return ONLY the pattern statement, no preamble.\n\n"
+                f"Episodes:\n{numbered}\n\nRecurring pattern:"
+            )
+            pattern = await llm.generate(prompt, temperature=0.1)
+            pattern = pattern.strip()
+            if pattern and len(pattern) > 10:
+                logger.debug("llm_pattern_extraction_success", episodes=len(contents), result_len=len(pattern))
+                return pattern
+        except (LLMError, Exception) as e:
+            logger.warning("llm_pattern_extraction_failed_using_fallback", error=str(e))
+
+        # Fallback: heuristic approach
         word_counts = defaultdict(int)
         for content in contents:
             words = set(content.lower().split())
             for word in words:
-                if len(word) > 3:  # Skip short words
+                if len(word) > 3:
                     word_counts[word] += 1
 
-        # Get words that appear in majority
         threshold = len(contents) // 2
         common_words = {w for w, c in word_counts.items() if c > threshold}
 
         if len(common_words) < 3:
             return None
 
-        # Use shortest content as base, filter to common words
         shortest = min(contents, key=len)
-
-        # Simple approach: prefix with "Pattern:"
         pattern = f"Pattern: {shortest}"
-
         return pattern if len(pattern) > 20 else None
