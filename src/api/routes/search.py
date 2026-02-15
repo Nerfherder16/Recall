@@ -63,6 +63,57 @@ class SearchResponse(BaseModel):
     query: str
 
 
+class BrowseResult(BaseModel):
+    """A lightweight search result for the 3-layer browse flow."""
+
+    id: str
+    summary: str
+    memory_type: str
+    domain: str
+    similarity: float
+    importance: float
+    created_at: str
+    tags: list[str]
+
+
+class BrowseResponse(BaseModel):
+    """Response from browse search."""
+
+    results: list[BrowseResult]
+    total: int
+    query: str
+
+
+class TimelineRequest(BaseModel):
+    """Request for chronological timeline view."""
+
+    anchor_id: str | None = None
+    domain: str | None = None
+    memory_type: str | None = None
+    limit: int = Field(default=20, ge=1, le=100)
+    before: int = Field(default=10, ge=0)
+    after: int = Field(default=10, ge=0)
+
+
+class TimelineEntry(BaseModel):
+    """A single timeline entry."""
+
+    id: str
+    summary: str
+    memory_type: str
+    domain: str
+    created_at: str
+    importance: float
+
+
+class TimelineResponse(BaseModel):
+    """Response from timeline view."""
+
+    entries: list[TimelineEntry]
+    total: int
+    anchor_id: str | None
+
+
 class ContextRequest(BaseModel):
     """Request for context assembly."""
 
@@ -86,6 +137,131 @@ class ContextResponse(BaseModel):
 # =============================================================
 # ROUTES
 # =============================================================
+
+
+@router.post("/browse", response_model=BrowseResponse)
+@limiter.limit("30/minute")
+async def browse_memories(request: Request, body: SearchRequest):
+    """
+    Token-efficient memory search.
+
+    Returns lightweight results with 120-char summaries instead of full content.
+    Use GET /memory/{id} to fetch full details for specific results.
+    """
+    try:
+        query = MemoryQuery(
+            text=body.query,
+            memory_types=body.memory_types,
+            domains=body.domains,
+            tags=body.tags,
+            min_importance=body.min_importance,
+            expand_relationships=body.expand_relationships,
+            max_depth=body.max_depth,
+            limit=body.limit,
+            session_id=body.session_id,
+            current_file=body.current_file,
+            current_task=body.current_task,
+            since=body.since,
+            until=body.until,
+        )
+
+        pipeline = await create_retrieval_pipeline()
+        results = await pipeline.retrieve(query)
+
+        browse_results = [
+            BrowseResult(
+                id=r.memory.id,
+                summary=r.memory.content[:120],
+                memory_type=r.memory.memory_type.value,
+                domain=r.memory.domain,
+                similarity=round(r.similarity, 4),
+                importance=r.memory.importance,
+                created_at=r.memory.created_at.isoformat(),
+                tags=r.memory.tags,
+            )
+            for r in results
+        ]
+
+        logger.info("browse_completed", query=body.query[:50], results=len(browse_results))
+
+        return BrowseResponse(
+            results=browse_results,
+            total=len(browse_results),
+            query=body.query,
+        )
+
+    except OllamaUnavailableError:
+        raise HTTPException(status_code=503, detail="Embedding service unavailable")
+    except Exception as e:
+        logger.error("browse_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/timeline", response_model=TimelineResponse)
+@limiter.limit("30/minute")
+async def timeline_view(request: Request, body: TimelineRequest):
+    """
+    Browse memories chronologically around an anchor point.
+
+    If anchor_id is provided, centers the timeline there.
+    Otherwise returns the most recent entries.
+    """
+    try:
+        from src.storage import get_qdrant_store
+
+        qdrant = await get_qdrant_store()
+
+        anchor_date = None
+        if body.anchor_id:
+            result = await qdrant.get(body.anchor_id)
+            if not result:
+                raise HTTPException(status_code=404, detail="Anchor memory not found")
+            _, payload = result
+            anchor_date = payload.get("created_at")
+
+        if anchor_date:
+            points = await qdrant.scroll_around(
+                anchor_date=anchor_date,
+                before=body.before,
+                after=body.after,
+                domain=body.domain,
+                memory_type=body.memory_type,
+            )
+        else:
+            # No anchor — return most recent
+            points = await qdrant.scroll_around(
+                anchor_date=datetime.utcnow().isoformat(),
+                before=body.limit,
+                after=0,
+                domain=body.domain,
+                memory_type=body.memory_type,
+            )
+
+        entries = [
+            TimelineEntry(
+                id=mid,
+                summary=payload.get("content", "")[:120],
+                memory_type=payload.get("memory_type", "semantic"),
+                domain=payload.get("domain", "general"),
+                created_at=payload.get("created_at", ""),
+                importance=payload.get("importance", 0.5),
+            )
+            for mid, payload in points
+        ]
+
+        logger.info("timeline_completed", entries=len(entries), anchor=body.anchor_id)
+
+        return TimelineResponse(
+            entries=entries,
+            total=len(entries),
+            anchor_id=body.anchor_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("timeline_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/query", response_model=SearchResponse)

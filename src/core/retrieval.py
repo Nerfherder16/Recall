@@ -58,11 +58,20 @@ class RetrievalPipeline:
             embedding_service = await get_embedding_service()
             query_embedding = await embedding_service.embed(query.text, prefix="query")
 
-        # Stage 2: Vector search
+        # Stage 2: Vector search (main collection + facts sub-embeddings)
         if query_embedding:
             vector_results = await self._vector_search(query, query_embedding)
             for result in vector_results:
                 results[result.memory.id] = result
+
+            # Also search facts collection for precise sub-embedding matches
+            fact_results = await self._fact_search(query, query_embedding, results)
+            for result in fact_results:
+                if result.memory.id not in results:
+                    results[result.memory.id] = result
+                else:
+                    # Boost score — fact-level match is more precise
+                    results[result.memory.id].score *= 1.1
 
         # Stage 3: Graph expansion
         if query.expand_relationships and results:
@@ -120,6 +129,49 @@ class RetrievalPipeline:
                     similarity=similarity,
                     graph_distance=0,
                     retrieval_path=[memory_id],
+                )
+            )
+
+        return results
+
+    async def _fact_search(
+        self, query: MemoryQuery, embedding: list[float],
+        existing_results: dict[str, RetrievalResult],
+    ) -> list[RetrievalResult]:
+        """Search facts sub-embeddings for precise matches, return parent memories."""
+        results = []
+        try:
+            fact_results = await self.qdrant.search_facts(
+                query_vector=embedding,
+                limit=query.limit,
+                domain=query.domains[0] if query.domains else None,
+            )
+        except Exception:
+            return results  # Facts collection might not exist yet
+
+        seen_parents = set(existing_results.keys())
+        for fact_id, similarity, fact_payload in fact_results:
+            parent_id = fact_payload.get("parent_id")
+            if not parent_id or parent_id in seen_parents:
+                continue
+            seen_parents.add(parent_id)
+
+            # Fetch parent memory
+            parent = await self.qdrant.get(parent_id)
+            if not parent:
+                continue
+
+            _, payload = parent
+            memory = self._payload_to_memory(parent_id, payload)
+
+            # Fact-level match gets a precision boost
+            results.append(
+                RetrievalResult(
+                    memory=memory,
+                    score=similarity * memory.importance * 1.15,
+                    similarity=similarity,
+                    graph_distance=0,
+                    retrieval_path=[parent_id],
                 )
             )
 

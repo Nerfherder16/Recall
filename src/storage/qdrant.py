@@ -62,6 +62,9 @@ class QdrantStore:
         # Create payload indexes for filtering
         await self._ensure_indexes()
 
+        # Create facts sub-embedding collection
+        await self.ensure_facts_collection()
+
     async def _ensure_indexes(self):
         """Create indexes for efficient filtering."""
         indexes = [
@@ -320,6 +323,194 @@ class QdrantStore:
             offset = next_offset
 
         return all_points
+
+    async def scroll_around(
+        self,
+        anchor_date: str,
+        before: int,
+        after: int,
+        domain: str | None = None,
+        memory_type: str | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """
+        Scroll memories around an anchor date for timeline view.
+
+        Returns (before + after) entries sorted by created_at.
+        """
+        base_conditions = []
+        if domain:
+            base_conditions.append(
+                FieldCondition(key="domain", match=MatchValue(value=domain))
+            )
+        if memory_type:
+            base_conditions.append(
+                FieldCondition(key="memory_type", match=MatchValue(value=memory_type))
+            )
+        base_conditions.append(
+            IsNullCondition(is_null=PayloadField(key="superseded_by"))
+        )
+
+        results = []
+
+        # Get entries BEFORE anchor (lte)
+        # Overscan and sort in Python for version compatibility
+        if before > 0:
+            before_conditions = base_conditions + [
+                FieldCondition(key="created_at", range=DatetimeRange(lte=anchor_date))
+            ]
+            before_points = []
+            offset = None
+            fetch_limit = min(before * 3, 200)  # Overscan to get closest entries
+            while len(before_points) < fetch_limit:
+                batch, next_offset = await self.client.scroll(
+                    collection_name=self.collection,
+                    scroll_filter=Filter(must=before_conditions),
+                    limit=min(100, fetch_limit - len(before_points)),
+                    offset=offset,
+                    with_payload=True,
+                )
+                for p in batch:
+                    before_points.append((str(p.id), p.payload or {}))
+                if next_offset is None or not batch:
+                    break
+                offset = next_offset
+
+            # Sort desc by created_at, take closest N to anchor
+            before_points.sort(key=lambda x: x[1].get("created_at", ""), reverse=True)
+            results.extend(before_points[:before])
+
+        # Get entries AFTER anchor (gt)
+        if after > 0:
+            after_conditions = base_conditions + [
+                FieldCondition(key="created_at", range=DatetimeRange(gt=anchor_date))
+            ]
+            after_points = []
+            offset = None
+            fetch_limit = min(after * 3, 200)
+            while len(after_points) < fetch_limit:
+                batch, next_offset = await self.client.scroll(
+                    collection_name=self.collection,
+                    scroll_filter=Filter(must=after_conditions),
+                    limit=min(100, fetch_limit - len(after_points)),
+                    offset=offset,
+                    with_payload=True,
+                )
+                for p in batch:
+                    after_points.append((str(p.id), p.payload or {}))
+                if next_offset is None or not batch:
+                    break
+                offset = next_offset
+
+            # Sort asc by created_at, take closest N to anchor
+            after_points.sort(key=lambda x: x[1].get("created_at", ""))
+            results.extend(after_points[:after])
+
+        # Final sort by created_at
+        results.sort(key=lambda x: x[1].get("created_at", ""))
+        return results
+
+    # --- Facts collection methods (sub-embeddings) ---
+
+    async def ensure_facts_collection(self):
+        """Create the facts sub-embedding collection if it doesn't exist."""
+        self.facts_collection = f"{self.collection}_facts"
+        collections = await self.client.get_collections()
+        exists = any(c.name == self.facts_collection for c in collections.collections)
+
+        if not exists:
+            await self.client.create_collection(
+                collection_name=self.facts_collection,
+                vectors_config=VectorParams(
+                    size=self.settings.embedding_dimensions,
+                    distance=Distance.COSINE,
+                ),
+            )
+            # Create indexes
+            for field_name, field_type in [
+                ("parent_id", "keyword"),
+                ("domain", "keyword"),
+                ("created_at", "datetime"),
+            ]:
+                try:
+                    await self.client.create_payload_index(
+                        collection_name=self.facts_collection,
+                        field_name=field_name,
+                        field_schema=field_type,
+                    )
+                except Exception:
+                    pass
+            logger.info("created_facts_collection", name=self.facts_collection)
+
+    async def store_fact(
+        self, parent_id: str, fact_content: str, fact_index: int,
+        embedding: list[float], domain: str = "general",
+    ) -> str:
+        """Store a single fact sub-embedding linked to a parent memory."""
+        from src.core.models import generate_id
+
+        fact_id = generate_id()
+        point = PointStruct(
+            id=fact_id,
+            vector=embedding,
+            payload={
+                "parent_id": parent_id,
+                "fact_content": fact_content,
+                "fact_index": fact_index,
+                "domain": domain,
+                "created_at": __import__("datetime").datetime.utcnow().isoformat(),
+            },
+        )
+        await self.client.upsert(
+            collection_name=self.facts_collection,
+            points=[point],
+        )
+        return fact_id
+
+    async def search_facts(
+        self, query_vector: list[float], limit: int = 10,
+        domain: str | None = None,
+    ) -> list[tuple[str, float, dict[str, Any]]]:
+        """Search the facts collection for matching sub-embeddings."""
+        conditions = []
+        if domain:
+            conditions.append(
+                FieldCondition(key="domain", match=MatchValue(value=domain))
+            )
+        search_filter = Filter(must=conditions) if conditions else None
+
+        results = await self.client.query_points(
+            collection_name=self.facts_collection,
+            query=query_vector,
+            limit=limit,
+            query_filter=search_filter,
+            with_payload=True,
+        )
+        return [
+            (str(r.id), r.score, r.payload)
+            for r in results.points
+        ]
+
+    async def delete_facts_for_memory(self, parent_id: str):
+        """Delete all facts linked to a parent memory."""
+        await self.client.delete(
+            collection_name=self.facts_collection,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="parent_id",
+                        match=MatchValue(value=parent_id),
+                    )
+                ]
+            ),
+        )
+
+    async def count_facts(self) -> int:
+        """Get total number of facts in the sub-embedding collection."""
+        try:
+            info = await self.client.get_collection(self.facts_collection)
+            return info.points_count
+        except Exception:
+            return 0
 
     async def count(self) -> int:
         """Get total number of memories."""

@@ -107,7 +107,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_search",
-        description: "Search memories by semantic similarity. Returns relevant memories ranked by similarity score.",
+        description: "Search memories. Returns brief summaries (120 chars) — use recall_get for full details on specific results. Token-efficient: prefer this over recall_search_full.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Natural language search query",
+            },
+            limit: {
+              type: "integer",
+              minimum: 1,
+              maximum: 20,
+              description: "Maximum results to return (default 5)",
+            },
+            domain: {
+              type: "string",
+              description: "Optional domain filter",
+            },
+            memory_type: {
+              type: "string",
+              enum: ["semantic", "episodic", "procedural"],
+              description: "Optional type filter",
+            },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "recall_search_full",
+        description: "Full-content search returning complete memory content. Use recall_search first for token efficiency, then recall_get for specific items.",
         inputSchema: {
           type: "object",
           properties: {
@@ -138,6 +167,44 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ["query"],
+        },
+      },
+      {
+        name: "recall_timeline",
+        description: "Browse memories chronologically around a point in time. Returns brief summaries. Use recall_get for full details.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            anchor_id: {
+              type: "string",
+              description: "Memory ID to center the timeline on (optional — defaults to most recent)",
+            },
+            domain: {
+              type: "string",
+              description: "Optional domain filter",
+            },
+            memory_type: {
+              type: "string",
+              enum: ["semantic", "episodic", "procedural"],
+              description: "Optional type filter",
+            },
+            limit: {
+              type: "integer",
+              minimum: 1,
+              maximum: 100,
+              description: "Total entries to return (default 20)",
+            },
+            before: {
+              type: "integer",
+              minimum: 0,
+              description: "Entries before anchor (default 10)",
+            },
+            after: {
+              type: "integer",
+              minimum: 0,
+              description: "Entries after anchor (default 10)",
+            },
+          },
         },
       },
       {
@@ -317,6 +384,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
         if (args.domain) body.domains = [args.domain];
         if (args.memory_type) body.memory_types = [args.memory_type];
+
+        const result = await recallAPI("/search/browse", "POST", body);
+
+        if (result.results.length === 0) {
+          return {
+            content: [{ type: "text", text: "No memories found matching your query." }],
+          };
+        }
+
+        const formatted = result.results.map((m, i) =>
+          `${i + 1}. [${(m.similarity * 100).toFixed(1)}%] (${m.memory_type}) ID:${m.id}\n   ${m.summary}`
+        ).join("\n\n");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Found ${result.total} memories (use recall_get for full content):\n\n${formatted}`,
+            },
+          ],
+        };
+      }
+
+      case "recall_search_full": {
+        const body = {
+          query: args.query,
+          limit: args.limit || 5,
+        };
+        if (args.domain) body.domains = [args.domain];
+        if (args.memory_type) body.memory_types = [args.memory_type];
         if (args.min_similarity !== undefined) body.min_similarity = args.min_similarity;
 
         const result = await recallAPI("/search/query", "POST", body);
@@ -336,6 +433,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: `Found ${result.total} memories:\n\n${formatted}`,
+            },
+          ],
+        };
+      }
+
+      case "recall_timeline": {
+        const body = {};
+        if (args.anchor_id) body.anchor_id = args.anchor_id;
+        if (args.domain) body.domain = args.domain;
+        if (args.memory_type) body.memory_type = args.memory_type;
+        if (args.limit) body.limit = args.limit;
+        if (args.before !== undefined) body.before = args.before;
+        if (args.after !== undefined) body.after = args.after;
+
+        const result = await recallAPI("/search/timeline", "POST", body);
+
+        if (result.entries.length === 0) {
+          return {
+            content: [{ type: "text", text: "No memories in timeline range." }],
+          };
+        }
+
+        const formatted = result.entries.map((e, i) =>
+          `${i + 1}. [${e.created_at}] (${e.memory_type}) ID:${e.id}\n   ${e.summary}`
+        ).join("\n\n");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Timeline (${result.total} entries):\n\n${formatted}`,
             },
           ],
         };

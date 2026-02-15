@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.core import (
@@ -85,7 +85,7 @@ class CreateRelationshipRequest(BaseModel):
 
 
 @router.post("/store", response_model=StoreMemoryResponse)
-async def store_memory(request: StoreMemoryRequest):
+async def store_memory(request: StoreMemoryRequest, background_tasks: BackgroundTasks):
     """
     Store a new memory.
 
@@ -156,6 +156,13 @@ async def store_memory(request: StoreMemoryRequest):
             details={"type": memory.memory_type.value, "domain": memory.domain},
         )
 
+        # Trigger sub-embedding extraction in background
+        from src.workers.fact_extractor import extract_facts_for_memory
+
+        background_tasks.add_task(
+            extract_facts_for_memory, memory.id, request.content, request.domain
+        )
+
         return StoreMemoryResponse(
             id=memory.id,
             content_hash=memory.content_hash,
@@ -215,9 +222,13 @@ async def delete_memory(memory_id: str):
         qdrant = await get_qdrant_store()
         neo4j = await get_neo4j_store()
 
-        # Delete from both stores
+        # Delete from both stores + facts sub-embeddings
         await qdrant.delete(memory_id)
         await neo4j.delete_memory(memory_id)
+        try:
+            await qdrant.delete_facts_for_memory(memory_id)
+        except Exception:
+            pass  # Facts collection might not exist yet
 
         logger.info("deleted_memory", id=memory_id)
 

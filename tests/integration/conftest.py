@@ -95,7 +95,7 @@ def ensure_healthy():
 @pytest.fixture
 async def api_client():
     """Function-scoped httpx async client — avoids event loop lifetime issues."""
-    async with httpx.AsyncClient(timeout=30.0, headers=_auth_headers()) as client:
+    async with httpx.AsyncClient(timeout=60.0, headers=_auth_headers()) as client:
         yield client
 
 

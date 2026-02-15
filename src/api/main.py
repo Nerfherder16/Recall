@@ -24,7 +24,7 @@ from src.core.metrics import get_metrics
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, get_redis_store
 
 from .rate_limit import limiter
-from .routes import admin, ingest, memory, ops, search, session
+from .routes import admin, events, ingest, memory, observe, ops, search, session
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -191,6 +191,14 @@ app.include_router(
     ops.router, prefix="/admin", tags=["ops"],
     dependencies=[Depends(require_auth)],
 )
+app.include_router(
+    observe.router, prefix="/observe", tags=["observe"],
+    dependencies=[Depends(require_auth)],
+)
+app.include_router(
+    events.router, prefix="/events", tags=["events"],
+    dependencies=[Depends(require_auth)],
+)
 
 
 # =============================================================
@@ -336,13 +344,33 @@ async def prometheus_metrics():
     )
 
 
-@app.get("/dashboard", dependencies=[Depends(require_auth)])
-async def dashboard():
-    """Serve the ops dashboard."""
+@app.get("/dashboard-legacy", dependencies=[Depends(require_auth)])
+async def dashboard_legacy():
+    """Serve the legacy ops dashboard."""
     html_path = Path(__file__).parent / "static" / "dashboard.html"
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Dashboard not found")
     return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+
+
+# Serve React SPA dashboard if built, otherwise fall back to legacy
+_dashboard_dir = Path(__file__).parent / "static" / "dashboard"
+if _dashboard_dir.exists():
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount(
+        "/dashboard",
+        StaticFiles(directory=str(_dashboard_dir), html=True),
+        name="dashboard",
+    )
+else:
+    @app.get("/dashboard", dependencies=[Depends(require_auth)])
+    async def dashboard():
+        """Serve the ops dashboard (legacy HTML fallback)."""
+        html_path = Path(__file__).parent / "static" / "dashboard.html"
+        if not html_path.exists():
+            raise HTTPException(status_code=404, detail="Dashboard not found")
+        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
