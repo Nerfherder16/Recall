@@ -18,7 +18,7 @@ import uuid
 import httpx
 import pytest
 
-from .conftest import API_BASE
+from .conftest import API_BASE, _auth_headers
 
 # Ollama is single-threaded: LLM generate must finish before embedding calls work.
 # These sleeps account for model cold start (~10s) + generation (~15-30s).
@@ -168,7 +168,7 @@ async def test_signal_detection_produces_memories(
     Uses its own client with a longer timeout since the search call
     needs Ollama for embedding after the LLM generate finishes.
     """
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, headers=_auth_headers()) as client:
         session = await active_session()
         sid = session["session_id"]
 
@@ -221,7 +221,7 @@ async def test_pending_signals(active_session, cleanup):
     Note: Whether signals land in pending vs auto-store depends on LLM confidence.
     This test verifies the pending endpoint works.
     """
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, headers=_auth_headers()) as client:
         session = await active_session()
         sid = session["session_id"]
 
@@ -252,7 +252,7 @@ async def test_approve_pending_signal(active_session, cleanup):
     """
     Ingest a turn, wait for LLM, then check for pending signals and approve.
     """
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, headers=_auth_headers()) as client:
         session = await active_session()
         sid = session["session_id"]
 
@@ -290,7 +290,7 @@ async def test_approve_pending_signal(active_session, cleanup):
 @pytest.mark.slow
 async def test_dedup_prevents_duplicate_signals(active_session, cleanup):
     """Ingesting the same conversation twice doesn't create duplicate memories."""
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, headers=_auth_headers()) as client:
         session = await active_session()
         sid = session["session_id"]
 

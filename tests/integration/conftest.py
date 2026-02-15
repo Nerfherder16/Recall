@@ -6,6 +6,7 @@ Each test gets a unique domain for isolation, and cleanup
 deletes all created resources after each test.
 """
 
+import os
 import uuid
 from dataclasses import dataclass, field
 
@@ -13,6 +14,7 @@ import httpx
 import pytest
 
 API_BASE = "http://192.168.50.19:8200"
+API_KEY = os.environ.get("RECALL_API_KEY", "")
 
 
 # =============================================================
@@ -66,6 +68,13 @@ def pytest_configure(config):
 # =============================================================
 
 
+def _auth_headers() -> dict[str, str]:
+    """Return auth headers if API key is configured."""
+    if API_KEY:
+        return {"Authorization": f"Bearer {API_KEY}"}
+    return {}
+
+
 @pytest.fixture(scope="session", autouse=True)
 def ensure_healthy():
     """Skip all tests if the API is not reachable or unhealthy."""
@@ -86,7 +95,7 @@ def ensure_healthy():
 @pytest.fixture
 async def api_client():
     """Function-scoped httpx async client — avoids event loop lifetime issues."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30.0, headers=_auth_headers()) as client:
         yield client
 
 

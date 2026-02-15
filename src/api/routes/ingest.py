@@ -33,8 +33,8 @@ router = APIRouter()
 class Turn(BaseModel):
     """A single conversation turn."""
 
-    role: str
-    content: str
+    role: str = Field(..., max_length=20)
+    content: str = Field(..., min_length=1, max_length=50000)
     timestamp: str | None = None
 
 
@@ -42,7 +42,7 @@ class IngestTurnsRequest(BaseModel):
     """Request to ingest conversation turns."""
 
     session_id: str
-    turns: list[Turn] = Field(..., min_length=1)
+    turns: list[Turn] = Field(..., min_length=1, max_length=50)
 
 
 class IngestTurnsResponse(BaseModel):

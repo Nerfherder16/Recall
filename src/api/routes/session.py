@@ -95,7 +95,7 @@ async def start_session(request: StartSessionRequest):
 
     except Exception as e:
         logger.error("start_session_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/end")
@@ -149,7 +149,7 @@ async def end_session(request: EndSessionRequest, background_tasks: BackgroundTa
         raise
     except Exception as e:
         logger.error("end_session_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 async def _run_session_end_consolidation(session_id: str):
@@ -201,7 +201,7 @@ async def get_session_status(session_id: str):
         raise
     except Exception as e:
         logger.error("get_session_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{session_id}/working-memory")
@@ -243,7 +243,7 @@ async def get_working_memory(session_id: str):
         raise
     except Exception as e:
         logger.error("get_working_memory_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/{session_id}/context")
@@ -278,4 +278,4 @@ async def update_session_context(
         raise
     except Exception as e:
         logger.error("update_context_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

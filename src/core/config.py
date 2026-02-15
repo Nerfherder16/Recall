@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     signal_detection_model: str = "qwen3:14b"
     signal_detection_timeout: float = 180.0
 
+    # Security
+    api_key: str = ""  # Empty = auth disabled (dev mode)
+    allowed_origins: str = "*"  # Comma-separated origins, or "*" for all
+    max_content_length: int = 50000  # Max chars for memory content / turn content
+    max_turns_per_request: int = 50  # Max turns per ingest request
+
     # Background Jobs
     consolidation_interval_hours: int = 1
     decay_interval_minutes: int = 30

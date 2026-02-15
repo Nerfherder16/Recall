@@ -32,11 +32,11 @@ router = APIRouter()
 class StoreMemoryRequest(BaseModel):
     """Request to store a new memory."""
 
-    content: str
+    content: str = Field(..., min_length=1, max_length=50000)
     memory_type: MemoryType = MemoryType.SEMANTIC
     source: MemorySource = MemorySource.USER
-    domain: str = "general"
-    tags: list[str] = []
+    domain: str = Field(default="general", max_length=200)
+    tags: list[str] = Field(default=[], max_length=50)
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     session_id: str | None = None
@@ -157,7 +157,7 @@ async def store_memory(request: StoreMemoryRequest):
 
     except Exception as e:
         logger.error("store_memory_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{memory_id}", response_model=MemoryResponse)
@@ -195,7 +195,7 @@ async def get_memory(memory_id: str):
         if "wrong input" in err or "uuid" in err or "bad request" in err:
             raise HTTPException(status_code=404, detail="Memory not found")
         logger.error("get_memory_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/{memory_id}")
@@ -218,7 +218,7 @@ async def delete_memory(memory_id: str):
         if "wrong input" in err or "uuid" in err or "bad request" in err:
             raise HTTPException(status_code=404, detail="Memory not found")
         logger.error("delete_memory_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/relationship")
@@ -250,7 +250,7 @@ async def create_relationship(request: CreateRelationshipRequest):
 
     except Exception as e:
         logger.error("create_relationship_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{memory_id}/related")
@@ -275,4 +275,4 @@ async def get_related_memories(
 
     except Exception as e:
         logger.error("get_related_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -94,7 +94,7 @@ async def trigger_consolidation(request: ConsolidateRequest):
 
     except Exception as e:
         logger.error("consolidation_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/decay", response_model=DecayResponse)
@@ -111,4 +111,4 @@ async def trigger_decay(request: DecayRequest):
 
     except Exception as e:
         logger.error("decay_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

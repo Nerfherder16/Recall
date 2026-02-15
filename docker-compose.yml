@@ -79,6 +79,7 @@ services:
       - RECALL_POSTGRES_DSN=postgresql+asyncpg://recall:recallmemory@postgres:5432/recall
       - RECALL_REDIS_URL=redis://redis:6379
       - RECALL_OLLAMA_HOST=http://192.168.50.62:11434
+      - RECALL_API_KEY=${RECALL_API_KEY:-}
     depends_on:
       - qdrant
       - neo4j
@@ -104,6 +105,7 @@ services:
       - RECALL_POSTGRES_DSN=postgresql+asyncpg://recall:recallmemory@postgres:5432/recall
       - RECALL_REDIS_URL=redis://redis:6379
       - RECALL_OLLAMA_HOST=http://192.168.50.62:11434
+      - RECALL_API_KEY=${RECALL_API_KEY:-}
     depends_on:
       - qdrant
       - neo4j

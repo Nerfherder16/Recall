@@ -144,7 +144,7 @@ async def search_memories(request: SearchRequest):
 
     except Exception as e:
         logger.error("search_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/context", response_model=ContextResponse)
@@ -248,7 +248,7 @@ async def assemble_context(request: ContextRequest):
 
     except Exception as e:
         logger.error("context_assembly_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/similar/{memory_id}")
@@ -292,4 +292,4 @@ async def find_similar(memory_id: str, limit: int = 5):
         if "wrong input" in err or "uuid" in err or "bad request" in err:
             raise HTTPException(status_code=404, detail="Memory not found")
         logger.error("find_similar_error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

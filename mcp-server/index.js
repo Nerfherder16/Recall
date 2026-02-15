@@ -22,13 +22,18 @@ import {
 
 // Configuration - can override with env vars
 const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 
 // Helper for API calls
 async function recallAPI(endpoint, method = "GET", body = null) {
   const url = `${RECALL_HOST}${endpoint}`;
+  const headers = { "Content-Type": "application/json" };
+  if (RECALL_API_KEY) {
+    headers["Authorization"] = `Bearer ${RECALL_API_KEY}`;
+  }
   const options = {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers,
   };
   if (body) {
     options.body = JSON.stringify(body);
