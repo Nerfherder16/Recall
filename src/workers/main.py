@@ -132,29 +132,6 @@ async def run_pattern_extraction(ctx: dict):
         raise
 
 
-async def process_event(ctx: dict, event_type: str, payload: dict):
-    """Process events from the event bus."""
-    logger.debug("processing_event", type=event_type)
-
-    if event_type == "session_ended":
-        # Consolidate session memories
-        memory_ids = payload.get("memory_ids", [])
-        if len(memory_ids) >= 2:
-            from src.core.consolidation import create_consolidator
-
-            consolidator = await create_consolidator()
-            # Note: Would need to filter consolidation to these specific memories
-            await consolidator.consolidate()
-
-    elif event_type == "memory_stored":
-        # Could trigger relationship linking here
-        memory_id = payload.get("memory_id")
-        # Future: auto-link to similar memories
-
-    else:
-        logger.warning("unknown_event_type", type=event_type)
-
-
 class WorkerSettings:
     """ARQ worker settings."""
 
@@ -162,7 +139,6 @@ class WorkerSettings:
         run_consolidation,
         run_decay,
         run_pattern_extraction,
-        process_event,
     ]
 
     cron_jobs = [

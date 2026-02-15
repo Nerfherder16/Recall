@@ -5,7 +5,7 @@ Session management routes.
 from datetime import datetime
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from src.core import Session
@@ -99,11 +99,12 @@ async def start_session(request: StartSessionRequest):
 
 
 @router.post("/end")
-async def end_session(request: EndSessionRequest):
+async def end_session(request: EndSessionRequest, background_tasks: BackgroundTasks):
     """
     End a session.
 
-    Optionally triggers consolidation of session memories.
+    Cleans up pending signals and optionally triggers consolidation
+    of session memories via BackgroundTasks.
     """
     try:
         redis = await get_redis_store()
@@ -119,28 +120,29 @@ async def end_session(request: EndSessionRequest):
         # Get working memory for consolidation
         working_memory = await redis.get_working_memory(request.session_id)
 
-        # TODO: If trigger_consolidation, queue consolidation job
-        if request.trigger_consolidation and working_memory:
-            # Publish event for worker
-            await redis.publish_event(
-                "session_ended",
-                {
-                    "session_id": request.session_id,
-                    "memory_ids": working_memory,
-                },
+        # Clean up pending signals (no longer reviewable after session ends)
+        await redis.clear_pending_signals(request.session_id)
+
+        # Trigger consolidation as a BackgroundTask (replaces dead event stream)
+        consolidation_queued = False
+        if request.trigger_consolidation and len(working_memory) >= 2:
+            background_tasks.add_task(
+                _run_session_end_consolidation, request.session_id
             )
+            consolidation_queued = True
 
         logger.info(
             "session_ended",
             id=request.session_id,
             memories=len(working_memory),
+            consolidation_queued=consolidation_queued,
         )
 
         return {
             "session_id": request.session_id,
             "ended": True,
             "memories_in_session": len(working_memory),
-            "consolidation_queued": request.trigger_consolidation and len(working_memory) > 0,
+            "consolidation_queued": consolidation_queued,
         }
 
     except HTTPException:
@@ -148,6 +150,28 @@ async def end_session(request: EndSessionRequest):
     except Exception as e:
         logger.error("end_session_error", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _run_session_end_consolidation(session_id: str):
+    """Background task: consolidate memories from an ended session."""
+    try:
+        from src.core.consolidation import create_consolidator
+
+        consolidator = await create_consolidator()
+        results = await consolidator.consolidate()
+
+        logger.info(
+            "session_end_consolidation_complete",
+            session_id=session_id,
+            clusters_merged=len(results),
+        )
+    except Exception as e:
+        logger.error(
+            "session_end_consolidation_failed",
+            session_id=session_id,
+            error=str(e),
+            error_type=type(e).__name__,
+        )
 
 
 @router.get("/{session_id}", response_model=SessionStatusResponse)

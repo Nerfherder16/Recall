@@ -7,6 +7,7 @@ Main entry point for the memory system.
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+import httpx
 import structlog
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,6 +53,19 @@ async def lifespan(app: FastAPI):
         if redis:
             await redis.close()
 
+        # Reset singleton globals so hot-reload creates fresh connections
+        import src.storage.qdrant as _qdrant_mod
+        import src.storage.neo4j_store as _neo4j_mod
+        import src.storage.redis_store as _redis_mod
+        import src.core.embeddings as _embed_mod
+        import src.core.llm as _llm_mod
+
+        _qdrant_mod._store = None
+        _neo4j_mod._store = None
+        _redis_mod._store = None
+        _embed_mod._embedding_service = None
+        _llm_mod._llm = None
+
 
 app = FastAPI(
     title="Recall",
@@ -85,6 +99,7 @@ async def health_check():
         "qdrant": "unknown",
         "neo4j": "unknown",
         "redis": "unknown",
+        "ollama": "unknown",
     }
 
     try:
@@ -107,6 +122,17 @@ async def health_check():
         checks["redis"] = f"ok ({sessions} sessions)"
     except Exception as e:
         checks["redis"] = f"error: {e}"
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(f"{settings.ollama_host}/api/tags")
+            if r.status_code == 200:
+                models = [m.get("name", "") for m in r.json().get("models", [])]
+                checks["ollama"] = f"ok ({len(models)} models)"
+            else:
+                checks["ollama"] = f"error: status {r.status_code}"
+    except Exception as e:
+        checks["ollama"] = f"error: {type(e).__name__}"
 
     healthy = all("ok" in str(v) for v in checks.values())
 
