@@ -22,7 +22,7 @@ from src.core import (
     RelationshipType,
     get_embedding_service,
 )
-from src.core.embeddings import content_hash
+from src.core.embeddings import OllamaUnavailableError, content_hash
 from src.core.llm import LLMError, get_llm
 
 logger = structlog.get_logger()
@@ -203,8 +203,12 @@ class PatternExtractor:
             return None
 
         # Check for duplicates
-        embedding_service = await get_embedding_service()
-        pattern_embedding = await embedding_service.embed(pattern_content)
+        try:
+            embedding_service = await get_embedding_service()
+            pattern_embedding = await embedding_service.embed(pattern_content)
+        except OllamaUnavailableError:
+            logger.warning("pattern_creation_ollama_unavailable")
+            return None
 
         # Check if similar pattern exists
         existing = await self.qdrant.search(

@@ -15,7 +15,7 @@ import numpy as np
 import structlog
 
 from .config import get_settings
-from .embeddings import content_hash, get_embedding_service
+from .embeddings import OllamaUnavailableError, content_hash, get_embedding_service
 from .llm import LLMError, get_llm
 from .models import (
     ConsolidationResult,
@@ -222,7 +222,11 @@ class MemoryConsolidator:
         )
 
         # Generate embedding for merged content
-        embedding = await self.embeddings.embed(merged_content)
+        try:
+            embedding = await self.embeddings.embed(merged_content)
+        except OllamaUnavailableError:
+            logger.warning("consolidation_merge_ollama_unavailable")
+            return None
 
         # Store merged memory — compensating delete on Neo4j failure
         await self.qdrant.store(merged, embedding)
@@ -246,6 +250,23 @@ class MemoryConsolidator:
             # Mark source as superseded in both stores
             await self.qdrant.mark_superseded(source_memory.id, merged.id)
             await self.neo4j.mark_superseded(source_memory.id, merged.id)
+
+        # Audit log — consolidation merge + supersedes
+        try:
+            from src.storage import get_postgres_store
+            pg = await get_postgres_store()
+            source_ids = [m.id for m in cluster]
+            await pg.log_audit(
+                "consolidate", merged.id, actor="consolidation",
+                details={"source_ids": source_ids, "source_count": len(source_ids)},
+            )
+            for source_memory in cluster:
+                await pg.log_audit(
+                    "supersede", source_memory.id, actor="consolidation",
+                    details={"superseded_by": merged.id},
+                )
+        except Exception as audit_err:
+            logger.warning("consolidation_audit_failed", error=str(audit_err))
 
         logger.info(
             "merged_memories",

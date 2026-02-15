@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recall Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --muted: #8b8fa3;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+    background: var(--bg);
+    color: var(--text);
+    padding: 1.5rem;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+  h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+  }
+  .card-full { grid-column: 1 / -1; }
+  .stat { display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+  .stat:last-child { border-bottom: none; }
+  .stat-label { color: var(--muted); }
+  .stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ok { color: var(--green); }
+  .warn { color: var(--yellow); }
+  .err { color: var(--red); }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .badge-ok { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-err { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-warn { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(168,85,247,0.15); color: var(--purple); }
+  button {
+    background: var(--blue);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin: 0.25rem;
+    transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary { background: var(--border); }
+  button.danger { background: var(--red); }
+  button.small { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+  .signal-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .signal-meta { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+  .signal-content { font-size: 0.9rem; margin-bottom: 0.5rem; }
+  #auth-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  #auth-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+  }
+  #auth-box input {
+    width: 100%;
+    padding: 0.6rem;
+    margin: 1rem 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  input, select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+  }
+  .filter-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+  .filter-row label { color: var(--muted); font-size: 0.8rem; }
+  .log { font-size: 0.8rem; color: var(--muted); max-height: 200px; overflow-y: auto; margin-top: 0.5rem; }
+  .log-entry { padding: 0.15rem 0; border-bottom: 1px solid var(--border); }
+  .refresh-info { font-size: 0.75rem; color: var(--muted); float: right; }
+  .scroll-table { max-height: 350px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  th { text-align: left; color: var(--muted); padding: 0.4rem; border-bottom: 2px solid var(--border); position: sticky; top: 0; background: var(--surface); }
+  td { padding: 0.4rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td.mono { font-family: monospace; font-size: 0.75rem; }
+  .search-result {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .search-result-meta { font-size: 0.75rem; color: var(--muted); display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.25rem; }
+  .search-result-content { font-size: 0.85rem; }
+  .truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2 style="color:var(--text);text-transform:none">Recall Dashboard</h2>
+    <p style="color:var(--muted);font-size:0.9rem">Enter your API key to continue</p>
+    <input type="password" id="auth-input" placeholder="API key" autofocus>
+    <button onclick="authenticate()">Connect</button>
+  </div>
+</div>
+
+<h1>Recall Dashboard <span class="refresh-info">Refreshes every 10s</span></h1>
+
+<!-- Health -->
+<h2>System Health</h2>
+<div class="grid" id="health-grid">
+  <div class="card" id="health-card">Loading...</div>
+</div>
+
+<!-- Stats -->
+<h2>Memory Stats</h2>
+<div class="grid" id="stats-grid">
+  <div class="card" id="stats-card">Loading...</div>
+  <div class="card" id="metrics-card">Loading...</div>
+</div>
+
+<!-- Admin Actions -->
+<h2>Admin Actions</h2>
+<div class="grid">
+  <div class="card card-full">
+    <div class="actions">
+      <button onclick="runAction('/admin/consolidate', 'POST')">Run Consolidation</button>
+      <button onclick="runAction('/admin/decay', 'POST')">Run Decay</button>
+      <button onclick="runAction('/admin/reconcile?repair=false', 'POST')">Reconcile (Report)</button>
+      <button class="secondary" onclick="runAction('/admin/reconcile?repair=true', 'POST')">Reconcile (Repair)</button>
+      <button class="secondary" onclick="downloadExport()">Download Export</button>
+    </div>
+    <div class="log" id="action-log"></div>
+  </div>
+</div>
+
+<!-- Audit Log Viewer -->
+<h2>Audit Log</h2>
+<div class="grid">
+  <div class="card card-full">
+    <div class="filter-row">
+      <label>Action:</label>
+      <select id="audit-action">
+        <option value="">All</option>
+        <option value="create">create</option>
+        <option value="delete">delete</option>
+        <option value="supersede">supersede</option>
+        <option value="consolidate">consolidate</option>
+        <option value="decay">decay</option>
+      </select>
+      <label>Memory ID:</label>
+      <input type="text" id="audit-memory-id" placeholder="optional" style="width:220px">
+      <button onclick="loadAuditLog()">Load</button>
+    </div>
+    <div class="scroll-table" id="audit-table">
+      <span class="stat-label">Click Load to fetch audit entries</span>
+    </div>
+  </div>
+</div>
+
+<!-- Session History -->
+<h2>Session History</h2>
+<div class="grid">
+  <div class="card card-full">
+    <div class="filter-row">
+      <button onclick="loadSessionHistory()">Load Sessions</button>
+    </div>
+    <div class="scroll-table" id="session-table">
+      <span class="stat-label">Click Load to fetch session history</span>
+    </div>
+  </div>
+</div>
+
+<!-- Memory Search -->
+<h2>Memory Search</h2>
+<div class="grid">
+  <div class="card card-full">
+    <div class="filter-row">
+      <input type="text" id="search-query" placeholder="Search query..." style="width:300px">
+      <label>Domain:</label>
+      <input type="text" id="search-domain" placeholder="optional" style="width:120px">
+      <button onclick="searchMemories()">Search</button>
+    </div>
+    <div id="search-results">
+      <span class="stat-label">Enter a query and click Search</span>
+    </div>
+  </div>
+</div>
+
+<!-- Signal Review -->
+<h2>Signal Review</h2>
+<div class="grid">
+  <div class="card card-full">
+    <div class="filter-row">
+      <label>Session ID:</label>
+      <input type="text" id="signal-session-id" placeholder="session UUID" style="width:300px">
+      <button onclick="loadSignals()">Load Signals</button>
+    </div>
+    <div id="signals-card">
+      <span class="stat-label">Enter a session ID and click Load Signals</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let API_KEY = sessionStorage.getItem('recall_api_key') || '';
+let pollTimer = null;
+
+function headers() {
+  const h = {'Content-Type': 'application/json'};
+  if (API_KEY) h['Authorization'] = 'Bearer ' + API_KEY;
+  return h;
+}
+
+function authenticate() {
+  API_KEY = document.getElementById('auth-input').value.trim();
+  if (!API_KEY) return;
+  sessionStorage.setItem('recall_api_key', API_KEY);
+  document.getElementById('auth-overlay').style.display = 'none';
+  refresh();
+  pollTimer = setInterval(refresh, 10000);
+}
+
+// Auto-connect if key cached
+if (API_KEY) {
+  document.getElementById('auth-overlay').style.display = 'none';
+  setTimeout(() => { refresh(); pollTimer = setInterval(refresh, 10000); }, 100);
+}
+
+async function refresh() {
+  await Promise.all([loadHealth(), loadStats(), loadMetrics()]);
+}
+
+async function loadHealth() {
+  try {
+    const r = await fetch(BASE + '/health');
+    const d = await r.json();
+    const card = document.getElementById('health-card');
+    let html = '';
+    const overall = d.status === 'healthy' ? 'badge-ok' : 'badge-warn';
+    html += `<div class="stat"><span class="stat-label">Overall</span><span class="badge ${overall}">${d.status}</span></div>`;
+    for (const [k, v] of Object.entries(d.checks || {})) {
+      const cls = String(v).startsWith('ok') ? 'ok' : 'err';
+      html += `<div class="stat"><span class="stat-label">${k}</span><span class="stat-value ${cls}">${v}</span></div>`;
+    }
+    card.innerHTML = html;
+  } catch(e) { document.getElementById('health-card').innerHTML = '<span class="err">Failed to load</span>'; }
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch(BASE + '/stats', {headers: headers()});
+    const d = await r.json();
+    const card = document.getElementById('stats-card');
+    let html = '';
+    html += `<div class="stat"><span class="stat-label">Total Memories</span><span class="stat-value">${d.memories?.total ?? '?'}</span></div>`;
+    html += `<div class="stat"><span class="stat-label">Graph Nodes</span><span class="stat-value">${d.memories?.graph_nodes ?? '?'}</span></div>`;
+    html += `<div class="stat"><span class="stat-label">Relationships</span><span class="stat-value">${d.memories?.relationships ?? '?'}</span></div>`;
+    html += `<div class="stat"><span class="stat-label">Active Sessions</span><span class="stat-value">${d.sessions?.active ?? '?'}</span></div>`;
+    card.innerHTML = html;
+  } catch(e) { document.getElementById('stats-card').innerHTML = '<span class="err">Failed to load</span>'; }
+}
+
+async function loadMetrics() {
+  try {
+    const r = await fetch(BASE + '/metrics');
+    const text = await r.text();
+    const card = document.getElementById('metrics-card');
+    const lines = text.split('\n').filter(l => l && !l.startsWith('#'));
+    const metrics = {};
+    for (const line of lines) {
+      const [key, val] = line.split(/\s+/);
+      if (key && val) metrics[key] = val;
+    }
+    let html = '<h2 style="margin-bottom:0.5rem">Counters</h2>';
+    const interesting = [
+      'recall_uptime_seconds',
+      'recall_memories_total',
+      'recall_llm_requests_total{model="qwen3:14b",status="success"}',
+      'recall_llm_requests_total{model="qwen3:14b",status="error"}',
+      'recall_embedding_requests_total{status="success"}',
+      'recall_signals_detected_total{outcome="auto"}',
+      'recall_signals_detected_total{outcome="pending"}',
+      'recall_consolidation_runs_total',
+      'recall_decay_runs_total',
+      'recall_pattern_runs_total',
+    ];
+    for (const k of interesting) {
+      if (metrics[k] !== undefined) {
+        const label = k.replace('recall_', '').replace(/{[^}]*}/g, m => ' ' + m);
+        const v = k.includes('seconds') ? parseFloat(metrics[k]).toFixed(1) + 's' : metrics[k];
+        html += `<div class="stat"><span class="stat-label" style="font-size:0.8rem">${label}</span><span class="stat-value">${v}</span></div>`;
+      }
+    }
+    for (const [k, v] of Object.entries(metrics)) {
+      if (!interesting.includes(k) && !k.endsWith('_sum') && !k.endsWith('_count') && k !== 'recall_uptime_seconds' && k !== 'recall_memories_total') {
+        const label = k.replace('recall_', '');
+        html += `<div class="stat"><span class="stat-label" style="font-size:0.8rem">${label}</span><span class="stat-value">${v}</span></div>`;
+      }
+    }
+    card.innerHTML = html;
+  } catch(e) { document.getElementById('metrics-card').innerHTML = '<span class="err">Failed to load metrics</span>'; }
+}
+
+// ==================== Audit Log ====================
+
+async function loadAuditLog() {
+  const container = document.getElementById('audit-table');
+  const action = document.getElementById('audit-action').value;
+  const memoryId = document.getElementById('audit-memory-id').value.trim();
+
+  const params = new URLSearchParams({limit: '100'});
+  if (action) params.set('action', action);
+  if (memoryId) params.set('memory_id', memoryId);
+
+  try {
+    container.innerHTML = '<span class="stat-label">Loading...</span>';
+    const r = await fetch(BASE + '/admin/audit?' + params, {headers: headers()});
+    const d = await r.json();
+    const entries = d.entries || [];
+
+    if (entries.length === 0) {
+      container.innerHTML = '<span class="stat-label">No audit entries found</span>';
+      return;
+    }
+
+    let html = '<table><thead><tr><th>Timestamp</th><th>Action</th><th>Memory ID</th><th>Actor</th><th>Details</th></tr></thead><tbody>';
+    for (const e of entries) {
+      const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '?';
+      const mid = e.memory_id ? e.memory_id.substring(0, 8) + '...' : '-';
+      const details = e.details ? JSON.stringify(e.details).substring(0, 80) : '-';
+      html += `<tr><td class="mono">${ts}</td><td><span class="badge badge-blue">${e.action}</span></td><td class="mono" title="${e.memory_id || ''}">${mid}</td><td>${e.actor || '-'}</td><td class="mono" title="${e.details ? JSON.stringify(e.details) : ''}">${details}</td></tr>`;
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch(e) { container.innerHTML = '<span class="err">Failed to load audit log</span>'; }
+}
+
+// ==================== Session History ====================
+
+async function loadSessionHistory() {
+  const container = document.getElementById('session-table');
+  try {
+    container.innerHTML = '<span class="stat-label">Loading...</span>';
+    const r = await fetch(BASE + '/admin/sessions?limit=50', {headers: headers()});
+    const d = await r.json();
+    const sessions = d.sessions || [];
+
+    if (sessions.length === 0) {
+      container.innerHTML = '<span class="stat-label">No archived sessions found</span>';
+      return;
+    }
+
+    let html = '<table><thead><tr><th>Session ID</th><th>Started</th><th>Ended</th><th>Task</th><th>Memories</th><th>Signals</th><th>Turns</th></tr></thead><tbody>';
+    for (const s of sessions) {
+      const sid = (s.session_id || '?').substring(0, 8) + '...';
+      const started = s.started_at ? new Date(s.started_at).toLocaleString() : '-';
+      const ended = s.ended_at ? new Date(s.ended_at).toLocaleString() : '-';
+      const task = (s.current_task || '-').substring(0, 40);
+      html += `<tr><td class="mono" title="${s.session_id || ''}">${sid}</td><td class="mono">${started}</td><td class="mono">${ended}</td><td title="${s.current_task || ''}">${task}</td><td>${s.memories_created ?? '-'}</td><td>${s.signals_detected ?? '-'}</td><td>${s.turns ?? '-'}</td></tr>`;
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch(e) { container.innerHTML = '<span class="err">Failed to load sessions</span>'; }
+}
+
+// ==================== Memory Search ====================
+
+async function searchMemories() {
+  const container = document.getElementById('search-results');
+  const query = document.getElementById('search-query').value.trim();
+  const domain = document.getElementById('search-domain').value.trim();
+
+  if (!query) { container.innerHTML = '<span class="warn">Enter a search query</span>'; return; }
+
+  const body = {query, limit: 20};
+  if (domain) body.domains = [domain];
+
+  try {
+    container.innerHTML = '<span class="stat-label">Searching...</span>';
+    const r = await fetch(BASE + '/search/query', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(body),
+    });
+
+    if (r.status === 503) {
+      container.innerHTML = '<span class="warn">Embedding service unavailable</span>';
+      return;
+    }
+
+    const d = await r.json();
+    const results = d.results || [];
+
+    if (results.length === 0) {
+      container.innerHTML = '<span class="stat-label">No results found</span>';
+      return;
+    }
+
+    let html = '';
+    for (const m of results) {
+      const typeCls = m.memory_type === 'semantic' ? 'badge-ok' : m.memory_type === 'episodic' ? 'badge-blue' : 'badge-purple';
+      html += `<div class="search-result">
+        <div class="search-result-meta">
+          <span class="badge ${typeCls}">${m.memory_type}</span>
+          <span>domain: ${m.domain}</span>
+          <span>score: ${m.score}</span>
+          <span>importance: ${m.importance}</span>
+          <span class="mono" title="${m.id}">${m.id.substring(0, 8)}...</span>
+        </div>
+        <div class="search-result-content">${escapeHtml(m.content)}</div>
+      </div>`;
+    }
+    container.innerHTML = html;
+  } catch(e) { container.innerHTML = '<span class="err">Search failed: ' + e.message + '</span>'; }
+}
+
+// ==================== Signal Review ====================
+
+async function loadSignals() {
+  const container = document.getElementById('signals-card');
+  const sessionId = document.getElementById('signal-session-id').value.trim();
+
+  if (!sessionId) { container.innerHTML = '<span class="warn">Enter a session ID</span>'; return; }
+
+  try {
+    container.innerHTML = '<span class="stat-label">Loading signals...</span>';
+    const r = await fetch(BASE + '/ingest/' + sessionId + '/signals', {headers: headers()});
+
+    if (r.status === 404) {
+      container.innerHTML = '<span class="warn">Session not found</span>';
+      return;
+    }
+
+    const signals = await r.json();
+
+    if (signals.length === 0) {
+      container.innerHTML = '<span class="stat-label">No pending signals for this session</span>';
+      return;
+    }
+
+    let html = '';
+    for (const s of signals) {
+      const confCls = s.confidence >= 0.7 ? 'badge-ok' : s.confidence >= 0.4 ? 'badge-warn' : 'badge-err';
+      html += `<div class="signal-item">
+        <div class="signal-meta">
+          <span class="badge badge-purple">${s.signal_type}</span>
+          <span class="badge ${confCls}">${(s.confidence * 100).toFixed(0)}%</span>
+          domain: ${s.domain} | tags: ${s.tags.join(', ') || 'none'}
+        </div>
+        <div class="signal-content">${escapeHtml(s.content)}</div>
+        <button class="small" onclick="approveSignal('${sessionId}', ${s.index})">Approve</button>
+      </div>`;
+    }
+    container.innerHTML = html;
+  } catch(e) { container.innerHTML = '<span class="err">Failed to load signals: ' + e.message + '</span>'; }
+}
+
+async function approveSignal(sessionId, index) {
+  try {
+    const r = await fetch(BASE + '/ingest/' + sessionId + '/signals/approve', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({index}),
+    });
+    const d = await r.json();
+    const log = document.getElementById('action-log');
+    const ts = new Date().toLocaleTimeString();
+    if (d.stored) {
+      log.innerHTML = `<div class="log-entry">[${ts}] Signal approved -> memory ${d.memory_id.substring(0, 8)}...</div>` + log.innerHTML;
+    } else {
+      log.innerHTML = `<div class="log-entry">[${ts}] Signal already stored as ${d.memory_id.substring(0, 8)}...</div>` + log.innerHTML;
+    }
+    // Reload signals
+    loadSignals();
+  } catch(e) {
+    const log = document.getElementById('action-log');
+    const ts = new Date().toLocaleTimeString();
+    log.innerHTML = `<div class="log-entry" style="color:var(--red)">[${ts}] Approve failed: ${e.message}</div>` + log.innerHTML;
+  }
+}
+
+// ==================== Shared ====================
+
+async function runAction(path, method) {
+  const log = document.getElementById('action-log');
+  const ts = new Date().toLocaleTimeString();
+  log.innerHTML = `<div class="log-entry">[${ts}] Running ${path}...</div>` + log.innerHTML;
+
+  try {
+    const r = await fetch(BASE + path, {method, headers: headers()});
+    const d = await r.json();
+    const ts2 = new Date().toLocaleTimeString();
+    log.innerHTML = `<div class="log-entry">[${ts2}] ${path} -> ${JSON.stringify(d).substring(0, 200)}</div>` + log.innerHTML;
+    setTimeout(refresh, 1000);
+  } catch(e) {
+    const ts2 = new Date().toLocaleTimeString();
+    log.innerHTML = `<div class="log-entry" style="color:var(--red)">[${ts2}] ${path} FAILED: ${e.message}</div>` + log.innerHTML;
+  }
+}
+
+function downloadExport() {
+  const url = BASE + '/admin/export';
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', url, true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + API_KEY);
+  xhr.responseType = 'blob';
+  xhr.onload = function() {
+    if (this.status === 200) {
+      const blob = this.response;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'recall-export.jsonl';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  };
+  xhr.send();
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Listen for Enter in auth input
+document.getElementById('auth-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') authenticate();
+});
+
+// Listen for Enter in search input
+document.getElementById('search-query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') searchMemories();
+});
+</script>
+</body>
+</html>

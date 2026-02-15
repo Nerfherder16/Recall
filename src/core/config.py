@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     max_content_length: int = 50000  # Max chars for memory content / turn content
     max_turns_per_request: int = 50  # Max turns per ingest request
 
+    # Rate Limiting
+    rate_limit_default: str = "60/minute"
+    rate_limit_search: str = "30/minute"
+    rate_limit_ingest: str = "20/minute"
+    rate_limit_admin: str = "10/minute"
+
+    # Operations
+    export_include_embeddings_default: bool = False
+    metrics_enabled: bool = True
+
     # Background Jobs
     consolidation_interval_hours: int = 1
     decay_interval_minutes: int = 30

@@ -16,6 +16,7 @@ from arq import cron
 from arq.connections import RedisSettings
 
 from src.core import get_settings
+from src.core.metrics import get_metrics
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -63,6 +64,8 @@ async def run_consolidation(ctx: dict):
 
     async with _consolidation_lock:
         logger.info("running_consolidation")
+        metrics = get_metrics()
+        metrics.increment("recall_consolidation_runs_total")
 
         try:
             from src.core.consolidation import create_consolidator
@@ -70,10 +73,13 @@ async def run_consolidation(ctx: dict):
             consolidator = await create_consolidator()
             results = await consolidator.consolidate()
 
+            merges = sum(len(r.source_memories) for r in results)
+            metrics.increment("recall_consolidation_merges_total", value=merges)
+
             logger.info(
                 "consolidation_complete",
                 clusters_merged=len(results),
-                total_memories_merged=sum(len(r.source_memories) for r in results),
+                total_memories_merged=merges,
             )
 
         except Exception as e:
@@ -89,12 +95,16 @@ async def run_decay(ctx: dict):
     Memories with high stability decay slower.
     """
     logger.info("running_decay")
+    metrics = get_metrics()
+    metrics.increment("recall_decay_runs_total")
 
     try:
         from src.workers.decay import DecayWorker
 
         worker = DecayWorker(ctx["qdrant"], ctx["neo4j"])
         stats = await worker.run()
+
+        metrics.increment("recall_decay_archived_total", value=stats["archived"])
 
         logger.info(
             "decay_complete",
@@ -107,6 +117,29 @@ async def run_decay(ctx: dict):
         raise
 
 
+async def save_metrics_snapshot(ctx: dict):
+    """
+    Periodic metrics snapshot to PostgreSQL.
+
+    Saves a point-in-time dump of all counters and gauges
+    for historical dashboard views.
+    """
+    logger.info("saving_metrics_snapshot")
+    try:
+        from src.storage import get_postgres_store
+
+        pg = await get_postgres_store()
+        metrics = get_metrics()
+        await pg.save_metrics_snapshot(
+            counters=dict(metrics._counters),
+            gauges=dict(metrics._gauges),
+        )
+        logger.info("metrics_snapshot_saved")
+    except Exception as e:
+        logger.error("metrics_snapshot_error", error=str(e))
+        # Don't raise — best-effort, don't retry via ARQ
+
+
 async def run_pattern_extraction(ctx: dict):
     """
     Daily pattern extraction.
@@ -115,12 +148,16 @@ async def run_pattern_extraction(ctx: dict):
     then creates semantic memories from those patterns.
     """
     logger.info("running_pattern_extraction")
+    metrics = get_metrics()
+    metrics.increment("recall_pattern_runs_total")
 
     try:
         from src.workers.patterns import PatternExtractor
 
         extractor = PatternExtractor(ctx["qdrant"], ctx["neo4j"])
         results = await extractor.extract()
+
+        metrics.increment("recall_patterns_created_total", value=results["patterns_created"])
 
         logger.info(
             "pattern_extraction_complete",
@@ -139,6 +176,7 @@ class WorkerSettings:
         run_consolidation,
         run_decay,
         run_pattern_extraction,
+        save_metrics_snapshot,
     ]
 
     cron_jobs = [
@@ -153,6 +191,12 @@ class WorkerSettings:
             run_decay,
             hour=None,
             minute={15, 45},
+        ),
+        # Save metrics snapshot every hour at :30 (staggered from consolidation)
+        cron(
+            save_metrics_snapshot,
+            hour=None,
+            minute=30,
         ),
         # Run pattern extraction daily at 3:30am (staggered from midnight jobs)
         cron(

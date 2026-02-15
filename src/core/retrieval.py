@@ -107,6 +107,8 @@ class RetrievalPipeline:
             min_importance=query.min_importance,
             include_superseded=query.include_superseded,
             session_id=query.session_id if query.session_id else None,
+            since=query.since.isoformat() if query.since else None,
+            until=query.until.isoformat() if query.until else None,
         )
 
         for memory_id, similarity, payload in search_results:

@@ -12,6 +12,7 @@ from typing import Any
 import structlog
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
+    DatetimeRange,
     Distance,
     FieldCondition,
     Filter,
@@ -69,6 +70,7 @@ class QdrantStore:
             ("source", "keyword"),
             ("session_id", "keyword"),
             ("content_hash", "keyword"),
+            ("created_at", "datetime"),
         ]
 
         for field, field_type in indexes:
@@ -129,6 +131,8 @@ class QdrantStore:
         min_importance: float = 0.0,
         include_superseded: bool = False,
         session_id: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
     ) -> list[tuple[str, float, dict[str, Any]]]:
         """
         Search for similar memories.
@@ -175,6 +179,16 @@ class QdrantStore:
                     key="session_id",
                     match=MatchValue(value=session_id),
                 )
+            )
+
+        if since:
+            conditions.append(
+                FieldCondition(key="created_at", range=DatetimeRange(gte=since))
+            )
+
+        if until:
+            conditions.append(
+                FieldCondition(key="created_at", range=DatetimeRange(lte=until))
             )
 
         search_filter = Filter(must=conditions) if conditions else None

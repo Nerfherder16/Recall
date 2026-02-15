@@ -7,6 +7,7 @@ BGE-large produces 1024-dimensional vectors optimized for retrieval.
 
 import hashlib
 import struct
+import time
 from typing import Any
 
 import httpx
@@ -14,6 +15,7 @@ import numpy as np
 import structlog
 
 from .config import get_settings
+from .metrics import get_metrics
 
 logger = structlog.get_logger()
 
@@ -87,6 +89,8 @@ class EmbeddingService:
         else:
             prefixed_text = text
 
+        metrics = get_metrics()
+        start = time.time()
         try:
             response = await self.client.post(
                 f"{self.settings.ollama_host}/api/embeddings",
@@ -107,14 +111,19 @@ class EmbeddingService:
                         actual=len(embedding),
                     )
 
+                metrics.increment("recall_embedding_requests_total", {"status": "success"})
                 return embedding
 
             logger.error("embedding_request_failed", status=response.status_code)
+            metrics.increment("recall_embedding_requests_total", {"status": "error"})
             raise EmbeddingError(f"Ollama returned status {response.status_code}")
 
         except httpx.RequestError as e:
             logger.error("embedding_request_error", error=str(e))
-            raise EmbeddingError(f"Failed to connect to Ollama: {e}")
+            metrics.increment("recall_embedding_requests_total", {"status": "error"})
+            raise OllamaUnavailableError(f"Failed to connect to Ollama: {e}")
+        finally:
+            metrics.observe("recall_embedding_latency_seconds", value=time.time() - start)
 
     async def embed_batch(
         self, texts: list[str], prefix: str = "passage"
@@ -145,6 +154,12 @@ class EmbeddingService:
 
 class EmbeddingError(Exception):
     """Raised when embedding generation fails."""
+
+    pass
+
+
+class OllamaUnavailableError(EmbeddingError):
+    """Raised when Ollama is unreachable (connection refused, timeout, etc.)."""
 
     pass
 

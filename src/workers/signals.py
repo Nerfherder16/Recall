@@ -16,6 +16,8 @@ from src.core import (
     get_embedding_service,
     get_settings,
 )
+from src.core.embeddings import OllamaUnavailableError
+from src.core.metrics import get_metrics
 from src.core.embeddings import content_hash
 from src.core.models import SignalType
 from src.core.signal_detector import (
@@ -23,7 +25,7 @@ from src.core.signal_detector import (
     SIGNAL_TO_MEMORY_TYPE,
     SignalDetector,
 )
-from src.storage import get_neo4j_store, get_qdrant_store, get_redis_store
+from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, get_redis_store
 
 logger = structlog.get_logger()
 
@@ -69,8 +71,10 @@ async def _run_signal_detection(session_id: str):
         logger.debug("signal_detection_no_signals", session_id=session_id)
         return
 
+    metrics = get_metrics()
     auto_stored = 0
     pending = 0
+    discarded = 0
 
     for signal in signals:
         if signal.confidence >= settings.signal_confidence_auto_store:
@@ -78,6 +82,7 @@ async def _run_signal_detection(session_id: str):
             memory_id = await _store_signal_as_memory(session_id, signal)
             if memory_id:
                 auto_stored += 1
+                metrics.increment("recall_signals_detected_total", {"outcome": "auto"})
                 # Handle contradiction signals — find and supersede conflicting memory
                 if signal.signal_type == SignalType.CONTRADICTION:
                     await _resolve_contradiction(memory_id, signal)
@@ -92,8 +97,12 @@ async def _run_signal_detection(session_id: str):
                 "tags": signal.suggested_tags,
             })
             pending += 1
+            metrics.increment("recall_signals_detected_total", {"outcome": "pending"})
 
-        # Below pending threshold — discard
+        else:
+            # Below pending threshold — discard
+            discarded += 1
+            metrics.increment("recall_signals_detected_total", {"outcome": "discarded"})
 
     # Update session stats
     if auto_stored > 0:
@@ -151,8 +160,12 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
         )
 
         # Generate embedding
-        embedding_service = await get_embedding_service()
-        embedding = await embedding_service.embed(signal.content)
+        try:
+            embedding_service = await get_embedding_service()
+            embedding = await embedding_service.embed(signal.content)
+        except OllamaUnavailableError:
+            logger.warning("signal_store_ollama_unavailable", signal_type=signal.signal_type.value)
+            return None
 
         # Store in Qdrant
         await qdrant.store(memory, embedding)
@@ -172,6 +185,15 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
             signal_type=signal.signal_type.value,
             confidence=signal.confidence,
         )
+
+        # Audit log (fire-and-forget)
+        pg = await get_postgres_store()
+        await pg.log_audit(
+            "create", memory.id, actor="signal",
+            session_id=session_id,
+            details={"signal_type": signal.signal_type.value, "confidence": signal.confidence},
+        )
+
         return memory.id
 
     except Exception as e:
@@ -193,10 +215,15 @@ async def _resolve_contradiction(new_memory_id: str, signal) -> None:
     try:
         qdrant = await get_qdrant_store()
         neo4j = await get_neo4j_store()
-        embedding_service = await get_embedding_service()
+
+        try:
+            embedding_service = await get_embedding_service()
+            embedding = await embedding_service.embed(signal.content)
+        except OllamaUnavailableError:
+            logger.warning("contradiction_resolution_ollama_unavailable", new_memory=new_memory_id)
+            return
 
         # Search for the memory being contradicted
-        embedding = await embedding_service.embed(signal.content)
         similar = await qdrant.search(
             query_vector=embedding,
             limit=5,

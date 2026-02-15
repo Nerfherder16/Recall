@@ -1,6 +1,7 @@
 """Storage layer for Recall."""
 
 from .neo4j_store import Neo4jStore, get_neo4j_store
+from .postgres_store import PostgresStore, get_postgres_store
 from .qdrant import QdrantStore, get_qdrant_store
 from .redis_store import RedisStore, get_redis_store
 
@@ -9,6 +10,8 @@ __all__ = [
     "get_qdrant_store",
     "Neo4jStore",
     "get_neo4j_store",
+    "PostgresStore",
+    "get_postgres_store",
     "RedisStore",
     "get_redis_store",
 ]

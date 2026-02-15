@@ -1,7 +1,7 @@
 """Core domain models and services."""
 
 from .config import Settings, get_settings
-from .embeddings import EmbeddingService, get_embedding_service
+from .embeddings import EmbeddingError, EmbeddingService, OllamaUnavailableError, get_embedding_service
 from .llm import LLMError, OllamaLLM, get_llm
 from .models import (
     AntiPattern,
@@ -24,6 +24,8 @@ __all__ = [
     "get_settings",
     # Embeddings
     "EmbeddingService",
+    "EmbeddingError",
+    "OllamaUnavailableError",
     "get_embedding_service",
     # LLM
     "OllamaLLM",

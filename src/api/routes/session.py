@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from src.core import Session
-from src.storage import get_redis_store
+from src.storage import get_postgres_store, get_redis_store
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -130,6 +130,17 @@ async def end_session(request: EndSessionRequest, background_tasks: BackgroundTa
                 _run_session_end_consolidation, request.session_id
             )
             consolidation_queued = True
+
+        # Archive session to Postgres (fire-and-forget)
+        # Re-fetch session data to get ended_at timestamp
+        updated_session = await redis.get_session(request.session_id)
+        if updated_session:
+            turns_count = len(await redis.get_recent_turns(request.session_id, count=9999))
+            pg = await get_postgres_store()
+            await pg.archive_session({
+                **updated_session,
+                "turns_count": turns_count,
+            })
 
         logger.info(
             "session_ended",

@@ -6,12 +6,14 @@ for signal detection and other text generation tasks.
 Singleton pattern matching embeddings.py.
 """
 
+import time
 from typing import Any
 
 import httpx
 import structlog
 
 from .config import get_settings
+from .metrics import get_metrics
 
 logger = structlog.get_logger()
 
@@ -66,6 +68,8 @@ class OllamaLLM:
             body["options"]["num_ctx"] = 8192
             body["think"] = False
 
+        metrics = get_metrics()
+        start = time.time()
         try:
             response = await self.client.post(
                 f"{self.settings.ollama_host}/api/generate",
@@ -74,6 +78,7 @@ class OllamaLLM:
 
             if response.status_code == 200:
                 data = response.json()
+                metrics.increment("recall_llm_requests_total", {"model": model, "status": "success"})
                 return data.get("response", "")
 
             logger.error(
@@ -81,14 +86,19 @@ class OllamaLLM:
                 status=response.status_code,
                 model=model,
             )
+            metrics.increment("recall_llm_requests_total", {"model": model, "status": "error"})
             raise LLMError(f"Ollama returned status {response.status_code}")
 
-        except httpx.TimeoutException as e:
+        except httpx.TimeoutException:
             logger.error("llm_timeout", model=model, timeout=self.settings.signal_detection_timeout)
+            metrics.increment("recall_llm_requests_total", {"model": model, "status": "timeout"})
             raise LLMError(f"Ollama timed out after {self.settings.signal_detection_timeout}s")
         except httpx.RequestError as e:
             logger.error("llm_request_error", error=repr(e), error_type=type(e).__name__)
+            metrics.increment("recall_llm_requests_total", {"model": model, "status": "error"})
             raise LLMError(f"Failed to connect to Ollama: {type(e).__name__}: {e}")
+        finally:
+            metrics.observe("recall_llm_latency_seconds", {"model": model}, value=time.time() - start)
 
     async def close(self):
         """Close the HTTP client."""

@@ -8,8 +8,10 @@ Admin endpoints for triggering maintenance operations on-demand.
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+
+from src.api.rate_limit import limiter
 
 from src.core.consolidation import MemoryConsolidator
 from src.core.embeddings import get_embedding_service
@@ -56,7 +58,8 @@ class DecayResponse(BaseModel):
 
 
 @router.post("/consolidate", response_model=ConsolidateResponse)
-async def trigger_consolidation(request: ConsolidateRequest):
+@limiter.limit("10/minute")
+async def trigger_consolidation(request: Request, body: ConsolidateRequest):
     """Trigger memory consolidation on-demand."""
     try:
         qdrant = await get_qdrant_store()
@@ -65,13 +68,13 @@ async def trigger_consolidation(request: ConsolidateRequest):
 
         consolidator = MemoryConsolidator(qdrant, neo4j, embeddings)
 
-        memory_type = MemoryType(request.memory_type) if request.memory_type else None
+        memory_type = MemoryType(body.memory_type) if body.memory_type else None
 
         results = await consolidator.consolidate(
             memory_type=memory_type,
-            domain=request.domain,
-            min_cluster_size=request.min_cluster_size,
-            dry_run=request.dry_run,
+            domain=body.domain,
+            min_cluster_size=body.min_cluster_size,
+            dry_run=body.dry_run,
         )
 
         formatted = []
@@ -98,14 +101,15 @@ async def trigger_consolidation(request: ConsolidateRequest):
 
 
 @router.post("/decay", response_model=DecayResponse)
-async def trigger_decay(request: DecayRequest):
+@limiter.limit("10/minute")
+async def trigger_decay(request: Request, body: DecayRequest):
     """Trigger importance decay on-demand, optionally simulating time passage."""
     try:
         qdrant = await get_qdrant_store()
         neo4j = await get_neo4j_store()
 
         worker = DecayWorker(qdrant, neo4j)
-        stats = await worker.run(hours_offset=request.simulate_hours)
+        stats = await worker.run(hours_offset=body.simulate_hours)
 
         return DecayResponse(**stats)
 

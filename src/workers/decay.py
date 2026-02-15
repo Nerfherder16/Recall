@@ -89,8 +89,16 @@ class DecayWorker:
                 # Check if should be archived
                 if new_importance < archive_threshold and stability < 0.3:
                     stats["archived"] += 1
-                    # Note: We don't actually delete, just mark as very low importance
-                    # Could move to cold storage in production
+                    # Audit log — only on significant decay (crossing archive threshold)
+                    try:
+                        from src.storage import get_postgres_store
+                        pg = await get_postgres_store()
+                        await pg.log_audit(
+                            "decay", memory_id, actor="decay",
+                            details={"old_importance": round(importance, 4), "new_importance": round(new_importance, 4)},
+                        )
+                    except Exception:
+                        pass  # Fire-and-forget
             else:
                 stats["stable"] += 1
 

@@ -2,13 +2,16 @@
 Search and retrieval routes.
 """
 
+from datetime import datetime
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from src.api.rate_limit import limiter
 from src.core import MemoryQuery, MemoryType, RelationshipType
+from src.core.embeddings import OllamaUnavailableError
 from src.core.retrieval import create_retrieval_pipeline
 
 logger = structlog.get_logger()
@@ -34,6 +37,8 @@ class SearchRequest(BaseModel):
     session_id: str | None = None
     current_file: str | None = None
     current_task: str | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 class SearchResult(BaseModel):
@@ -84,7 +89,8 @@ class ContextResponse(BaseModel):
 
 
 @router.post("/query", response_model=SearchResponse)
-async def search_memories(request: SearchRequest):
+@limiter.limit("30/minute")
+async def search_memories(request: Request, body: SearchRequest):
     """
     Search for relevant memories.
 
@@ -97,17 +103,19 @@ async def search_memories(request: SearchRequest):
     try:
         # Build query
         query = MemoryQuery(
-            text=request.query,
-            memory_types=request.memory_types,
-            domains=request.domains,
-            tags=request.tags,
-            min_importance=request.min_importance,
-            expand_relationships=request.expand_relationships,
-            max_depth=request.max_depth,
-            limit=request.limit,
-            session_id=request.session_id,
-            current_file=request.current_file,
-            current_task=request.current_task,
+            text=body.query,
+            memory_types=body.memory_types,
+            domains=body.domains,
+            tags=body.tags,
+            min_importance=body.min_importance,
+            expand_relationships=body.expand_relationships,
+            max_depth=body.max_depth,
+            limit=body.limit,
+            session_id=body.session_id,
+            current_file=body.current_file,
+            current_task=body.current_task,
+            since=body.since,
+            until=body.until,
         )
 
         # Execute retrieval
@@ -132,23 +140,26 @@ async def search_memories(request: SearchRequest):
 
         logger.info(
             "search_completed",
-            query=request.query[:50],
+            query=body.query[:50],
             results=len(search_results),
         )
 
         return SearchResponse(
             results=search_results,
             total=len(search_results),
-            query=request.query,
+            query=body.query,
         )
 
+    except OllamaUnavailableError:
+        raise HTTPException(status_code=503, detail="Embedding service unavailable")
     except Exception as e:
         logger.error("search_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/context", response_model=ContextResponse)
-async def assemble_context(request: ContextRequest):
+@limiter.limit("30/minute")
+async def assemble_context(request: Request, body: ContextRequest):
     """
     Assemble context for injection into a conversation.
 
@@ -169,9 +180,9 @@ async def assemble_context(request: ContextRequest):
         context_parts = []
 
         # Include working memory if session provided
-        if request.include_working_memory and request.session_id:
+        if body.include_working_memory and body.session_id:
             redis = await get_redis_store()
-            working_ids = await redis.get_working_memory(request.session_id)
+            working_ids = await redis.get_working_memory(body.session_id)
 
             if working_ids:
                 from src.storage import get_qdrant_store
@@ -191,12 +202,12 @@ async def assemble_context(request: ContextRequest):
                     context_parts.append("\n".join(working_context))
 
         # Retrieve relevant memories
-        if request.query or request.current_task:
+        if body.query or body.current_task:
             query = MemoryQuery(
-                text=request.query or request.current_task,
-                session_id=request.session_id,
-                current_file=request.current_file,
-                current_task=request.current_task,
+                text=body.query or body.current_task,
+                session_id=body.session_id,
+                current_file=body.current_file,
+                current_task=body.current_task,
                 limit=10,
             )
 
@@ -234,10 +245,10 @@ async def assemble_context(request: ContextRequest):
         estimated_tokens = len(full_context) // 4
 
         # Truncate if needed
-        if estimated_tokens > request.max_tokens:
-            char_limit = request.max_tokens * 4
+        if estimated_tokens > body.max_tokens:
+            char_limit = body.max_tokens * 4
             full_context = full_context[:char_limit] + "\n... (truncated)"
-            estimated_tokens = request.max_tokens
+            estimated_tokens = body.max_tokens
 
         return ContextResponse(
             context=full_context,
@@ -246,6 +257,8 @@ async def assemble_context(request: ContextRequest):
             breakdown=breakdown,
         )
 
+    except OllamaUnavailableError:
+        raise HTTPException(status_code=503, detail="Embedding service unavailable")
     except Exception as e:
         logger.error("context_assembly_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")

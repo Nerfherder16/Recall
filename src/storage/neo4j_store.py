@@ -283,6 +283,47 @@ class Neo4jStore:
                 id=memory_id,
             )
 
+    async def get_all_memory_ids(self) -> set[str]:
+        """Return the set of all Memory node IDs in the graph."""
+        async with self.driver.session() as session:
+            result = await session.run("MATCH (m:Memory) RETURN m.id AS id")
+            records = await result.data()
+            return {r["id"] for r in records}
+
+    async def get_memory_data(self, memory_id: str) -> dict[str, Any] | None:
+        """Return {importance, superseded_by} for a single memory node."""
+        async with self.driver.session() as session:
+            result = await session.run(
+                """
+                MATCH (m:Memory {id: $id})
+                RETURN m.importance AS importance,
+                       m.superseded_by AS superseded_by
+                """,
+                id=memory_id,
+            )
+            record = await result.single()
+            if record:
+                return {
+                    "importance": record["importance"],
+                    "superseded_by": record["superseded_by"],
+                }
+            return None
+
+    async def get_relationships_for_memory(self, memory_id: str) -> list[dict[str, Any]]:
+        """Return all relationships involving a memory (as source or target)."""
+        async with self.driver.session() as session:
+            result = await session.run(
+                """
+                MATCH (m:Memory {id: $id})-[r]-(other:Memory)
+                RETURN type(r) AS rel_type,
+                       r.strength AS strength,
+                       startNode(r).id AS source_id,
+                       endNode(r).id AS target_id
+                """,
+                id=memory_id,
+            )
+            return await result.data()
+
     async def get_statistics(self) -> dict[str, Any]:
         """Get graph statistics."""
         async with self.driver.session() as session:

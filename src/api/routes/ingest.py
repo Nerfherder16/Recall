@@ -6,8 +6,10 @@ from datetime import datetime
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
+
+from src.api.rate_limit import limiter
 
 from src.core import (
     Memory,
@@ -16,7 +18,7 @@ from src.core import (
     get_embedding_service,
     get_settings,
 )
-from src.core.embeddings import content_hash
+from src.core.embeddings import OllamaUnavailableError, content_hash
 from src.core.signal_detector import SIGNAL_IMPORTANCE, SIGNAL_TO_MEMORY_TYPE
 from src.storage import get_neo4j_store, get_qdrant_store, get_redis_store
 from src.workers.signals import process_signal_detection
@@ -89,7 +91,8 @@ class ApproveSignalResponse(BaseModel):
 
 
 @router.post("/turns", response_model=IngestTurnsResponse)
-async def ingest_turns(request: IngestTurnsRequest, background_tasks: BackgroundTasks):
+@limiter.limit("20/minute")
+async def ingest_turns(request: Request, body: IngestTurnsRequest, background_tasks: BackgroundTasks):
     """
     Ingest conversation turns and trigger background signal detection.
 
@@ -99,7 +102,7 @@ async def ingest_turns(request: IngestTurnsRequest, background_tasks: Background
     redis = await get_redis_store()
 
     # Validate session exists
-    session = await redis.get_session(request.session_id)
+    session = await redis.get_session(body.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -110,23 +113,23 @@ async def ingest_turns(request: IngestTurnsRequest, background_tasks: Background
             "content": t.content,
             "timestamp": t.timestamp or datetime.utcnow().isoformat(),
         }
-        for t in request.turns
+        for t in body.turns
     ]
-    total = await redis.add_turns(request.session_id, turn_dicts)
+    total = await redis.add_turns(body.session_id, turn_dicts)
 
     # Queue signal detection
-    background_tasks.add_task(process_signal_detection, request.session_id)
+    background_tasks.add_task(process_signal_detection, body.session_id)
 
     logger.info(
         "turns_ingested",
-        session_id=request.session_id,
-        count=len(request.turns),
+        session_id=body.session_id,
+        count=len(body.turns),
         total=total,
     )
 
     return IngestTurnsResponse(
-        session_id=request.session_id,
-        turns_ingested=len(request.turns),
+        session_id=body.session_id,
+        turns_ingested=len(body.turns),
         total_turns=total,
         detection_queued=True,
     )
@@ -210,8 +213,11 @@ async def approve_signal(session_id: str, request: ApproveSignalRequest):
     )
 
     # Generate embedding and store
-    embedding_service = await get_embedding_service()
-    embedding = await embedding_service.embed(signal["content"])
+    try:
+        embedding_service = await get_embedding_service()
+        embedding = await embedding_service.embed(signal["content"])
+    except OllamaUnavailableError:
+        raise HTTPException(status_code=503, detail="Embedding service unavailable")
 
     await qdrant.store(memory, embedding)
 
