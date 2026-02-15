@@ -24,20 +24,20 @@ Recall is designed like biological memory:
 │                                                             │
 │  ┌─────────────────┐     ┌─────────────────┐               │
 │  │   API (FastAPI) │     │  Workers (ARQ)  │               │
-│  │   - Store       │     │  - Consolidate  │               │
-│  │   - Retrieve    │     │  - Decay        │               │
-│  │   - Search      │     │  - Extract      │               │
+│  │   - Store/Batch │     │  - Consolidate  │               │
+│  │   - Search      │     │  - Decay        │               │
 │  │   - Ingest      │     │  - Patterns     │               │
+│  │   - Dashboard   │     │  - Metrics      │               │
 │  └────────┬────────┘     └────────┬────────┘               │
 │           │                       │                         │
 │           └───────────┬───────────┘                         │
 │                       │                                     │
 │  ┌────────────────────┴────────────────────┐               │
 │  │              STORAGE LAYER              │               │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐│               │
-│  │  │  Qdrant  │ │  Neo4j   │ │  Redis   ││               │
-│  │  │ (vectors)│ │ (graph)  │ │ (cache)  ││               │
-│  │  └──────────┘ └──────────┘ └──────────┘│               │
+│  │  ┌────────┐ ┌───────┐ ┌───────┐ ┌────┐ │               │
+│  │  │ Qdrant │ │ Neo4j │ │ Redis │ │ PG │ │               │
+│  │  │(vector)│ │(graph)│ │(cache)│ │(log)│ │               │
+│  │  └────────┘ └───────┘ └───────┘ └────┘ │               │
 │  └─────────────────────────────────────────┘               │
 │                                                             │
 │  ┌──────────────┐  ┌──────────────────────┐               │
@@ -79,6 +79,18 @@ Recall is designed like biological memory:
 - **Consolidation** - merges similar memories (hourly)
 - **Pattern extraction** - learns from episodes (daily)
 - **Decay** - applies forgetting curve (every 30 min)
+
+### Operational
+- **Rate limiting** - per-IP throttling (slowapi): 60/min default, 30/min search, 20/min ingest, 10/min admin
+- **Batch operations** - store up to 50 or delete up to 100 memories in a single call
+- **Date-range search** - filter by `since`/`until` timestamps
+- **Per-domain stats** - count and average importance per domain
+- **Prometheus metrics** - `/metrics` endpoint for monitoring
+- **Ops dashboard** - HTML dashboard at `/dashboard` with audit log, session history, memory search, signal review
+- **JSONL export/import** - full data portability with streaming export
+- **Reconcile** - detect and repair Qdrant/Neo4j inconsistencies
+- **Audit log** - every mutation logged to PostgreSQL (create, delete, supersede, consolidate, decay, signal)
+- **Graceful degradation** - API returns 503 when Ollama is down instead of crashing; background workers skip and retry
 
 ### Security
 - **Bearer token auth** - optional API key via `RECALL_API_KEY`
@@ -328,6 +340,45 @@ Create a typed relationship between two memories.
 
 Relationship types: `related_to`, `caused_by`, `solved_by`, `supersedes`, `derived_from`, `contradicts`, `requires`, `part_of`
 
+#### `POST /memory/batch/store`
+Store multiple memories in one request (max 50). Each item follows the same schema as `/memory/store`. Returns per-item results with created/duplicate/error counts.
+
+**Request:**
+```json
+{
+  "memories": [
+    {"content": "Fact one", "memory_type": "semantic", "domain": "project"},
+    {"content": "Fact two", "memory_type": "semantic", "domain": "project"}
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {"id": "uuid-1", "content_hash": "...", "created": true, "message": "Stored"},
+    {"id": "uuid-2", "content_hash": "...", "created": true, "message": "Stored"}
+  ],
+  "created": 2,
+  "duplicates": 0,
+  "errors": 0
+}
+```
+
+#### `POST /memory/batch/delete`
+Delete multiple memories by ID (max 100).
+
+**Request:**
+```json
+{"ids": ["uuid-1", "uuid-2"]}
+```
+
+**Response:**
+```json
+{"deleted": 2, "not_found": 0, "errors": 0}
+```
+
 #### `GET /memory/{id}/related`
 Get memories connected via graph traversal.
 
@@ -351,7 +402,9 @@ Semantic search using the full retrieval pipeline: vector similarity, graph expa
   "limit": 10,
   "session_id": null,
   "current_file": null,
-  "current_task": null
+  "current_task": null,
+  "since": "2026-01-01T00:00:00",
+  "until": null
 }
 ```
 
@@ -505,6 +558,23 @@ Trigger importance decay on-demand.
 }
 ```
 
+#### `GET /admin/export`
+Export all memories as streaming JSONL. Each line contains `{"memory": {...}, "relationships": [...]}`.
+
+Query params: `include_embeddings` (bool, default false), `include_superseded` (bool, default false)
+
+#### `POST /admin/import`
+Import memories from a `.jsonl` file upload. Supports `conflict=skip|overwrite` and `regenerate_embeddings=true|false`.
+
+#### `POST /admin/reconcile`
+Compare Qdrant and Neo4j to find orphans, importance mismatches, and superseded mismatches. Set `repair=true` to auto-fix (Qdrant is source of truth).
+
+#### `GET /admin/audit`
+Query the PostgreSQL audit log. Filter by `memory_id` and/or `action` (create, delete, supersede, consolidate, decay, signal).
+
+#### `GET /admin/sessions`
+Get archived session history from PostgreSQL (survives Redis TTL). Supports `limit` and `offset`.
+
 ### System
 
 #### `GET /health`
@@ -512,6 +582,15 @@ Returns health status of all services (API, Qdrant, Neo4j, Redis, Ollama) with m
 
 #### `GET /stats`
 Returns total memory count, graph node/relationship counts, and active session count.
+
+#### `GET /stats/domains`
+Returns count and average importance per domain.
+
+#### `GET /metrics`
+Prometheus-format metrics for monitoring (embedding latency, LLM calls, signal counts, etc.).
+
+#### `GET /dashboard`
+HTML ops dashboard with audit log viewer, session history, memory search, and signal review.
 
 ---
 
@@ -523,7 +602,7 @@ Returns total memory count, graph node/relationship counts, and active session c
 | `recall-worker` | Built from Dockerfile | - | ARQ background tasks |
 | `recall-qdrant` | qdrant/qdrant | 6333, 6334 | Vector storage |
 | `recall-neo4j` | neo4j:5-community | 7575, 7688 | Graph storage |
-| `recall-postgres` | postgres:16-alpine | 5433 | Metadata (future) |
+| `recall-postgres` | postgres:16-alpine | 5433 | Audit log, session archive, metrics snapshots |
 | `recall-redis` | redis:7-alpine | 6380 | Cache, sessions, working memory |
 
 All storage ports are bound to `127.0.0.1` only (not exposed to network).
@@ -554,6 +633,10 @@ All configuration is via environment variables (prefix `RECALL_`):
 | `RECALL_NEO4J_PASSWORD` | `recallmemory` | Neo4j password |
 | `RECALL_REDIS_URL` | `redis://redis:6379` | Redis connection |
 | `RECALL_POSTGRES_DSN` | *(see docker-compose)* | PostgreSQL DSN |
+| `RECALL_RATE_LIMIT_DEFAULT` | `60/minute` | Default rate limit |
+| `RECALL_RATE_LIMIT_SEARCH` | `30/minute` | Search endpoint limit |
+| `RECALL_RATE_LIMIT_INGEST` | `20/minute` | Ingest endpoint limit |
+| `RECALL_RATE_LIMIT_ADMIN` | `10/minute` | Admin endpoint limit |
 
 ---
 
@@ -575,6 +658,7 @@ Workers run on a cron schedule via ARQ:
 |--------|----------|-------------|
 | Consolidation | Every hour at :00 | Merges similar memories, boosts stability |
 | Decay | Every 30 min at :15/:45 | Reduces importance of unaccessed memories |
+| Metrics snapshot | Every hour at :30 | Snapshots system metrics to PostgreSQL |
 | Pattern extraction | Daily at 3:30 AM | Finds recurring patterns in episodic memories |
 
 Consolidation uses a lock to prevent overlapping runs. All workers use `scroll_all()` for unbiased batch processing.
@@ -665,15 +749,21 @@ Active development. Current state:
 - [x] Docker Compose deployment
 - [x] Deploy scripts (bash + PowerShell)
 - [x] MCP server for Claude Code
-- [x] Integration tests (111 tests: 82 fast + 29 slow/LLM)
+- [x] Integration tests (138 tests: 109 fast + 29 slow/LLM)
 - [x] Bearer token authentication
 - [x] Error sanitization
 - [x] Input validation & CORS lockdown
 - [x] Dual-write consistency (compensating deletes)
-- [ ] LLM-powered consolidation (smarter merges)
-- [ ] Prometheus metrics
-- [ ] Backup/export/import
-- [ ] Admin dashboard
+- [x] LLM-powered consolidation (smarter merges)
+- [x] Prometheus metrics
+- [x] JSONL export/import/reconcile
+- [x] Ops dashboard (audit log, sessions, search, signals)
+- [x] PostgreSQL audit log & session archive
+- [x] Rate limiting (slowapi)
+- [x] Batch store/delete operations
+- [x] Date-range search
+- [x] Graceful Ollama degradation
+- [ ] Scheduled backups
 
 ## License
 
