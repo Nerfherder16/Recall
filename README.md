@@ -18,36 +18,39 @@ Recall is designed like biological memory:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         RECALL                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────┐     ┌─────────────────┐               │
-│  │   API (FastAPI) │     │  Workers (ARQ)  │               │
-│  │   - Store/Batch │     │  - Consolidate  │               │
-│  │   - Search      │     │  - Decay        │               │
-│  │   - Ingest      │     │  - Patterns     │               │
-│  │   - Dashboard   │     │  - Metrics      │               │
-│  └────────┬────────┘     └────────┬────────┘               │
-│           │                       │                         │
-│           └───────────┬───────────┘                         │
-│                       │                                     │
-│  ┌────────────────────┴────────────────────┐               │
-│  │              STORAGE LAYER              │               │
-│  │  ┌────────┐ ┌───────┐ ┌───────┐ ┌────┐ │               │
-│  │  │ Qdrant │ │ Neo4j │ │ Redis │ │ PG │ │               │
-│  │  │(vector)│ │(graph)│ │(cache)│ │(log)│ │               │
-│  │  └────────┘ └───────┘ └───────┘ └────┘ │               │
-│  └─────────────────────────────────────────┘               │
-│                                                             │
-│  ┌──────────────┐  ┌──────────────────────┐               │
-│  │ MEMORY TYPES │  │    SIGNAL BRAIN      │               │
-│  │  Episodic    │  │  LLM-powered auto    │               │
-│  │  Semantic    │  │  memory from convos  │               │
-│  │  Procedural  │  │  (qwen3:14b/Ollama)  │               │
-│  └──────────────┘  └──────────────────────┘               │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                            RECALL                                │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌───────────────┐  │
+│  │   API (FastAPI)  │  │  Workers (ARQ)   │  │   Dashboard   │  │
+│  │   - Store/Batch  │  │  - Consolidate   │  │  React + Vite │  │
+│  │   - Browse/      │  │  - Decay         │  │  + DaisyUI    │  │
+│  │     Timeline     │  │  - Patterns      │  │  6 views, SSE │  │
+│  │   - Observer     │  │  - Metrics       │  │               │  │
+│  │   - SSE Events   │  │  - Fact Extract  │  └───────────────┘  │
+│  └────────┬─────────┘  └────────┬─────────┘                     │
+│           │                     │                                │
+│           └─────────┬───────────┘                                │
+│                     │                                            │
+│  ┌──────────────────┴───────────────────────┐                   │
+│  │              STORAGE LAYER               │                   │
+│  │  ┌────────┐ ┌───────┐ ┌───────┐ ┌─────┐ │                   │
+│  │  │ Qdrant │ │ Neo4j │ │ Redis │ │ PG  │ │                   │
+│  │  │(vector)│ │(graph)│ │(cache)│ │(log)│ │                   │
+│  │  │+ facts │ │       │ │       │ │     │ │                   │
+│  │  └────────┘ └───────┘ └───────┘ └─────┘ │                   │
+│  └──────────────────────────────────────────┘                   │
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐  │
+│  │ MEMORY TYPES │  │ SIGNAL BRAIN │  │    CLAUDE CODE HOOKS  │  │
+│  │  Episodic    │  │ Auto-memory  │  │  - Observer (edits)   │  │
+│  │  Semantic    │  │ from convos  │  │  - Lint check         │  │
+│  │  Procedural  │  │ (qwen3:14b)  │  │  - Context monitor    │  │
+│  └──────────────┘  └──────────────┘  │  - Stop guard         │  │
+│                                      └───────────────────────┘  │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Features
@@ -80,16 +83,49 @@ Recall is designed like biological memory:
 - **Pattern extraction** - learns from episodes (daily)
 - **Decay** - applies forgetting curve (every 30 min)
 
+### 3-Layer Token-Efficient Search
+- **Browse** (`POST /search/browse`) - Returns IDs + 120-char summaries, not full content
+- **Get** (`GET /memory/{id}`) - Fetch full details on demand for interesting results
+- **Timeline** (`POST /search/timeline`) - Chronological view around an anchor memory
+- Dramatically reduces context window usage when searching large memory sets
+
+### Sub-Embeddings (Granular Fact Search)
+- Each memory is broken into atomic facts by LLM at store time
+- Facts stored in a separate Qdrant collection (`recall_memories_facts`) with `parent_id` linking
+- Search hits precise facts, then returns parent memories with a 1.15x score boost
+- Solves the "averaged embedding" problem where multi-topic memories match weakly
+
+### Observer (Auto-Memory from Code Edits)
+- PostToolUse hook sends Write/Edit data to `POST /observe/file-change`
+- Server-side LLM extracts concrete facts (ports, URLs, architecture decisions, bug fixes)
+- Stores as memories with `importance: 0.4` and `source: system`
+- Content-hash deduplication prevents repeated facts from re-editing
+- Session snapshots on Stop hook capture what was worked on
+
+### Claude Code Hooks
+- **Lint check** - Runs ruff (Python) and eslint (JS/TS) after every Write/Edit, auto-fixes first
+- **Observer** - Async, fire-and-forget observation of code edits
+- **Context monitor** - Estimates token usage from transcript size, warns at 150K+
+- **Stop guard** - Blocks stop if uncommitted git changes exist (exit code 2)
+- **Session save** - Auto-saves session state to Recall on stop
+- All hooks are Node.js (CommonJS) scripts in `hooks/`
+
+### React Dashboard
+- Full SPA at `/dashboard` built with React + Vite + Tailwind + DaisyUI
+- 6 views: Dashboard (health/stats), Memories (3-layer browse), Sessions, Signals, Audit, Settings
+- Real-time updates via Server-Sent Events (`GET /events/stream`)
+- Auth gate with localStorage API key persistence
+- Multi-stage Docker build (Node.js for dashboard, Python for API)
+
 ### Operational
 - **Rate limiting** - per-IP throttling (slowapi): 60/min default, 30/min search, 20/min ingest, 10/min admin
 - **Batch operations** - store up to 50 or delete up to 100 memories in a single call
 - **Date-range search** - filter by `since`/`until` timestamps
 - **Per-domain stats** - count and average importance per domain
 - **Prometheus metrics** - `/metrics` endpoint for monitoring
-- **Ops dashboard** - HTML dashboard at `/dashboard` with audit log, session history, memory search, signal review
 - **JSONL export/import** - full data portability with streaming export
 - **Reconcile** - detect and repair Qdrant/Neo4j inconsistencies
-- **Audit log** - every mutation logged to PostgreSQL (create, delete, supersede, consolidate, decay, signal)
+- **Audit log** - every mutation logged to PostgreSQL (create, delete, supersede, consolidate, decay, signal, observer)
 - **Graceful degradation** - API returns 503 when Ollama is down instead of crashing; background workers skip and retry
 
 ### Security
@@ -241,7 +277,9 @@ Restart Claude Code. The `recall_*` tools will be available.
 | Tool | Description |
 |------|-------------|
 | `recall_store` | Store a memory (semantic, episodic, or procedural) |
-| `recall_search` | Semantic similarity search |
+| `recall_search` | Browse memories — returns IDs + 120-char summaries (use `recall_get` for full details) |
+| `recall_search_full` | Full-content search (backwards compat, returns complete memory content) |
+| `recall_timeline` | Browse memories chronologically around a point in time |
 | `recall_context` | Assemble formatted context for prompt injection |
 | `recall_stats` | Get memory counts and system statistics |
 | `recall_health` | Check health of all services |
@@ -386,6 +424,74 @@ Query params: `max_depth` (1-10, default 2), `limit` (1-100, default 10)
 
 ### Search & Retrieval
 
+#### `POST /search/browse`
+Token-efficient search — returns IDs and 120-char summaries instead of full content. Use `GET /memory/{id}` to fetch full details for interesting results.
+
+**Request:**
+```json
+{
+  "query": "How does the auth system work?",
+  "domains": ["auth"],
+  "memory_types": ["semantic"],
+  "tags": [],
+  "min_importance": 0.0,
+  "limit": 10
+}
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "id": "uuid",
+      "summary": "The auth service uses bcrypt for password hashing with...",
+      "memory_type": "semantic",
+      "domain": "auth",
+      "similarity": 0.92,
+      "importance": 0.7,
+      "created_at": "2026-02-14T10:30:00",
+      "tags": ["security"]
+    }
+  ],
+  "total": 1,
+  "query": "How does the auth system work?"
+}
+```
+
+#### `POST /search/timeline`
+Chronological view of memories around an anchor point. If no `anchor_id`, returns most recent entries.
+
+**Request:**
+```json
+{
+  "anchor_id": "uuid-or-null",
+  "domain": "auth",
+  "memory_type": null,
+  "limit": 20,
+  "before": 10,
+  "after": 10
+}
+```
+
+**Response:**
+```json
+{
+  "entries": [
+    {
+      "id": "uuid",
+      "summary": "The auth service uses bcrypt...",
+      "memory_type": "semantic",
+      "domain": "auth",
+      "created_at": "2026-02-14T10:30:00",
+      "importance": 0.7
+    }
+  ],
+  "anchor_id": "uuid-or-null",
+  "total": 5
+}
+```
+
 #### `POST /search/query`
 Semantic search using the full retrieval pipeline: vector similarity, graph expansion, context filtering, and ranking.
 
@@ -508,6 +614,41 @@ Approve a pending signal, storing it as a memory.
 #### `GET /ingest/{session_id}/turns`
 Get stored turns for a session (debug/inspection).
 
+### Observer
+
+#### `POST /observe/file-change`
+Observe a code edit for automatic fact extraction. Returns immediately; processing happens in the background. Used by the Claude Code observer hook.
+
+**Request:**
+```json
+{
+  "file_path": "/path/to/file.py",
+  "content": "full file content (for Write)",
+  "old_string": "original text (for Edit)",
+  "new_string": "replacement text (for Edit)",
+  "tool_name": "Write"
+}
+```
+
+**Response:** `{"status": "queued"}`
+
+#### `POST /observe/session-snapshot`
+Capture a session snapshot as a memory. Used by the Stop hook.
+
+**Request:**
+```json
+{"session_id": "uuid"}
+```
+
+**Response:** `{"status": "queued"}`
+
+### Events
+
+#### `GET /events/stream`
+Server-Sent Events stream for real-time dashboard updates. Emits `health` events every 5 seconds with system status.
+
+**Headers:** `Accept: text/event-stream`
+
 ### Sessions
 
 Sessions scope working memory and provide context for memory operations.
@@ -590,7 +731,7 @@ Returns count and average importance per domain.
 Prometheus-format metrics for monitoring (embedding latency, LLM calls, signal counts, etc.).
 
 #### `GET /dashboard`
-HTML ops dashboard with audit log viewer, session history, memory search, and signal review.
+React SPA dashboard with 6 views: health/stats, memory browse, sessions, signals, audit log, and settings. Built with Vite + Tailwind + DaisyUI. Supports auth gate and real-time SSE updates.
 
 ---
 
@@ -598,7 +739,7 @@ HTML ops dashboard with audit log viewer, session history, memory search, and si
 
 | Container | Image | Port | Purpose |
 |-----------|-------|------|---------|
-| `recall-api` | Built from Dockerfile | 8200 | FastAPI application |
+| `recall-api` | Built from Dockerfile (multi-stage: Node.js + Python) | 8200 | FastAPI application + React dashboard |
 | `recall-worker` | Built from Dockerfile | - | ARQ background tasks |
 | `recall-qdrant` | qdrant/qdrant | 6333, 6334 | Vector storage |
 | `recall-neo4j` | neo4j:5-community | 7575, 7688 | Graph storage |
@@ -697,6 +838,14 @@ pytest tests/integration/ -v -m "slow"
 RECALL_API_KEY=your-key pytest tests/integration/ -v
 ```
 
+### Dashboard development
+```bash
+cd dashboard
+npm install
+npm run dev    # Vite dev server with API proxy
+npm run build  # Build to src/api/static/dashboard/
+```
+
 ### Lint
 ```bash
 ruff check src/
@@ -749,7 +898,7 @@ Active development. Current state:
 - [x] Docker Compose deployment
 - [x] Deploy scripts (bash + PowerShell)
 - [x] MCP server for Claude Code
-- [x] Integration tests (138 tests: 109 fast + 29 slow/LLM)
+- [x] Integration tests (148 tests: 119 fast + 29 slow/LLM)
 - [x] Bearer token authentication
 - [x] Error sanitization
 - [x] Input validation & CORS lockdown
@@ -763,6 +912,12 @@ Active development. Current state:
 - [x] Batch store/delete operations
 - [x] Date-range search
 - [x] Graceful Ollama degradation
+- [x] 3-layer token-efficient search (browse + timeline)
+- [x] Sub-embeddings (granular fact search)
+- [x] Observer (auto-memory from code edits)
+- [x] Claude Code hooks (lint, observer, context monitor, stop guard)
+- [x] React SPA dashboard (6 views, SSE real-time updates)
+- [x] Server-Sent Events endpoint
 - [ ] Scheduled backups
 
 ## License

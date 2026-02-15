@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider } from "./context/ToastContext";
 import { useAuth } from "./hooks/useAuth";
 import AuditPage from "./pages/AuditPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -48,20 +50,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthGate>
-        <Routes>
-          <Route path="/dashboard" element={<Layout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="memories" element={<MemoriesPage />} />
-            <Route path="sessions" element={<SessionsPage />} />
-            <Route path="signals" element={<SignalsPage />} />
-            <Route path="audit" element={<AuditPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </AuthGate>
-    </BrowserRouter>
+    <ThemeProvider>
+      <ToastProvider>
+        <BrowserRouter>
+          <AuthGate>
+            <Routes>
+              <Route path="/dashboard" element={<Layout />}>
+                <Route index element={<DashboardPage />} />
+                <Route path="memories" element={<MemoriesPage />} />
+                <Route path="sessions" element={<SessionsPage />} />
+                <Route path="signals" element={<SignalsPage />} />
+                <Route path="audit" element={<AuditPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </AuthGate>
+        </BrowserRouter>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

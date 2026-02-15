@@ -1,3 +1,40 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Sidebar collapse transition */
+.sidebar-transition {
+  transition: width 200ms ease-in-out;
+}
+
+/* Toast slide-in */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 200ms ease-out;
+}
+
+/* Mobile sidebar overlay backdrop */
+.sidebar-overlay {
+  transition: opacity 200ms ease-in-out;
+}
+
+/* Timeline connector line */
+.timeline-line::before {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: oklch(var(--bc) / 0.15);
+}

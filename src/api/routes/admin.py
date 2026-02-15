@@ -3,15 +3,18 @@ Admin endpoints for triggering maintenance operations on-demand.
 
 - POST /admin/consolidate  — merge similar memories
 - POST /admin/decay        — apply importance decay
+- GET  /admin/ollama       — proxy Ollama model/status info
 """
 
 from typing import Any
 
+import httpx
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from src.api.rate_limit import limiter
+from src.core.config import get_settings
 
 from src.core.consolidation import MemoryConsolidator
 from src.core.embeddings import get_embedding_service
@@ -116,3 +119,56 @@ async def trigger_decay(request: Request, body: DecayRequest):
     except Exception as e:
         logger.error("decay_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/ollama")
+async def ollama_info(request: Request):
+    """Proxy Ollama model info, running models, and version."""
+    settings = get_settings()
+    host = settings.ollama_host
+    result: dict[str, Any] = {}
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            r = await client.get(f"{host}/api/version")
+            result["version"] = r.json().get("version", "unknown") if r.status_code == 200 else "error"
+        except Exception:
+            result["version"] = "unreachable"
+
+        try:
+            r = await client.get(f"{host}/api/tags")
+            if r.status_code == 200:
+                result["models"] = [
+                    {
+                        "name": m.get("name"),
+                        "parameter_size": m.get("details", {}).get("parameter_size"),
+                        "quantization": m.get("details", {}).get("quantization_level"),
+                        "family": m.get("details", {}).get("family"),
+                        "size_bytes": m.get("size", 0),
+                    }
+                    for m in r.json().get("models", [])
+                ]
+            else:
+                result["models"] = []
+        except Exception:
+            result["models"] = []
+
+        try:
+            r = await client.get(f"{host}/api/ps")
+            if r.status_code == 200:
+                result["running"] = [
+                    {
+                        "name": m.get("name"),
+                        "size_bytes": m.get("size", 0),
+                        "size_vram": m.get("size_vram", 0),
+                        "context_length": m.get("context_length", 0),
+                        "expires_at": m.get("expires_at"),
+                    }
+                    for m in r.json().get("models", [])
+                ]
+            else:
+                result["running"] = []
+        except Exception:
+            result["running"] = []
+
+    return result

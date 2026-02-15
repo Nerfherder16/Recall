@@ -59,7 +59,7 @@ export interface SessionEntry {
   current_task: string | null;
   memories_created: number;
   signals_detected: number;
-  turns_ingested: number;
+  turns_count: number;
 }
 
 export interface SSEHealth {
@@ -73,4 +73,29 @@ export interface SSEHealth {
   neo4j?: string;
   redis?: string;
   postgres?: string;
+}
+
+// Phase 10 additions
+
+export interface MemoryPreview {
+  id: string;
+  summary: string;
+  memory_type: string;
+  domain: string;
+  importance: number;
+  created_at: string;
+  tags: string[];
+}
+
+export interface Turn {
+  role: "user" | "assistant";
+  content: string;
+  timestamp?: string;
+}
+
+export interface WorkingMemory {
+  session_id: string;
+  current_task: string | null;
+  active_context: string[];
+  turns: Turn[];
 }

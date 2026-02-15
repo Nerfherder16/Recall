@@ -1,30 +1,65 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "../api/client";
-import type { BrowseResult, MemoryDetail } from "../api/types";
+import type { BrowseResult, MemoryDetail, DomainStat } from "../api/types";
 import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
+import PageHeader from "../components/PageHeader";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ViewToggle from "../components/ViewToggle";
+import SelectionToolbar from "../components/SelectionToolbar";
+import ConfirmDialog from "../components/ConfirmDialog";
+import MemoryDetailModal from "../components/MemoryDetailModal";
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useToastContext } from "../context/ToastContext";
 
 export default function MemoriesPage() {
+  const { addToast } = useToastContext();
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState("");
   const [memType, setMemType] = useState("");
   const [results, setResults] = useState<BrowseResult[]>([]);
-  const [expanded, setExpanded] = useState<Record<string, MemoryDetail>>({});
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useLocalStorage<"grid" | "list">(
+    "recall_mem_view",
+    "list",
+  );
+  const [domains, setDomains] = useState<string[]>([]);
 
-  async function search() {
-    if (!query.trim()) return;
+  // Selection state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Detail modal
+  const [detailMem, setDetailMem] = useState<MemoryDetail | null>(null);
+
+  // Load domains for filter dropdown
+  useEffect(() => {
+    api<{ domains: DomainStat[] }>("/stats/domains")
+      .then((d) => setDomains(d.domains.map((x) => x.domain)))
+      .catch(() => {});
+  }, []);
+
+  // Auto-browse on mount (timeline, no query needed)
+  useEffect(() => {
+    loadTimeline();
+  }, []);
+
+  async function loadTimeline() {
     setLoading(true);
     try {
-      const body: Record<string, unknown> = { query, limit: 20 };
-      if (domain) body.domains = [domain];
-      if (memType) body.memory_types = [memType];
-      const res = await api<{ results: BrowseResult[] }>(
-        "/search/browse",
+      const res = await api<{ entries: BrowseResult[] }>(
+        "/search/timeline",
         "POST",
-        body,
+        { limit: 30 },
       );
-      setResults(res.results);
+      // Timeline returns entries (not results), and items lack tags/similarity
+      setResults(
+        (res.entries || []).map((e) => ({
+          ...e,
+          tags: e.tags || [],
+          similarity: e.similarity || 0,
+        })),
+      );
     } catch {
       setResults([]);
     } finally {
@@ -32,50 +67,105 @@ export default function MemoriesPage() {
     }
   }
 
-  async function toggleExpand(id: string) {
-    if (expanded[id]) {
-      const next = { ...expanded };
-      delete next[id];
-      setExpanded(next);
+  async function search() {
+    if (!query.trim()) {
+      loadTimeline();
       return;
     }
+    setLoading(true);
+    setSelected(new Set());
     try {
-      const detail = await api<MemoryDetail>(`/memory/${id}`);
-      setExpanded({ ...expanded, [id]: detail });
-    } catch {}
+      const body: Record<string, unknown> = { query, limit: 30 };
+      if (domain) body.domains = [domain];
+      if (memType) body.memory_types = [memType];
+      const res = await api<{ results: BrowseResult[] }>(
+        "/search/browse",
+        "POST",
+        body,
+      );
+      setResults(res.results || []);
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function deleteMemory(id: string) {
-    if (!confirm("Delete this memory?")) return;
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  async function openDetail(id: string) {
+    try {
+      const detail = await api<MemoryDetail>(`/memory/${id}`);
+      setDetailMem(detail);
+    } catch {
+      addToast("Failed to load memory detail", "error");
+    }
+  }
+
+  async function deleteSingle(id: string) {
     try {
       await api(`/memory/${id}`, "DELETE");
-      setResults(results.filter((r) => r.id !== id));
-      const next = { ...expanded };
-      delete next[id];
-      setExpanded(next);
-    } catch {}
+      setResults((prev) => prev.filter((r) => r.id !== id));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      addToast("Memory deleted", "success");
+    } catch {
+      addToast("Failed to delete memory", "error");
+    }
+  }
+
+  async function bulkDelete() {
+    setConfirmDelete(false);
+    const ids = Array.from(selected);
+    try {
+      await api("/memory/batch/delete", "POST", { ids });
+      setResults((prev) => prev.filter((r) => !selected.has(r.id)));
+      addToast(`Deleted ${ids.length} memories`, "success");
+      setSelected(new Set());
+    } catch {
+      addToast("Bulk delete failed", "error");
+    }
   }
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">Memories</h2>
+      <PageHeader title="Memories" subtitle="Browse and manage stored memories">
+        <ViewToggle view={view} onChange={setView} />
+      </PageHeader>
 
-      <div className="flex gap-2 mb-4">
+      {/* Search bar */}
+      <div className="flex flex-wrap gap-2 mb-4">
         <input
-          className="input input-bordered flex-1"
-          placeholder="Search memories..."
+          className="input input-bordered flex-1 min-w-48"
+          placeholder="Search memories (or leave empty for recent)..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && search()}
         />
-        <input
-          className="input input-bordered w-32"
-          placeholder="Domain"
+        <select
+          className="select select-bordered w-36"
           value={domain}
           onChange={(e) => setDomain(e.target.value)}
-        />
+        >
+          <option value="">All domains</option>
+          {domains.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
         <select
-          className="select select-bordered w-40"
+          className="select select-bordered w-36"
           value={memType}
           onChange={(e) => setMemType(e.target.value)}
         >
@@ -92,72 +182,135 @@ export default function MemoriesPage() {
         </button>
       </div>
 
-      {results.length === 0 && !loading && (
-        <EmptyState message="Search for memories above" />
+      {loading && <LoadingSpinner />}
+
+      {!loading && results.length === 0 && (
+        <EmptyState message="No memories found" />
       )}
 
-      <div className="flex flex-col gap-2">
-        {results.map((r) => (
-          <div key={r.id} className="card bg-base-100 shadow-sm">
-            <div className="card-body p-4">
-              <div className="flex items-start justify-between">
-                <div
-                  className="flex-1 cursor-pointer"
-                  onClick={() => toggleExpand(r.id)}
-                >
-                  <div className="flex gap-2 items-center mb-1">
-                    <Badge text={r.memory_type} />
-                    <span className="text-xs text-base-content/50">
-                      {r.domain}
-                    </span>
-                    <span className="text-xs text-base-content/40">
-                      {(r.similarity * 100).toFixed(1)}%
-                    </span>
-                    <span className="text-xs text-base-content/40">
-                      imp: {r.importance.toFixed(2)}
-                    </span>
-                  </div>
-                  <p className="text-sm">{r.summary}</p>
-                  {r.tags.length > 0 && (
-                    <div className="flex gap-1 mt-1">
-                      {r.tags.slice(0, 5).map((t) => (
-                        <span key={t} className="badge badge-xs badge-ghost">
-                          {t}
-                        </span>
-                      ))}
+      {/* Grid view */}
+      {!loading && results.length > 0 && view === "grid" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {results.map((r) => (
+            <div key={r.id} className="card bg-base-100 shadow-sm">
+              <div className="card-body p-4">
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm mt-1"
+                    checked={selected.has(r.id)}
+                    onChange={() => toggleSelect(r.id)}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex gap-2 items-center mb-1">
+                      <Badge text={r.memory_type} />
+                      <span className="text-xs text-base-content/50">
+                        {r.domain}
+                      </span>
                     </div>
-                  )}
-                </div>
-                <button
-                  className="btn btn-ghost btn-xs text-error"
-                  onClick={() => deleteMemory(r.id)}
-                >
-                  Del
-                </button>
-              </div>
-
-              {expanded[r.id] && (
-                <div className="mt-3 p-3 bg-base-200 rounded text-sm whitespace-pre-wrap">
-                  <p className="font-mono text-xs text-base-content/40 mb-2">
-                    ID: {r.id}
-                  </p>
-                  {expanded[r.id].content}
-                  <div className="flex gap-4 mt-2 text-xs text-base-content/50">
-                    <span>
-                      Stability: {expanded[r.id].stability.toFixed(2)}
-                    </span>
-                    <span>
-                      Confidence: {expanded[r.id].confidence.toFixed(2)}
-                    </span>
-                    <span>Accesses: {expanded[r.id].access_count}</span>
-                    <span>Created: {expanded[r.id].created_at}</span>
+                    <p
+                      className="text-sm cursor-pointer hover:text-primary transition-colors line-clamp-3"
+                      onClick={() => openDetail(r.id)}
+                    >
+                      {r.summary}
+                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="flex gap-1">
+                        {r.tags.slice(0, 3).map((t) => (
+                          <span key={t} className="badge badge-xs badge-ghost">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="text-xs text-base-content/40">
+                        imp: {r.importance.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* List view */}
+      {!loading && results.length > 0 && view === "list" && (
+        <div className="flex flex-col gap-2">
+          {results.map((r) => (
+            <div key={r.id} className="card bg-base-100 shadow-sm">
+              <div className="card-body p-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm mt-1"
+                    checked={selected.has(r.id)}
+                    onChange={() => toggleSelect(r.id)}
+                  />
+                  <div
+                    className="flex-1 cursor-pointer min-w-0"
+                    onClick={() => openDetail(r.id)}
+                  >
+                    <div className="flex gap-2 items-center mb-1">
+                      <Badge text={r.memory_type} />
+                      <span className="text-xs text-base-content/50">
+                        {r.domain}
+                      </span>
+                      {r.similarity > 0 && (
+                        <span className="text-xs text-base-content/40">
+                          {(r.similarity * 100).toFixed(1)}%
+                        </span>
+                      )}
+                      <span className="text-xs text-base-content/40">
+                        imp: {r.importance.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-sm">{r.summary}</p>
+                    {r.tags.length > 0 && (
+                      <div className="flex gap-1 mt-1">
+                        {r.tags.slice(0, 5).map((t) => (
+                          <span key={t} className="badge badge-xs badge-ghost">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="btn btn-ghost btn-xs text-error shrink-0"
+                    onClick={() => deleteSingle(r.id)}
+                  >
+                    Del
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Bulk selection toolbar */}
+      <SelectionToolbar
+        count={selected.size}
+        onDelete={() => setConfirmDelete(true)}
+        onClear={() => setSelected(new Set())}
+      />
+
+      {/* Confirm bulk delete dialog */}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete Memories"
+        message={`Are you sure you want to delete ${selected.size} selected memories? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={bulkDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+
+      {/* Detail modal */}
+      <MemoryDetailModal
+        memory={detailMem}
+        onClose={() => setDetailMem(null)}
+      />
     </div>
   );
 }
