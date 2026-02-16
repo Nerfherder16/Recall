@@ -131,7 +131,12 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
     """
     try:
         memory_type = SIGNAL_TO_MEMORY_TYPE.get(signal.signal_type)
-        importance = SIGNAL_IMPORTANCE.get(signal.signal_type, 0.5)
+        # Prefer LLM-scored importance, fall back to flat type-based default
+        importance = (
+            signal.suggested_importance
+            if signal.suggested_importance is not None
+            else SIGNAL_IMPORTANCE.get(signal.signal_type, 0.5)
+        )
 
         chash = content_hash(signal.content)
 

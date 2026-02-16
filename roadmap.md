@@ -88,7 +88,83 @@
 
 ---
 
-## Phase 11: Organic Memory Hooks (Next)
+## Phase 11: Organic Memory Hooks — COMPLETE (commit 80718bd + 5e3c448)
+- **recall-retrieve.js** (UserPromptSubmit): queries /search/browse, injects top 5 memories, project affinity via [projectName] prefix
+- **recall-session-summary.js** (Stop): reads transcript JSONL, stores episodic summary with project domain/tags
+- **observe-edit.js** (PostToolUse): already existed — extracts facts from file edits
+- Closed the retrieval loop — no CLAUDE.md instructions needed
+
+---
+
+## Phase 12: Neural Memory (Next)
+
+### 12A: Spreading Activation (Collins & Loftus)
+Replace BFS graph traversal with weighted activation propagation:
+- Seed nodes from vector search get initial activation = similarity score
+- Activation spreads through edges: `child_activation = parent_activation * edge_strength * (1 / (1 + distance * 0.3))`
+- Collect all nodes above activation threshold
+- Use relationship `strength` field (currently stored but ignored by `find_related()`)
+- Update `retrieval.py` Stage 3 to use activation scores instead of flat distance penalty
+
+### 12B: Interference / Inhibition
+Post-ranking suppression of contradictory or redundant memories:
+- After final ranking, check for `CONTRADICTS` relationships between results
+- Higher-scoring memory suppresses lower-scoring contradicting memory (penalty: 0.7x)
+- Also suppress near-duplicate results (similarity > 0.95 between two results → keep only the higher-scored one)
+- Update `retrieval.py` to add suppression pass after Stage 5
+
+### 12C: Core Memory Auto-Elevation
+Smarter importance scoring in signal detector:
+- Tune prompt to assess impact/severity, not just signal type
+- Production bug fixes → importance 0.9 (not flat 0.7)
+- Routine facts → importance 0.4
+- Architecture decisions → importance 0.8
+- Use the Stanford Generative Agents 1-10 scale: "rate the poignancy of this memory"
+- Update `signal_detector.py` prompt
+
+---
+
+## Deferred (Post Phase 12 Evaluation)
+
+### Prospective Memory Triggers
+- "When condition X is met, surface memory Y"
+- May be solved by spreading activation — evaluate after Phase 12
+
+### Encoding Context Snapshots
+- Store full encoding context (project, files, task, working memory IDs)
+- Match retrieval context to encoding context for boost
+- Marginal improvement over existing context boosting
+
+### Schema Formation
+- Hierarchical abstraction: facts → concepts → principles → mental models
+- High value but needs spreading activation foundation first
+
+---
+
+## Future: Research-Backed Enhancements
+
+### From Stanford Generative Agents
+- **Reflections**: Periodically synthesize higher-order insights from recent memories ("I notice that every time I work on Recall, I encounter Qdrant API issues"). Store as first-class memories. Triggered when cumulative importance exceeds threshold.
+- **Three-factor retrieval**: `score = α*recency + β*importance + γ*similarity` (partially implemented)
+
+### From mem0
+- **Four-operation consolidation**: LLM chooses ADD/UPDATE/DELETE/NOOP per fact against existing memories (more precise than current merge-all)
+- **Custom extraction prompts with few-shot examples**: Domain-specific prompts dramatically improve extraction precision
+
+### From Zep/Graphiti
+- **Bi-temporal invalidation**: Never delete, mark invalid with timestamps. Enables "what did we know at time T?" queries
+- **Extraction reflection**: LLM reviews its own entity extractions before committing (reduces hallucinated facts)
+- **BM25 + vector search with RRF fusion**: Catches keyword matches that vectors miss
+
+### From HyDE
+- **Hypothetical Document Embeddings**: For vague queries, generate a hypothetical answer first, embed that. Bridges the query-document embedding gap. Use selectively when initial search returns low-confidence results.
+
+### From A-MEM (Zettelkasten-inspired)
+- **Memory evolution**: When new memories link to old ones, LLM enriches the old memory's context. Not replacing — evolving.
+- **Validated with Ollama**: 1.1s per operation with 1B model locally. Feasible for real-time use.
+
+### From GraphRAG
+- **Community/cluster summaries**: Run Leiden clustering on Neo4j, pre-generate summaries per cluster. Enables "what do I know about X?" without scanning all memories.
 
 ### Problem
 Recall's storage side works (observer hooks extract facts from file edits), but the **retrieval side is broken** — nothing queries Recall before the agent starts working. Phase 10's simulation generated 85 memories about Build Hub architecture, but when actually building Build Hub Desktop, none were retrieved. Memory is useless if it's never consulted.

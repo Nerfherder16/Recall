@@ -45,8 +45,16 @@ For each signal, identify:
 - signal_type: one of "error_fix", "decision", "pattern", "preference", "fact", "workflow", "contradiction"
 - content: a clear, self-contained description of what should be remembered (include enough context to be useful standalone)
 - confidence: 0.0-1.0 how confident you are this is worth remembering
+- importance: 1-10 how poignant or impactful this memory is (see scale below)
 - domain: topic area (e.g., "docker", "python", "infrastructure", "project-recall")
 - tags: relevant tags as a list of strings
+
+Importance scale (1-10):
+1-2: Trivial, routine observations (e.g., "ran npm install")
+3-4: Useful facts, minor preferences, simple configurations
+5-6: Notable decisions, meaningful patterns, useful workflows
+7-8: Critical bug fixes, architectural decisions, production issues
+9-10: Fundamental breakthroughs, system-wide changes, critical security fixes
 
 Rules:
 - Only extract signals that would be genuinely useful to recall later
@@ -59,6 +67,7 @@ Rules:
 - pattern: a recurring theme or convention
 - contradiction: information that conflicts with something previously known
 - Set confidence based on how clearly the signal appears in the conversation
+- Set importance based on the impact and poignancy of the memory, not just the signal type
 - If no signals are found, return an empty array
 
 Respond with ONLY a JSON array of signal objects. No other text.
@@ -168,6 +177,18 @@ class SignalDetector:
                 confidence = float(item.get("confidence", 0.5))
                 confidence = max(0.0, min(1.0, confidence))
 
+                # Parse LLM-provided importance (1-10 scale → 0.0-1.0)
+                suggested_importance = None
+                raw_importance = item.get("importance")
+                if raw_importance is not None:
+                    try:
+                        imp_val = float(raw_importance)
+                        # Clamp to 1-10, then map to 0.0-1.0
+                        imp_val = max(1.0, min(10.0, imp_val))
+                        suggested_importance = imp_val / 10.0
+                    except (ValueError, TypeError):
+                        pass
+
                 signal = DetectedSignal(
                     signal_type=signal_type,
                     content=item["content"],
@@ -175,6 +196,7 @@ class SignalDetector:
                     source=MemorySource.SYSTEM,
                     suggested_domain=item.get("domain"),
                     suggested_tags=item.get("tags", []),
+                    suggested_importance=suggested_importance,
                 )
                 signals.append(signal)
 

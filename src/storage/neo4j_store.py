@@ -172,7 +172,8 @@ class Neo4jStore:
                     related.domain as domain,
                     related.importance as importance,
                     length(path) as distance,
-                    [rel in relationships(path) | type(rel)] as rel_types
+                    [rel in relationships(path) | type(rel)] as rel_types,
+                    [rel in relationships(path) | coalesce(rel.strength, 0.5)] as rel_strengths
                 ORDER BY distance, related.importance DESC
                 LIMIT $limit
                 """,
@@ -182,6 +183,29 @@ class Neo4jStore:
 
             records = await result.data()
             return records
+
+    async def find_contradictions(
+        self, memory_ids: list[str]
+    ) -> list[tuple[str, str]]:
+        """
+        Find CONTRADICTS edges between a set of memory IDs.
+
+        Returns list of (id_a, id_b) pairs that contradict each other.
+        """
+        if len(memory_ids) < 2:
+            return []
+
+        async with self.driver.session() as session:
+            result = await session.run(
+                """
+                MATCH (a:Memory)-[:CONTRADICTS]-(b:Memory)
+                WHERE a.id IN $ids AND b.id IN $ids AND a.id < b.id
+                RETURN a.id AS id_a, b.id AS id_b
+                """,
+                ids=memory_ids,
+            )
+            records = await result.data()
+            return [(r["id_a"], r["id_b"]) for r in records]
 
     async def find_path(
         self, source_id: str, target_id: str, max_depth: int = 5

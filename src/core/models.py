@@ -233,6 +233,7 @@ class DetectedSignal(BaseModel):
     source: MemorySource
     suggested_domain: str | None = None
     suggested_tags: list[str] = Field(default_factory=list)
+    suggested_importance: float | None = None  # LLM-scored 0.0-1.0
     context: dict[str, Any] = Field(default_factory=dict)
 
 

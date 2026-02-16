@@ -97,6 +97,9 @@ class RetrievalPipeline:
         # Stage 5: Final ranking
         ranked = self._rank_results(list(results.values()), query)
 
+        # Stage 5.5: Inhibition — suppress contradictions and near-duplicates
+        ranked = await self._inhibit(ranked)
+
         # Stage 6: Track access
         await self._track_access(ranked[:query.limit])
 
@@ -183,8 +186,16 @@ class RetrievalPipeline:
         relationship_types: list[RelationshipType] | None,
         max_depth: int,
     ) -> list[RetrievalResult]:
-        """Stage 3: Expand through graph relationships."""
-        results = []
+        """
+        Stage 3: Spreading activation (Collins & Loftus, 1975).
+
+        Instead of flat distance penalty, activation propagates through
+        graph edges weighted by relationship strength:
+          child_activation = parent_activation * edge_strength * decay
+        where decay = 1 / (1 + hop * 0.3)
+        """
+        # Activation map: memory_id -> (best_activation, seed_id)
+        activation: dict[str, tuple[float, str]] = {}
 
         for seed_id in seed_ids:
             related = await self.neo4j.find_related(
@@ -195,25 +206,47 @@ class RetrievalPipeline:
             )
 
             for record in related:
-                # Fetch full memory from Qdrant
-                qdrant_result = await self.qdrant.get(record["id"])
-                if qdrant_result:
-                    embedding, payload = qdrant_result
-                    memory = self._payload_to_memory(record["id"], payload)
+                node_id = record["id"]
+                distance = record.get("distance", 1)
+                strengths = record.get("rel_strengths", [])
 
-                    # Score decreases with distance
-                    distance = record.get("distance", 1)
-                    graph_score = memory.importance / (1 + distance * 0.3)
+                # Propagate activation through edge strengths
+                # Start with seed activation = 1.0
+                act = 1.0
+                for hop_idx, strength in enumerate(strengths):
+                    edge_strength = max(0.01, min(1.0, strength))
+                    decay = 1.0 / (1 + (hop_idx + 1) * 0.3)
+                    act *= edge_strength * decay
 
-                    results.append(
-                        RetrievalResult(
-                            memory=memory,
-                            score=graph_score,
-                            similarity=0.0,  # Not from vector search
-                            graph_distance=distance,
-                            retrieval_path=[seed_id, record["id"]],
-                        )
+                # Scale by node importance
+                node_importance = record.get("importance", 0.5) or 0.5
+                act *= node_importance
+
+                # Keep highest activation across seeds
+                if node_id not in activation or act > activation[node_id][0]:
+                    activation[node_id] = (act, seed_id)
+
+        # Fetch memories for activated nodes above threshold
+        results = []
+        activation_threshold = 0.05
+
+        for node_id, (act, seed_id) in activation.items():
+            if act < activation_threshold:
+                continue
+
+            qdrant_result = await self.qdrant.get(node_id)
+            if qdrant_result:
+                _, payload = qdrant_result
+                memory = self._payload_to_memory(node_id, payload)
+                results.append(
+                    RetrievalResult(
+                        memory=memory,
+                        score=act,
+                        similarity=0.0,
+                        graph_distance=0,  # activation replaces distance
+                        retrieval_path=[seed_id, node_id],
                     )
+                )
 
         return results
 
@@ -278,6 +311,58 @@ class RetrievalPipeline:
         # Sort by final score
         results.sort(key=lambda r: r.score, reverse=True)
         return results
+
+    async def _inhibit(self, ranked: list[RetrievalResult]) -> list[RetrievalResult]:
+        """
+        Stage 5.5: Interference and inhibition.
+
+        Two suppression mechanisms:
+        1. Contradiction inhibition: if A CONTRADICTS B and A scores higher,
+           penalize B by 0.7x (it might still appear, just ranked lower).
+        2. Near-duplicate suppression: if two results have very similar content
+           (same content_hash or score ratio within 5%), keep only the higher.
+        """
+        if len(ranked) < 2:
+            return ranked
+
+        # --- Contradiction inhibition via Neo4j CONTRADICTS edges ---
+        result_ids = [r.memory.id for r in ranked]
+        try:
+            contradictions = await self.neo4j.find_contradictions(result_ids)
+        except Exception:
+            contradictions = []
+
+        # Build score lookup
+        score_map = {r.memory.id: r for r in ranked}
+
+        suppressed_ids: set[str] = set()
+        for id_a, id_b in contradictions:
+            ra, rb = score_map.get(id_a), score_map.get(id_b)
+            if not ra or not rb:
+                continue
+            # Higher score wins — penalize the loser
+            if ra.score >= rb.score:
+                rb.score *= 0.7
+            else:
+                ra.score *= 0.7
+
+        # --- Near-duplicate suppression ---
+        # Group by content hash to catch exact duplicates
+        seen_hashes: dict[str, str] = {}  # hash -> best id
+        for r in ranked:
+            chash = getattr(r.memory, "content_hash", None)
+            if not chash:
+                continue
+            if chash in seen_hashes:
+                # Duplicate — suppress the lower-scored one
+                suppressed_ids.add(r.memory.id)
+            else:
+                seen_hashes[chash] = r.memory.id
+
+        # Remove fully suppressed, re-sort
+        result = [r for r in ranked if r.memory.id not in suppressed_ids]
+        result.sort(key=lambda r: r.score, reverse=True)
+        return result
 
     async def _track_access(self, results: list[RetrievalResult]):
         """Track that these memories were accessed (reinforcement)."""

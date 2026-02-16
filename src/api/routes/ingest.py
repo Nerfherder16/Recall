@@ -181,7 +181,15 @@ async def approve_signal(session_id: str, request: ApproveSignalRequest):
         sig_type = SignalType.FACT
 
     memory_type = SIGNAL_TO_MEMORY_TYPE.get(sig_type, MemoryType.SEMANTIC)
-    importance = request.importance or SIGNAL_IMPORTANCE.get(sig_type, 0.5)
+    # Prefer: explicit request > LLM-scored (1-10 → 0.0-1.0) > flat type default
+    llm_importance = None
+    raw_imp = signal.get("importance")
+    if raw_imp is not None:
+        try:
+            llm_importance = max(0.1, min(1.0, float(raw_imp) / 10.0))
+        except (ValueError, TypeError):
+            pass
+    importance = request.importance or llm_importance or SIGNAL_IMPORTANCE.get(sig_type, 0.5)
     domain = request.domain or signal.get("domain", "general")
     tags = request.tags if request.tags is not None else signal.get("tags", [])
     tags = [f"signal:{signal['signal_type']}"] + tags
