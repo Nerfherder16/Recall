@@ -96,31 +96,10 @@
 
 ---
 
-## Phase 12: Neural Memory (Next)
-
-### 12A: Spreading Activation (Collins & Loftus)
-Replace BFS graph traversal with weighted activation propagation:
-- Seed nodes from vector search get initial activation = similarity score
-- Activation spreads through edges: `child_activation = parent_activation * edge_strength * (1 / (1 + distance * 0.3))`
-- Collect all nodes above activation threshold
-- Use relationship `strength` field (currently stored but ignored by `find_related()`)
-- Update `retrieval.py` Stage 3 to use activation scores instead of flat distance penalty
-
-### 12B: Interference / Inhibition
-Post-ranking suppression of contradictory or redundant memories:
-- After final ranking, check for `CONTRADICTS` relationships between results
-- Higher-scoring memory suppresses lower-scoring contradicting memory (penalty: 0.7x)
-- Also suppress near-duplicate results (similarity > 0.95 between two results → keep only the higher-scored one)
-- Update `retrieval.py` to add suppression pass after Stage 5
-
-### 12C: Core Memory Auto-Elevation
-Smarter importance scoring in signal detector:
-- Tune prompt to assess impact/severity, not just signal type
-- Production bug fixes → importance 0.9 (not flat 0.7)
-- Routine facts → importance 0.4
-- Architecture decisions → importance 0.8
-- Use the Stanford Generative Agents 1-10 scale: "rate the poignancy of this memory"
-- Update `signal_detector.py` prompt
+## Phase 12: Neural Memory — COMPLETE (commit ce48382)
+- **12A: Spreading Activation** (Collins & Loftus, 1975): Graph expansion now propagates weighted activation through edges using relationship `strength` field. `child_activation = parent_activation * edge_strength * decay`. Replaces flat `importance / (1 + distance * 0.3)` penalty. Neo4j `find_related()` returns `rel_strengths`. Activation threshold at 0.05.
+- **12B: Interference / Inhibition**: New Stage 5.5 in retrieval pipeline. CONTRADICTS edges between results cause 0.7x penalty on lower-scored memory. Near-duplicates (same content_hash) fully suppressed. New `find_contradictions()` method in Neo4j store.
+- **12C: Core Memory Auto-Elevation**: Signal detector prompt updated with 1-10 poignancy scale (Stanford Generative Agents inspired). LLM-scored importance maps to 0.0-1.0, preferred over flat `SIGNAL_IMPORTANCE` dict. `DetectedSignal.suggested_importance` field added. Workers and ingest route use LLM importance with type-based fallback.
 
 ---
 
