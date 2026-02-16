@@ -52,6 +52,7 @@ class SessionStatusResponse(BaseModel):
     current_task: str | None
     memories_created: int
     memories_retrieved: int
+    signals_detected: int
     working_memory_count: int
 
 
@@ -205,6 +206,7 @@ async def get_session_status(session_id: str):
             current_task=session_data.get("current_task") or None,
             memories_created=int(session_data.get("memories_created", 0)),
             memories_retrieved=int(session_data.get("memories_retrieved", 0)),
+            signals_detected=int(session_data.get("signals_detected", 0)),
             working_memory_count=len(working_memory),
         )
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
  * Statusline script: displays context usage + triggers Ollama-based
- * session summary when context reaches 90%.
+ * session summary when context reaches 65% (before auto-compact at ~72-80%).
  *
  * Receives JSON on stdin with context_window.used_percentage, session_id,
  * transcript_path, cwd, model, cost, etc.
  *
  * Output: plain text with ANSI colors to stdout.
- * Side-effect at 90%: spawns background process to summarize via Ollama
+ * Side-effect at 65%: spawns background process to summarize via Ollama
  * and store to Recall.
  */
 
@@ -19,7 +19,7 @@ const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
 const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://192.168.50.62:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:14b";
-const THRESHOLD = 90;
+const THRESHOLD = 65;
 const MAX_TRANSCRIPT_LINES = 300;
 
 // ANSI colors
@@ -139,7 +139,7 @@ function buildOllamaPrompt(messages, cwd, cost) {
       `${cost.total_lines_removed || 0} lines removed.`
     : "";
 
-  return `You are summarizing a Claude Code session for continuity. The context window is about to compact (90%+ used). Write a detailed handoff summary that the next session (or a compacted session) can use to continue the work seamlessly.
+  return `You are summarizing a Claude Code session for continuity. The context window is about to compact (90%+ used). Write a detailed handoff summary that a compacted session can use to continue the work seamlessly.
 
 Project: ${projectName}
 Working directory: ${cwd}
@@ -274,7 +274,7 @@ async function main() {
     child.unref();
   } else if (pct >= THRESHOLD && alreadyFired) {
     line += ` ${GREEN}${DIM}✓ handoff sent${RESET}`;
-  } else if (pct >= 80) {
+  } else if (pct >= 50) {
     line += ` ${YELLOW}${DIM}(handoff at ${THRESHOLD}%)${RESET}`;
   }
 

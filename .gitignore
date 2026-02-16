@@ -60,6 +60,10 @@ data/
 logs/
 *.log
 
+# Simulation reports (but keep test data)
+tests/simulation/reports/
+!tests/simulation/data/
+
 # OS
 .DS_Store
 Thumbs.db
