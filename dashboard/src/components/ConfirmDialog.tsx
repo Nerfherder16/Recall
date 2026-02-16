@@ -15,7 +15,7 @@ export default function ConfirmDialog({
   title,
   message,
   confirmLabel = "Confirm",
-  confirmClass = "btn-error",
+  confirmClass,
   onConfirm,
   onCancel,
 }: Props) {
@@ -29,16 +29,27 @@ export default function ConfirmDialog({
     }
   }, [open]);
 
+  const btnColor =
+    confirmClass === "btn-error"
+      ? "bg-error text-error-content hover:bg-error/90"
+      : "bg-primary text-primary-content hover:bg-primary/90";
+
   return (
     <dialog ref={ref} className="modal" onClose={onCancel}>
-      <div className="modal-box">
-        <h3 className="font-bold text-lg">{title}</h3>
-        <p className="py-4 text-sm text-base-content/70">{message}</p>
-        <div className="modal-action">
-          <button className="btn btn-ghost" onClick={onCancel}>
+      <div className="rounded-2xl bg-base-100 border border-base-content/5 p-6 max-w-sm w-full">
+        <h3 className="font-semibold text-lg">{title}</h3>
+        <p className="py-4 text-sm text-base-content/60">{message}</p>
+        <div className="flex justify-end gap-2">
+          <button
+            className="rounded-lg px-4 py-2 text-sm hover:bg-base-content/5 transition-colors"
+            onClick={onCancel}
+          >
             Cancel
           </button>
-          <button className={`btn ${confirmClass}`} onClick={onConfirm}>
+          <button
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${btnColor}`}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </button>
         </div>

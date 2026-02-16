@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Outlet } from "react-router-dom";
+import { List as ListIcon } from "@phosphor-icons/react";
 import Sidebar from "./Sidebar";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 
@@ -49,27 +50,18 @@ export default function Layout() {
       <main className="flex-1 overflow-y-auto">
         {/* Mobile header */}
         {isMobile && (
-          <div className="sticky top-0 z-30 bg-base-300 px-4 py-2 flex items-center gap-3">
+          <div className="sticky top-0 z-30 bg-base-300 px-4 py-2 flex items-center gap-3 border-b border-base-content/5">
             <button
-              className="btn btn-ghost btn-sm btn-square"
+              className="rounded-lg p-1.5 hover:bg-base-100/50 transition-colors"
               onClick={() => setMobileOpen(true)}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
+              <ListIcon size={20} weight="bold" />
             </button>
-            <h1 className="text-lg font-bold">Recall</h1>
+            <img
+              src="/dashboard/recall-logo.png"
+              alt="Recall"
+              className="h-auto w-[120px]"
+            />
           </div>
         )}
         <div className="p-6">

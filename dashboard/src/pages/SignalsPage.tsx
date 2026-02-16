@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Check } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type { SessionEntry } from "../api/types";
 import Badge from "../components/Badge";
@@ -73,7 +74,7 @@ export default function SignalsPage() {
 
       <div className="flex flex-wrap gap-2 mb-4">
         <select
-          className="select select-bordered flex-1 min-w-48"
+          className="flex-1 min-w-48 rounded-lg border border-base-content/10 bg-base-200 px-3 py-2 text-sm focus:border-primary/50 focus:outline-none"
           value={sessionId}
           onChange={(e) => setSessionId(e.target.value)}
         >
@@ -87,7 +88,11 @@ export default function SignalsPage() {
           ))}
         </select>
         {signals.length > 0 && (
-          <button className="btn btn-success" onClick={approveAll}>
+          <button
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-content hover:bg-accent/90 transition-colors"
+            onClick={approveAll}
+          >
+            <Check size={16} weight="bold" />
             Approve All ({signals.length})
           </button>
         )}
@@ -105,27 +110,31 @@ export default function SignalsPage() {
 
       <div className="flex flex-col gap-2">
         {signals.map((s, i) => (
-          <div key={i} className="card bg-base-100 shadow-sm">
-            <div className="card-body p-4">
-              <div className="flex gap-2 items-center mb-1">
-                <Badge text={s.signal_type} />
-                <span className="text-xs text-base-content/50">{s.domain}</span>
-                <div className="flex-1" />
-                <span className="text-xs">
-                  Confidence: {(s.confidence * 100).toFixed(0)}%
-                </span>
-              </div>
-              <p className="text-sm">{s.content}</p>
-              {s.tags.length > 0 && (
-                <div className="flex gap-1 mt-1">
-                  {s.tags.map((t) => (
-                    <span key={t} className="badge badge-xs badge-ghost">
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
+          <div
+            key={i}
+            className="rounded-xl bg-base-100 border border-base-content/5 p-4 hover:border-base-content/10 transition-colors"
+          >
+            <div className="flex gap-2 items-center mb-1">
+              <Badge text={s.signal_type} />
+              <span className="text-xs text-base-content/40">{s.domain}</span>
+              <div className="flex-1" />
+              <span className="text-xs text-base-content/40 tabular-nums">
+                Confidence: {(s.confidence * 100).toFixed(0)}%
+              </span>
             </div>
+            <p className="text-sm">{s.content}</p>
+            {s.tags.length > 0 && (
+              <div className="flex gap-1 mt-1">
+                {s.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center rounded-md bg-zinc-500/10 text-zinc-400 px-1.5 py-0.5 text-[10px] font-medium"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

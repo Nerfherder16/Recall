@@ -17,30 +17,31 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (!apiKey) {
     return (
       <div className="flex items-center justify-center h-screen bg-base-200">
-        <div className="card bg-base-100 shadow-xl w-96">
-          <div className="card-body">
-            <h2 className="card-title">Recall Dashboard</h2>
-            <p className="text-sm text-base-content/60">
-              Enter your API key to continue. Leave blank if auth is disabled.
-            </p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const val = (e.target as HTMLFormElement).key.value;
-                setApiKey(val || "none");
-              }}
+        <div className="rounded-2xl bg-base-100 border border-base-content/5 w-96 p-6">
+          <h2 className="text-xl font-semibold mb-1">Recall Dashboard</h2>
+          <p className="text-sm text-base-content/40 mb-4">
+            Enter your API key to continue. Leave blank if auth is disabled.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const val = (e.target as HTMLFormElement).key.value;
+              setApiKey(val || "none");
+            }}
+          >
+            <input
+              name="key"
+              type="password"
+              placeholder="API Key (or leave blank)"
+              className="w-full rounded-lg border border-base-content/10 bg-base-200 px-3 py-2 text-sm focus:border-primary/50 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="w-full mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-content hover:bg-primary/90 transition-colors"
             >
-              <input
-                name="key"
-                type="password"
-                placeholder="API Key (or leave blank)"
-                className="input input-bordered w-full mt-2"
-              />
-              <button type="submit" className="btn btn-primary w-full mt-3">
-                Connect
-              </button>
-            </form>
-          </div>
+              Connect
+            </button>
+          </form>
         </div>
       </div>
     );

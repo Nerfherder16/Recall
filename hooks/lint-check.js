@@ -8,7 +8,7 @@
  */
 
 const { execSync } = require("child_process");
-const { existsSync } = require("fs");
+const { existsSync, readFileSync } = require("fs");
 const path = require("path");
 
 // Find ruff - check common locations
@@ -59,6 +59,24 @@ function readStdin() {
     process.stdin.on("end", () => resolve(data));
     setTimeout(() => resolve(data), 3000);
   });
+}
+
+function getAutopilotMode(filePath) {
+  let dir = path.dirname(filePath);
+  for (let i = 0; i < 10; i++) {
+    const modeFile = path.join(dir, ".autopilot", "mode");
+    if (existsSync(modeFile)) {
+      try {
+        return readFileSync(modeFile, "utf8").trim();
+      } catch {
+        return "";
+      }
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return "";
 }
 
 function run(cmd) {
@@ -118,6 +136,43 @@ async function main() {
           `Lint errors in ${filePath}:\n${recheck.output}\n`,
         );
         process.exit(2);
+      }
+    }
+
+    // TypeScript type checking for .ts/.tsx files
+    if (/\.(ts|tsx)$/.test(filePath)) {
+      // Find tsconfig by walking up from the file
+      let tsconfigDir = path.dirname(filePath);
+      let tsconfigFound = false;
+      for (let i = 0; i < 10; i++) {
+        if (existsSync(path.join(tsconfigDir, "tsconfig.json"))) {
+          tsconfigFound = true;
+          break;
+        }
+        const parent = path.dirname(tsconfigDir);
+        if (parent === tsconfigDir) break;
+        tsconfigDir = parent;
+      }
+
+      if (tsconfigFound) {
+        const tsc = run(
+          `npx tsc --noEmit --project "${path.join(tsconfigDir, "tsconfig.json")}"`,
+        );
+        if (!tsc.ok) {
+          // Check autopilot mode to decide block vs warn
+          const mode = getAutopilotMode(filePath);
+          if (mode === "build") {
+            process.stderr.write(
+              `Type errors (blocking in build mode):\n${tsc.output}\n`,
+            );
+            process.exit(2);
+          } else {
+            process.stderr.write(
+              `Type check warnings:\n${tsc.output}\n`,
+            );
+            // Don't block in normal mode — just warn
+          }
+        }
       }
     }
   }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CaretDown } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type { SessionEntry, Turn } from "../api/types";
 import { useRecallAPI } from "../hooks/useRecallAPI";
@@ -80,9 +81,12 @@ export default function SessionsPage() {
             const isActive = !s.ended_at;
             const isExpanded = expandedId === s.session_id;
             return (
-              <div key={s.session_id} className="card bg-base-100 shadow-sm">
+              <div
+                key={s.session_id}
+                className="rounded-xl bg-base-100 border border-base-content/5 hover:border-base-content/10 transition-colors"
+              >
                 <div
-                  className="card-body p-4 cursor-pointer"
+                  className="p-4 cursor-pointer"
                   onClick={() => toggleExpand(s.session_id)}
                 >
                   <div className="flex items-start justify-between">
@@ -91,18 +95,22 @@ export default function SessionsPage() {
                         <span className="font-mono text-sm">
                           {s.session_id.slice(0, 12)}...
                         </span>
-                        <span
-                          className={`badge badge-sm ${isActive ? "badge-success" : "badge-ghost"}`}
-                        >
-                          {isActive ? "Active" : "Completed"}
-                        </span>
+                        {isActive ? (
+                          <span className="inline-flex items-center rounded-md bg-emerald-500/10 text-emerald-400 px-2 py-0.5 text-[11px] font-medium">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md bg-zinc-500/10 text-zinc-400 px-2 py-0.5 text-[11px] font-medium">
+                            Completed
+                          </span>
+                        )}
                       </div>
                       {s.current_task && (
-                        <p className="text-sm text-base-content/70 truncate mb-1">
+                        <p className="text-sm text-base-content/60 truncate mb-1">
                           {s.current_task}
                         </p>
                       )}
-                      <div className="flex gap-4 text-xs text-base-content/50">
+                      <div className="flex gap-4 text-xs text-base-content/40">
                         <span>Started: {timeAgo(s.started_at)}</span>
                         <span>
                           Duration: {formatDuration(s.started_at, s.ended_at)}
@@ -111,56 +119,50 @@ export default function SessionsPage() {
                     </div>
                     <div className="flex gap-4 text-center shrink-0">
                       <div>
-                        <p className="text-lg font-bold">
+                        <p className="text-lg font-semibold tabular-nums">
                           {s.memories_created}
                         </p>
-                        <p className="text-xs text-base-content/50">memories</p>
+                        <p className="text-[11px] text-base-content/40">
+                          memories
+                        </p>
                       </div>
                       <div>
-                        <p className="text-lg font-bold">
+                        <p className="text-lg font-semibold tabular-nums">
                           {s.signals_detected}
                         </p>
-                        <p className="text-xs text-base-content/50">signals</p>
+                        <p className="text-[11px] text-base-content/40">
+                          signals
+                        </p>
                       </div>
                       <div>
-                        <p className="text-lg font-bold">{s.turns_count}</p>
-                        <p className="text-xs text-base-content/50">turns</p>
+                        <p className="text-lg font-semibold tabular-nums">
+                          {s.turns_count}
+                        </p>
+                        <p className="text-[11px] text-base-content/40">
+                          turns
+                        </p>
                       </div>
                     </div>
                     <div className="ml-3">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className={`h-5 w-5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
+                      <CaretDown
+                        size={18}
+                        className={`text-base-content/30 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Expanded: turn timeline */}
                 {isExpanded && (
-                  <div className="border-t border-base-300 px-4 py-3">
-                    {turnsLoading && (
-                      <div className="flex justify-center py-4">
-                        <span className="loading loading-spinner loading-sm" />
-                      </div>
-                    )}
+                  <div className="border-t border-base-content/5 px-4 py-3">
+                    {turnsLoading && <LoadingSpinner size="sm" />}
                     {turnsError && (
-                      <p className="text-sm text-base-content/50 italic py-2">
+                      <p className="text-sm text-base-content/40 italic py-2">
                         {turnsError}
                       </p>
                     )}
                     {!turnsLoading && !turnsError && turns.length === 0 && (
-                      <p className="text-sm text-base-content/50 italic py-2">
+                      <p className="text-sm text-base-content/40 italic py-2">
                         No turns recorded
                       </p>
                     )}
@@ -179,7 +181,7 @@ export default function SessionsPage() {
                             <div>
                               <div className="flex items-center gap-2 mb-0.5">
                                 <span
-                                  className={`text-xs font-semibold ${
+                                  className={`text-xs font-medium ${
                                     t.role === "user"
                                       ? "text-primary"
                                       : "text-secondary"
@@ -188,12 +190,12 @@ export default function SessionsPage() {
                                   {t.role === "user" ? "User" : "Assistant"}
                                 </span>
                                 {t.timestamp && (
-                                  <span className="text-xs text-base-content/40">
+                                  <span className="text-xs text-base-content/30">
                                     {timeAgo(t.timestamp)}
                                   </span>
                                 )}
                               </div>
-                              <p className="text-sm text-base-content/80 line-clamp-4 whitespace-pre-wrap">
+                              <p className="text-sm text-base-content/70 line-clamp-4 whitespace-pre-wrap">
                                 {t.content}
                               </p>
                             </div>
