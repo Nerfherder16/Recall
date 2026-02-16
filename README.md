@@ -1,165 +1,167 @@
-# Recall
+<p align="center">
+  <img src="recallfull.png" alt="Recall — Memory System for Claude Code" width="800" />
+</p>
 
-**Living Memory System for AI Assistants**
+<p align="center">
+  <strong>A neuroscience-inspired persistent memory system for AI coding assistants</strong>
+</p>
 
-Recall is a semantic, evolving, context-aware memory system designed to give AI assistants true persistent memory - not just storage, but understanding.
+---
 
-## Philosophy
+## The Problem
 
-Traditional memory systems are filing cabinets: store text, retrieve by keyword.
+Every time you start a new Claude Code session, the slate is wiped clean. That architecture decision you made yesterday? Gone. The bug fix that took an hour to track down? Forgotten. The deployment workflow you refined over weeks? You'll explain it again.
 
-Recall is designed like biological memory:
-- **Memories form** through attention and importance, or automatically via LLM signal detection
-- **Memories consolidate** through background processing (like sleep)
-- **Memories decay** without reinforcement
-- **Memories connect** to form knowledge graphs
-- **Memories reconstruct** based on current context
+AI assistants today have impressive reasoning but zero continuity. They're like a brilliant colleague with severe amnesia — capable in the moment, but unable to learn from experience.
+
+## The Neuroscience Behind Recall
+
+Human memory isn't a filing cabinet. It's a living, dynamic network — and that's exactly how Recall is built.
+
+In the 1960s, Atkinson and Shiffrin proposed the **multi-store model**: sensory input flows through short-term (working) memory, and only the important parts get consolidated into long-term storage. Recall mirrors this with **session-scoped working memory** (Redis) that feeds into **persistent vector and graph storage** (Qdrant + Neo4j) through a consolidation pipeline.
+
+Collins and Loftus' **spreading activation theory** (1975) describes how recalling one concept activates related concepts through weighted connections — thinking of "doctor" primes "nurse," "hospital," and "stethoscope." Recall implements this literally: when you search for a memory, activation propagates through the knowledge graph's weighted edges, surfacing contextually related memories that a simple keyword or vector search would miss.
+
+The brain doesn't remember everything equally. The **amygdala** gates memory formation based on emotional significance — a production outage gets seared into memory while a routine `npm install` fades immediately. Recall's signal detector uses an LLM to score each memory's **poignancy** on a 1-10 scale (inspired by Stanford's Generative Agents research), so critical bug fixes score 0.9 while routine facts settle at 0.4.
+
+Ebbinghaus' **forgetting curve** shows that memories decay exponentially without reinforcement, but each retrieval resets the curve. Recall applies the same principle: unused memories gradually lose importance, while accessed memories strengthen. Consolidated memories (those that survived merging with similar memories) develop higher **stability** — just like how human memories become more resilient through reconsolidation.
+
+The result: an AI assistant that actually learns from experience. It remembers what matters, forgets what doesn't, and builds an ever-growing web of interconnected knowledge that gets smarter with every session.
+
+## How It Works
+
+```
+You type a prompt
+       |
+       v
+[recall-retrieve.js]  <-- Queries Recall automatically
+  Returns top 5 relevant memories from past sessions
+  Claude sees them as natural context
+       |
+       v
+Claude works (edits files, writes code)
+       |
+       v
+[observe-edit.js]  <-- Watches every file edit
+  LLM extracts facts: ports, URLs, architecture decisions, bug fixes
+  Stores them as memories automatically
+       |
+       v
+Session ends
+       |
+       v
+[recall-session-summary.js]  <-- Captures what happened
+  Stores an episodic summary for next-session continuity
+       |
+       v
+Next session --> recall-retrieve.js surfaces those memories
+```
+
+No configuration needed. No CLAUDE.md instructions. The hooks create a closed-loop memory system that works organically.
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                            RECALL                                │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌───────────────┐  │
-│  │   API (FastAPI)  │  │  Workers (ARQ)   │  │   Dashboard   │  │
-│  │   - Store/Batch  │  │  - Consolidate   │  │  React + Vite │  │
-│  │   - Browse/      │  │  - Decay         │  │  + DaisyUI    │  │
-│  │     Timeline     │  │  - Patterns      │  │  6 views, SSE │  │
-│  │   - Observer     │  │  - Metrics       │  │               │  │
-│  │   - SSE Events   │  │  - Fact Extract  │  └───────────────┘  │
-│  └────────┬─────────┘  └────────┬─────────┘                     │
-│           │                     │                                │
-│           └─────────┬───────────┘                                │
-│                     │                                            │
-│  ┌──────────────────┴───────────────────────┐                   │
-│  │              STORAGE LAYER               │                   │
-│  │  ┌────────┐ ┌───────┐ ┌───────┐ ┌─────┐ │                   │
-│  │  │ Qdrant │ │ Neo4j │ │ Redis │ │ PG  │ │                   │
-│  │  │(vector)│ │(graph)│ │(cache)│ │(log)│ │                   │
-│  │  │+ facts │ │       │ │       │ │     │ │                   │
-│  │  └────────┘ └───────┘ └───────┘ └─────┘ │                   │
-│  └──────────────────────────────────────────┘                   │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐  │
-│  │ MEMORY TYPES │  │ SIGNAL BRAIN │  │    CLAUDE CODE HOOKS  │  │
-│  │  Episodic    │  │ Auto-memory  │  │  - Observer (edits)   │  │
-│  │  Semantic    │  │ from convos  │  │  - Lint check         │  │
-│  │  Procedural  │  │ (qwen3:14b)  │  │  - Context monitor    │  │
-│  └──────────────┘  └──────────────┘  │  - Stop guard         │  │
-│                                      └───────────────────────┘  │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
+Claude Code Hooks (client-side)
+    |-- UserPromptSubmit --> recall-retrieve.js (query memories)
+    |-- PostToolUse      --> observe-edit.js (extract & store facts)
+    |-- PostToolUse      --> lint-check.js (auto-fix code)
+    |-- PostToolUse      --> context-monitor.js (track token usage)
+    |-- Stop             --> recall-session-summary.js (store summary)
+    |-- Stop             --> stop-guard.js (warn on uncommitted changes)
+    |-- Stop             --> session-save.js (save session state)
+    |
+    v
+FastAPI API (:8200)
+    |-- /memory/*     CRUD + relationships + batch operations
+    |-- /search/*     browse (summaries) / full / timeline / context
+    |-- /session/*    session lifecycle + working memory
+    |-- /ingest/*     turn ingestion + signal detection
+    |-- /observe/*    file-change observer (fact extraction)
+    |-- /admin/*      export, import, reconcile, audit, sessions, ollama
+    |-- /events/*     SSE stream for real-time dashboard
+    |-- /health       public health check
+    |-- /metrics      Prometheus format
+    |-- /stats        system + domain statistics
+    |-- /dashboard    React SPA
+    |
+    v
+Storage Layer
+    |-- Qdrant        vector store (memories + sub-embeddings/facts)
+    |-- Neo4j         graph store (relationships, spreading activation)
+    |-- Redis         volatile (sessions, working memory, turns, cache)
+    |-- PostgreSQL    durable metadata (audit log, session archive, metrics)
+    |
+    v
+ARQ Worker (background jobs)
+    |-- Consolidation   hourly at :00 (merge similar memories)
+    |-- Decay           every 30min at :15/:45 (forgetting curve)
+    |-- Metrics         hourly at :30 (snapshot to Postgres)
+    |-- Patterns        daily at 3:30am (extract recurring themes)
+    |
+    v
+Ollama (local LLM inference)
+    |-- qwen3:14b     signal detection, consolidation, fact extraction
+    |-- bge-large     embeddings (1024 dimensions)
 ```
 
-## Features
+## Core Features
 
-### Semantic Understanding
-- **BGE-large embeddings** (1024 dimensions) via Ollama
-- True similarity search, not keyword matching
-- Understanding of meaning, not just words
+### Memory Formation
+| Mechanism | Inspiration | Implementation |
+|-----------|-------------|----------------|
+| **Signal Detection** | Selective attention — not everything becomes long-term memory | LLM analyzes conversations, extracts facts/decisions/bugs/workflows with confidence scores |
+| **Poignancy Scoring** | Amygdala-gated encoding — emotional significance determines memory strength | 1-10 importance scale: production bugs score 8, routine facts score 4 |
+| **Observer Hooks** | Incidental encoding — we remember things we weren't trying to learn | File edits are automatically analyzed for extractable facts |
+| **Content-Hash Dedup** | Pattern separation — the hippocampus prevents overlapping memories | Identical content detected and deduplicated at store time |
 
-### Automatic Memory Formation (Signal Detection Brain)
-- Ingest conversation turns via `POST /ingest/turns`
-- LLM (qwen3:14b) analyzes conversations for important signals
-- Auto-stores high-confidence signals as memories (error fixes, facts, decisions, workflows)
-- Medium-confidence signals queued for human review
-- Content-hash deduplication prevents duplicate memories
+### Memory Retrieval
+| Mechanism | Inspiration | Implementation |
+|-----------|-------------|----------------|
+| **Spreading Activation** | Collins & Loftus (1975) — activation propagates through semantic networks | Graph traversal weighted by relationship strength: `activation *= edge_strength * decay` |
+| **Multi-Stage Pipeline** | Reconstructive memory — recall is an active process, not playback | Vector search -> graph expansion -> context filtering -> ranking -> inhibition |
+| **Interference/Inhibition** | Competing memories suppress each other | CONTRADICTS relationships penalize lower-scored memory (0.7x); exact duplicates removed |
+| **Context-Dependent Retrieval** | Encoding specificity — recall is better when context matches | Session, file path, and task keywords boost matching memories |
+| **Retrieval-Induced Strengthening** | Testing effect — retrieving a memory makes it stronger | Every access increments importance and resets the decay clock |
 
 ### Memory Dynamics
-- **Importance decay** - unused memories fade
-- **Reinforcement** - accessed memories strengthen
-- **Stability** - consolidated memories resist decay
-- **Confidence** - tracks certainty of information
+| Mechanism | Inspiration | Implementation |
+|-----------|-------------|----------------|
+| **Forgetting Curve** | Ebbinghaus (1885) — exponential decay without rehearsal | Importance decays every 30 minutes; unused memories fade |
+| **Consolidation** | Sleep consolidation — the brain merges related memories overnight | Hourly LLM-powered merge of similar memories; increases stability |
+| **Pattern Extraction** | Schema formation — episodes become generalized knowledge | Daily job finds recurring themes across episodic memories |
+| **Stability** | Synaptic consolidation — older memories resist interference | Consolidated memories have higher stability, slower decay |
 
-### Graph Relationships
-- Memories connect through typed relationships
-- Traversal for context expansion
-- Contradiction detection
+### Storage Architecture
+| Store | Role | Neuroscience Parallel |
+|-------|------|----------------------|
+| **Qdrant** (vector) | Semantic similarity, embedding search, sub-embeddings | Hippocampal index — fast pattern-matching retrieval |
+| **Neo4j** (graph) | Relationships, traversal, spreading activation, contradiction tracking | Cortical networks — associative connections between concepts |
+| **Redis** (volatile) | Sessions, working memory, turn buffer, cache | Working memory — temporary, capacity-limited, fast access |
+| **PostgreSQL** (durable) | Audit log, session archive, metrics snapshots | Autobiographical record — what happened and when |
 
-### Background Processing
-- **Consolidation** - merges similar memories (hourly)
-- **Pattern extraction** - learns from episodes (daily)
-- **Decay** - applies forgetting curve (every 30 min)
+### Token-Efficient 3-Layer Search
+Most memory systems dump full content into the context window. Recall is designed for token economy:
 
-### 3-Layer Token-Efficient Search
-- **Browse** (`POST /search/browse`) - Returns IDs + 120-char summaries, not full content
-- **Get** (`GET /memory/{id}`) - Fetch full details on demand for interesting results
-- **Timeline** (`POST /search/timeline`) - Chronological view around an anchor memory
-- Dramatically reduces context window usage when searching large memory sets
+1. **Browse** (`POST /search/browse`) — Returns IDs + 120-char summaries. Scan dozens of memories for pennies.
+2. **Get** (`GET /memory/{id}`) — Fetch full content only for the memories that matter.
+3. **Timeline** (`POST /search/timeline`) — Chronological view for temporal context.
 
 ### Sub-Embeddings (Granular Fact Search)
-- Each memory is broken into atomic facts by LLM at store time
-- Facts stored in a separate Qdrant collection (`recall_memories_facts`) with `parent_id` linking
-- Search hits precise facts, then returns parent memories with a 1.15x score boost
-- Solves the "averaged embedding" problem where multi-topic memories match weakly
+A single memory about "deploying the auth service" might contain facts about Docker, nginx, JWT tokens, and port numbers. A standard embedding averages all of these, producing weak matches for any specific topic.
 
-### Observer (Auto-Memory from Code Edits)
-- PostToolUse hook sends Write/Edit data to `POST /observe/file-change`
-- Server-side LLM extracts concrete facts (ports, URLs, architecture decisions, bug fixes)
-- Stores as memories with `importance: 0.4` and `source: system`
-- Content-hash deduplication prevents repeated facts from re-editing
-- Session snapshots on Stop hook capture what was worked on
-
-### Claude Code Hooks
-- **Memory retrieval** (`UserPromptSubmit`) - Queries Recall on every user prompt and injects relevant memories as context. Skips trivial messages (<15 chars, greetings, slash commands, confirmations). This is the organic retrieval loop — no CLAUDE.md instructions needed
-- **Observer** (`PostToolUse`) - Async, fire-and-forget extraction of facts from code edits
-- **Session summary** (`Stop`) - Reads the transcript, extracts user messages, and stores an episodic session summary so the next session has continuity
-- **Lint check** (`PostToolUse`) - Runs ruff (Python) and eslint (JS/TS) after every Write/Edit, auto-fixes first
-- **Context monitor** (`PostToolUse`) - Estimates token usage from transcript size, warns at 150K+
-- **Stop guard** (`Stop`) - Blocks stop if uncommitted git changes exist (exit code 2)
-- **Session save** (`Stop`) - Auto-saves session state to Recall on stop
-- All hooks are Node.js (CommonJS) scripts in `hooks/`
-
-### Organic Memory Loop
-The hooks create a closed-loop memory system that works without any configuration in CLAUDE.md:
-
-```
-User types prompt
-       ↓
-[recall-retrieve.js]  ← UserPromptSubmit
-  Queries POST /search/browse with user's message
-  Injects top 5 relevant memories (similarity > 0.25)
-       ↓
-Agent works (edits files)
-       ↓
-[observe-edit.js]  ← PostToolUse (Write|Edit)
-  Sends file changes to POST /observe/file-change
-  LLM extracts facts → stored as memories
-       ↓
-Session ends
-       ↓
-[recall-session-summary.js]  ← Stop
-  Reads transcript, extracts user messages
-  Stores episodic summary to Recall
-       ↓
-Next session → recall-retrieve.js surfaces those memories
-```
+Recall breaks each memory into **atomic facts** at store time, embedding each one separately in a dedicated Qdrant collection. Search hits the precise fact, then returns the parent memory with a 1.15x score boost. This solves the "averaged embedding" problem that plagues every other memory system.
 
 ### React Dashboard
-- Full SPA at `/dashboard` built with React + Vite + Tailwind + DaisyUI
-- 6 views: Dashboard (health/stats), Memories (3-layer browse), Sessions, Signals, Audit, Settings
-- Real-time updates via Server-Sent Events (`GET /events/stream`)
-- Auth gate with localStorage API key persistence
-- Multi-stage Docker build (Node.js for dashboard, Python for API)
-
-### Operational
-- **Rate limiting** - per-IP throttling (slowapi): 60/min default, 30/min search, 20/min ingest, 10/min admin
-- **Batch operations** - store up to 50 or delete up to 100 memories in a single call
-- **Date-range search** - filter by `since`/`until` timestamps
-- **Per-domain stats** - count and average importance per domain
-- **Prometheus metrics** - `/metrics` endpoint for monitoring
-- **JSONL export/import** - full data portability with streaming export
-- **Reconcile** - detect and repair Qdrant/Neo4j inconsistencies
-- **Audit log** - every mutation logged to PostgreSQL (create, delete, supersede, consolidate, decay, signal, observer)
-- **Graceful degradation** - API returns 503 when Ollama is down instead of crashing; background workers skip and retry
-
-### Security
-- **Bearer token auth** - optional API key via `RECALL_API_KEY`
-- **Error sanitization** - internal details never leaked to clients
-- **Input validation** - content length, turn count, and field size limits
-- **Configurable CORS** - restrict origins via `RECALL_ALLOWED_ORIGINS`
+Full single-page app at `/dashboard` built with React + Vite + Tailwind + DaisyUI:
+- **Memories** — Browse, search, bulk select/delete, detail modals
+- **Sessions** — Expandable cards with turn timelines
+- **Signals** — Review pending auto-detected signals
+- **Audit** — Full mutation history with relative timestamps
+- **LLM** — Ollama model status, running models, RAM/VRAM usage
+- **Settings** — Maintenance operations, theme toggle
+- Real-time updates via Server-Sent Events
+- Dark/light theme with collapsible sidebar
 
 ---
 
@@ -234,20 +236,8 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ### First Memory
 
 ```bash
-# Without auth:
 curl -X POST http://localhost:8200/memory/store \
   -H "Content-Type: application/json" \
-  -d '{
-    "content": "JWT tokens should use 24h expiry for this project",
-    "memory_type": "semantic",
-    "domain": "auth",
-    "tags": ["jwt", "security"]
-  }'
-
-# With auth:
-curl -X POST http://localhost:8200/memory/store \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your-secret-key-here" \
   -d '{
     "content": "JWT tokens should use 24h expiry for this project",
     "memory_type": "semantic",
@@ -259,7 +249,7 @@ curl -X POST http://localhost:8200/memory/store \
 ### Search
 
 ```bash
-curl -X POST http://localhost:8200/search/query \
+curl -X POST http://localhost:8200/search/browse \
   -H "Content-Type: application/json" \
   -d '{
     "query": "What is the token configuration?",
@@ -313,6 +303,20 @@ Restart Claude Code. The `recall_*` tools will be available.
 | `recall_get` | Retrieve a specific memory by UUID |
 | `recall_similar` | Find memories similar to a given one |
 | `recall_ingest` | Ingest conversation turns for auto signal detection |
+
+### Claude Code Hooks
+
+All hooks are Node.js (CommonJS) scripts in `hooks/`. They run automatically — no CLAUDE.md configuration needed.
+
+| Hook | Event | What It Does |
+|------|-------|-------------|
+| `recall-retrieve.js` | UserPromptSubmit | Queries Recall on every prompt, injects top 5 relevant memories as context |
+| `observe-edit.js` | PostToolUse (Write/Edit) | Sends file changes to Recall for LLM fact extraction |
+| `recall-session-summary.js` | Stop | Reads transcript, stores episodic session summary |
+| `lint-check.js` | PostToolUse (Write/Edit) | Runs ruff (Python) / eslint (JS/TS), auto-fixes first |
+| `context-monitor.js` | PostToolUse | Estimates token usage from transcript size, warns at 150K+ |
+| `stop-guard.js` | Stop | Blocks stop if uncommitted git changes exist |
+| `session-save.js` | Stop | Auto-saves session state to Recall |
 
 ### Slash Commands
 
@@ -408,41 +412,8 @@ Relationship types: `related_to`, `caused_by`, `solved_by`, `supersedes`, `deriv
 #### `POST /memory/batch/store`
 Store multiple memories in one request (max 50). Each item follows the same schema as `/memory/store`. Returns per-item results with created/duplicate/error counts.
 
-**Request:**
-```json
-{
-  "memories": [
-    {"content": "Fact one", "memory_type": "semantic", "domain": "project"},
-    {"content": "Fact two", "memory_type": "semantic", "domain": "project"}
-  ]
-}
-```
-
-**Response:**
-```json
-{
-  "results": [
-    {"id": "uuid-1", "content_hash": "...", "created": true, "message": "Stored"},
-    {"id": "uuid-2", "content_hash": "...", "created": true, "message": "Stored"}
-  ],
-  "created": 2,
-  "duplicates": 0,
-  "errors": 0
-}
-```
-
 #### `POST /memory/batch/delete`
 Delete multiple memories by ID (max 100).
-
-**Request:**
-```json
-{"ids": ["uuid-1", "uuid-2"]}
-```
-
-**Response:**
-```json
-{"deleted": 2, "not_found": 0, "errors": 0}
-```
 
 #### `GET /memory/{id}/related`
 Get memories connected via graph traversal.
@@ -466,131 +437,14 @@ Token-efficient search — returns IDs and 120-char summaries instead of full co
 }
 ```
 
-**Response:**
-```json
-{
-  "results": [
-    {
-      "id": "uuid",
-      "summary": "The auth service uses bcrypt for password hashing with...",
-      "memory_type": "semantic",
-      "domain": "auth",
-      "similarity": 0.92,
-      "importance": 0.7,
-      "created_at": "2026-02-14T10:30:00",
-      "tags": ["security"]
-    }
-  ],
-  "total": 1,
-  "query": "How does the auth system work?"
-}
-```
-
 #### `POST /search/timeline`
 Chronological view of memories around an anchor point. If no `anchor_id`, returns most recent entries.
 
-**Request:**
-```json
-{
-  "anchor_id": "uuid-or-null",
-  "domain": "auth",
-  "memory_type": null,
-  "limit": 20,
-  "before": 10,
-  "after": 10
-}
-```
-
-**Response:**
-```json
-{
-  "entries": [
-    {
-      "id": "uuid",
-      "summary": "The auth service uses bcrypt...",
-      "memory_type": "semantic",
-      "domain": "auth",
-      "created_at": "2026-02-14T10:30:00",
-      "importance": 0.7
-    }
-  ],
-  "anchor_id": "uuid-or-null",
-  "total": 5
-}
-```
-
 #### `POST /search/query`
-Semantic search using the full retrieval pipeline: vector similarity, graph expansion, context filtering, and ranking.
-
-**Request:**
-```json
-{
-  "query": "How does the auth system work?",
-  "memory_types": ["semantic", "procedural"],
-  "domains": ["auth"],
-  "tags": ["security"],
-  "min_importance": 0.3,
-  "expand_relationships": true,
-  "max_depth": 2,
-  "limit": 10,
-  "session_id": null,
-  "current_file": null,
-  "current_task": null,
-  "since": "2026-01-01T00:00:00",
-  "until": null
-}
-```
-
-**Response:**
-```json
-{
-  "results": [
-    {
-      "id": "uuid",
-      "content": "The auth service uses bcrypt...",
-      "memory_type": "semantic",
-      "domain": "auth",
-      "score": 0.89,
-      "similarity": 0.92,
-      "graph_distance": 0,
-      "importance": 0.7,
-      "tags": ["security"]
-    }
-  ],
-  "total": 1,
-  "query": "How does the auth system work?"
-}
-```
+Full retrieval pipeline: vector similarity -> spreading activation -> context filtering -> ranking -> inhibition.
 
 #### `POST /search/context`
 Assemble formatted context for injection into prompts. Groups memories by type under markdown headers.
-
-**Request:**
-```json
-{
-  "query": "deployment process",
-  "session_id": null,
-  "current_file": null,
-  "current_task": null,
-  "max_tokens": 2000,
-  "include_working_memory": true
-}
-```
-
-**Response:**
-```json
-{
-  "context": "## Known Facts\n- ...\n\n## Workflows\n- ...",
-  "memories_used": 5,
-  "estimated_tokens": 420,
-  "breakdown": {
-    "working_memory": 0,
-    "semantic": 3,
-    "episodic": 0,
-    "procedural": 2
-  }
-}
-```
 
 #### `GET /search/similar/{id}?limit=5`
 Find memories semantically similar to a given memory.
@@ -617,148 +471,50 @@ Ingest conversation turns for automatic signal detection. The LLM analyzes turns
 | `turn.content` | 1-50,000 chars |
 | `turn.role` | max 20 chars |
 
-**Response:**
-```json
-{
-  "session_id": "uuid",
-  "turns_ingested": 2,
-  "total_turns": 2,
-  "detection_queued": true
-}
-```
-
 Signal confidence thresholds:
 - **>= 0.75**: Auto-stored as memory
 - **0.4 - 0.75**: Added to pending queue for review
 - **< 0.4**: Discarded
 
-#### `GET /ingest/{session_id}/signals`
-Get pending signals (medium confidence) awaiting review.
-
-#### `POST /ingest/{session_id}/signals/approve`
-Approve a pending signal, storing it as a memory.
-
-#### `GET /ingest/{session_id}/turns`
-Get stored turns for a session (debug/inspection).
+#### `GET /ingest/{session_id}/signals` - Pending signals awaiting review
+#### `POST /ingest/{session_id}/signals/approve` - Approve a pending signal
+#### `GET /ingest/{session_id}/turns` - Get stored turns for a session
 
 ### Observer
 
 #### `POST /observe/file-change`
-Observe a code edit for automatic fact extraction. Returns immediately; processing happens in the background. Used by the Claude Code observer hook.
-
-**Request:**
-```json
-{
-  "file_path": "/path/to/file.py",
-  "content": "full file content (for Write)",
-  "old_string": "original text (for Edit)",
-  "new_string": "replacement text (for Edit)",
-  "tool_name": "Write"
-}
-```
-
-**Response:** `{"status": "queued"}`
+Observe a code edit for automatic fact extraction. Returns immediately; processing happens in the background.
 
 #### `POST /observe/session-snapshot`
-Capture a session snapshot as a memory. Used by the Stop hook.
-
-**Request:**
-```json
-{"session_id": "uuid"}
-```
-
-**Response:** `{"status": "queued"}`
-
-### Events
-
-#### `GET /events/stream`
-Server-Sent Events stream for real-time dashboard updates. Emits `health` events every 5 seconds with system status.
-
-**Headers:** `Accept: text/event-stream`
+Capture a session snapshot as a memory.
 
 ### Sessions
 
-Sessions scope working memory and provide context for memory operations.
-
-#### `POST /session/start`
-```json
-{
-  "session_id": null,
-  "working_directory": "/path/to/project",
-  "current_task": "Fix auth bug"
-}
-```
-
-#### `POST /session/end`
-```json
-{
-  "session_id": "uuid",
-  "trigger_consolidation": true
-}
-```
-
-Ending a session cleans up pending signals and optionally triggers consolidation of session memories.
-
+#### `POST /session/start` - Start a new session
+#### `POST /session/end` - End session (optionally trigger consolidation)
 #### `GET /session/{id}` - Session status
 #### `GET /session/{id}/working-memory` - Working memory contents
 #### `POST /session/{id}/context` - Update session context
 
 ### Admin
 
-#### `POST /admin/consolidate`
-Trigger memory consolidation on-demand. Finds clusters of similar memories and merges them.
-
-```json
-{
-  "domain": null,
-  "memory_type": null,
-  "min_cluster_size": 2,
-  "dry_run": false
-}
-```
-
-#### `POST /admin/decay`
-Trigger importance decay on-demand.
-
-```json
-{
-  "simulate_hours": 0.0
-}
-```
-
-#### `GET /admin/export`
-Export all memories as streaming JSONL. Each line contains `{"memory": {...}, "relationships": [...]}`.
-
-Query params: `include_embeddings` (bool, default false), `include_superseded` (bool, default false)
-
-#### `POST /admin/import`
-Import memories from a `.jsonl` file upload. Supports `conflict=skip|overwrite` and `regenerate_embeddings=true|false`.
-
-#### `POST /admin/reconcile`
-Compare Qdrant and Neo4j to find orphans, importance mismatches, and superseded mismatches. Set `repair=true` to auto-fix (Qdrant is source of truth).
-
-#### `GET /admin/audit`
-Query the PostgreSQL audit log. Filter by `memory_id` and/or `action` (create, delete, supersede, consolidate, decay, signal).
-
-#### `GET /admin/sessions`
-Get archived session history from PostgreSQL (survives Redis TTL). Supports `limit` and `offset`.
+#### `POST /admin/consolidate` - Trigger memory consolidation on-demand
+#### `POST /admin/decay` - Trigger importance decay on-demand
+#### `GET /admin/export` - Export all memories as streaming JSONL
+#### `POST /admin/import` - Import memories from `.jsonl` file upload
+#### `POST /admin/reconcile` - Detect/repair Qdrant-Neo4j inconsistencies
+#### `GET /admin/audit` - Query PostgreSQL audit log
+#### `GET /admin/sessions` - Archived session history
+#### `GET /admin/ollama` - Ollama model status and resource usage
 
 ### System
 
-#### `GET /health`
-Returns health status of all services (API, Qdrant, Neo4j, Redis, Ollama) with memory/node/model counts. **Always public** (no auth required).
-
-#### `GET /stats`
-Returns total memory count, graph node/relationship counts, and active session count.
-
-#### `GET /stats/domains`
-Returns count and average importance per domain.
-
-#### `GET /metrics`
-Prometheus-format metrics for monitoring (embedding latency, LLM calls, signal counts, etc.).
-
-#### `GET /dashboard`
-React SPA dashboard with 6 views: health/stats, memory browse, sessions, signals, audit log, and settings. Built with Vite + Tailwind + DaisyUI. Supports auth gate and real-time SSE updates.
+#### `GET /health` - Service health (always public, no auth)
+#### `GET /stats` - Memory counts, graph stats, active sessions
+#### `GET /stats/domains` - Per-domain count and average importance
+#### `GET /metrics` - Prometheus-format metrics
+#### `GET /events/stream` - SSE stream for real-time dashboard updates
+#### `GET /dashboard` - React SPA dashboard
 
 ---
 
@@ -818,21 +574,6 @@ All configuration is via environment variables (prefix `RECALL_`):
 
 ---
 
-## Background Workers
-
-Workers run on a cron schedule via ARQ:
-
-| Worker | Schedule | Description |
-|--------|----------|-------------|
-| Consolidation | Every hour at :00 | Merges similar memories, boosts stability |
-| Decay | Every 30 min at :15/:45 | Reduces importance of unaccessed memories |
-| Metrics snapshot | Every hour at :30 | Snapshots system metrics to PostgreSQL |
-| Pattern extraction | Daily at 3:30 AM | Finds recurring patterns in episodic memories |
-
-Consolidation uses a lock to prevent overlapping runs. All workers use `scroll_all()` for unbiased batch processing.
-
----
-
 ## Development
 
 ### Install dependencies
@@ -860,9 +601,6 @@ pytest tests/integration/ -v -m "not slow"
 
 # Slow tests (signal detection, consolidation — requires Ollama)
 pytest tests/integration/ -v -m "slow"
-
-# With auth enabled, set the key:
-RECALL_API_KEY=your-key pytest tests/integration/ -v
 ```
 
 ### Dashboard development
@@ -873,34 +611,28 @@ npm run dev    # Vite dev server with API proxy
 npm run build  # Build to src/api/static/dashboard/
 ```
 
-### Lint
-```bash
-ruff check src/
-mypy src/
-```
-
-### Common Docker commands
-```bash
-# View API logs
-docker compose logs -f api
-
-# Restart API after code changes (volumes mount ./src)
-docker compose restart api
-
-# Shell into API container
-docker compose exec api /bin/bash
-
-# Full rebuild (needed for dependency changes)
-docker compose down && docker compose build && docker compose up -d
-```
-
 ### Deploy changes without rebuild
 Source code is volume-mounted (`./src:/app/src`), so:
 ```bash
-# Copy changed files and restart
-scp src/path/to/file.py server:/path/to/Recall/src/path/to/file.py
-ssh server "cd /path/to/Recall && docker compose restart api worker"
+docker compose restart api worker
 ```
+
+---
+
+## Operational Features
+
+- **Rate limiting** — per-IP throttling (slowapi): 60/min default, 30/min search, 20/min ingest, 10/min admin
+- **Batch operations** — store up to 50 or delete up to 100 memories in a single call
+- **Date-range search** — filter by `since`/`until` timestamps
+- **Prometheus metrics** — `/metrics` endpoint for monitoring
+- **JSONL export/import** — full data portability with streaming export
+- **Reconcile** — detect and repair Qdrant/Neo4j inconsistencies
+- **Audit log** — every mutation logged to PostgreSQL
+- **Graceful degradation** — API returns 503 when Ollama is down; workers skip and retry
+- **Bearer token auth** — optional API key via `RECALL_API_KEY`
+- **Error sanitization** — internal details never leaked to clients
+- **Input validation** — content length, turn count, and field size limits
+- **Configurable CORS** — restrict origins via `RECALL_ALLOWED_ORIGINS`
 
 ---
 
@@ -914,7 +646,7 @@ Superseded memories (merged during consolidation) are marked in both stores and 
 
 ## Project Status
 
-Active development. Current state:
+Active development through 12 phases of iterative refinement:
 
 - [x] Core API (store, search, context, sessions)
 - [x] Vector storage (Qdrant) with content-hash deduplication
@@ -922,31 +654,22 @@ Active development. Current state:
 - [x] Cache & sessions (Redis) with SCAN-based counting
 - [x] Background workers (decay, consolidation, patterns)
 - [x] Signal detection brain (auto-memory from conversations)
-- [x] Docker Compose deployment
-- [x] Deploy scripts (bash + PowerShell)
+- [x] Docker Compose deployment with deploy scripts
 - [x] MCP server for Claude Code
 - [x] Integration tests (148 tests: 119 fast + 29 slow/LLM)
-- [x] Bearer token authentication
-- [x] Error sanitization
-- [x] Input validation & CORS lockdown
-- [x] Dual-write consistency (compensating deletes)
-- [x] LLM-powered consolidation (smarter merges)
-- [x] Prometheus metrics
-- [x] JSONL export/import/reconcile
-- [x] Ops dashboard (audit log, sessions, search, signals)
+- [x] Security (auth, error sanitization, input validation, CORS)
+- [x] LLM-powered consolidation and pattern extraction
 - [x] PostgreSQL audit log & session archive
-- [x] Rate limiting (slowapi)
-- [x] Batch store/delete operations
-- [x] Date-range search
-- [x] Graceful Ollama degradation
+- [x] Prometheus metrics & JSONL export/import
+- [x] Rate limiting & batch operations
 - [x] 3-layer token-efficient search (browse + timeline)
 - [x] Sub-embeddings (granular fact search)
-- [x] Observer (auto-memory from code edits)
-- [x] Claude Code hooks (lint, observer, context monitor, stop guard)
-- [x] React SPA dashboard (6 views, SSE real-time updates)
-- [x] Server-Sent Events endpoint
-- [x] Organic memory loop (auto-retrieve on prompt, auto-store on edit, session summaries)
-- [ ] Project-scoped memory (auto-filter by working directory)
+- [x] Observer hooks (auto-memory from code edits)
+- [x] React SPA dashboard (6 views, SSE real-time, dark/light theme)
+- [x] Organic memory loop (auto-retrieve on prompt, session summaries)
+- [x] Spreading activation (Collins & Loftus graph traversal)
+- [x] Interference/inhibition (contradiction suppression, deduplication)
+- [x] LLM-scored poignancy (Stanford Generative Agents inspired importance)
 - [ ] Scheduled backups
 
 ## License
