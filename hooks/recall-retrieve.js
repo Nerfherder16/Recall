@@ -76,6 +76,13 @@ async function main() {
   const prompt = parsed.prompt || "";
   if (shouldSkip(prompt)) process.exit(0);
 
+  // Extract project name from cwd for search affinity
+  const cwd = parsed.cwd || "";
+  const projectName = cwd.split(/[/\\]/).filter(Boolean).pop() || "";
+  const query = projectName
+    ? `[${projectName}] ${prompt.slice(0, 480)}`
+    : prompt.slice(0, 500);
+
   // Query Recall browse endpoint
   const headers = { "Content-Type": "application/json" };
   if (RECALL_API_KEY) {
@@ -87,7 +94,7 @@ async function main() {
       method: "POST",
       headers,
       body: JSON.stringify({
-        query: prompt.slice(0, 500),
+        query,
         limit: MAX_RESULTS,
       }),
       signal: AbortSignal.timeout(3500),

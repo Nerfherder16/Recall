@@ -103,6 +103,9 @@ async function main() {
 
   if (!transcriptPath) process.exit(0);
 
+  // Extract project name from cwd for domain tagging
+  const projectName = cwd.split(/[/\\]/).filter(Boolean).pop() || "unknown";
+
   // Extract user messages from transcript
   const userMessages = extractUserMessages(transcriptPath);
   if (userMessages.length < 2) {
@@ -125,10 +128,10 @@ async function main() {
       headers,
       body: JSON.stringify({
         content: summary,
-        domain: "work",
+        domain: projectName,
         source: "system",
         memory_type: "episodic",
-        tags: ["session-summary"],
+        tags: ["session-summary", projectName],
         importance: 0.4,
       }),
       signal: AbortSignal.timeout(5000),
