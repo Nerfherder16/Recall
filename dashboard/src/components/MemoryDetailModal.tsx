@@ -95,6 +95,7 @@ export default function MemoryDetailModal({ memory, onClose }: Props) {
 
         <div className="flex gap-4 mt-4 text-xs text-base-content/50">
           <span>Source: {memory.source}</span>
+          {memory.stored_by && <span>Stored by: {memory.stored_by}</span>}
           <span>Created: {formatDate(memory.created_at)}</span>
           <span>Last access: {formatDate(memory.last_accessed)}</span>
         </div>

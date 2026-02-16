@@ -58,6 +58,14 @@ class Neo4jStore:
                 """
             )
 
+            # Create index on user_id
+            await session.run(
+                """
+                CREATE INDEX memory_user_id_idx IF NOT EXISTS
+                FOR (m:Memory) ON (m.user_id)
+                """
+            )
+
         logger.info("connected_to_neo4j")
 
     async def create_memory_node(self, memory: Memory):
@@ -75,7 +83,8 @@ class Neo4jStore:
                     m.domain = $domain,
                     m.importance = $importance,
                     m.created_at = $created_at,
-                    m.content_preview = $preview
+                    m.content_preview = $preview,
+                    m.user_id = $user_id
                 """,
                 id=memory.id,
                 memory_type=memory.memory_type.value,
@@ -83,6 +92,7 @@ class Neo4jStore:
                 importance=memory.importance,
                 created_at=memory.created_at.isoformat(),
                 preview=memory.content[:100] if memory.content else "",
+                user_id=memory.user_id,
             )
 
         logger.debug("created_memory_node", id=memory.id)

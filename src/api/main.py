@@ -4,7 +4,6 @@ Recall API - FastAPI application for living memory.
 Main entry point for the memory system.
 """
 
-import secrets
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -15,7 +14,6 @@ import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -23,33 +21,12 @@ from src.core import get_settings
 from src.core.metrics import get_metrics
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, get_redis_store
 
+from .auth import require_auth
 from .rate_limit import limiter
 from .routes import admin, events, ingest, memory, observe, ops, search, session
 
 logger = structlog.get_logger()
 settings = get_settings()
-
-
-# =============================================================
-# AUTH
-# =============================================================
-
-_bearer_scheme = HTTPBearer(auto_error=False)
-
-
-async def require_auth(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-):
-    """Validate Bearer token if RECALL_API_KEY is configured."""
-    if not settings.api_key:
-        return  # Auth disabled — dev mode
-
-    if not credentials or not credentials.credentials:
-        raise HTTPException(status_code=401, detail="Missing API key")
-
-    # Constant-time comparison to prevent timing attacks
-    if not secrets.compare_digest(credentials.credentials, settings.api_key):
-        raise HTTPException(status_code=401, detail="Invalid API key")
 
 
 # =============================================================

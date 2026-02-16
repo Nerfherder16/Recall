@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../api/client";
-import type { BrowseResult, MemoryDetail, DomainStat } from "../api/types";
+import type {
+  BrowseResult,
+  MemoryDetail,
+  DomainStat,
+  UserInfo,
+} from "../api/types";
 import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
@@ -17,6 +22,7 @@ export default function MemoriesPage() {
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState("");
   const [memType, setMemType] = useState("");
+  const [userFilter, setUserFilter] = useState("");
   const [results, setResults] = useState<BrowseResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useLocalStorage<"grid" | "list">(
@@ -24,6 +30,7 @@ export default function MemoriesPage() {
     "list",
   );
   const [domains, setDomains] = useState<string[]>([]);
+  const [users, setUsers] = useState<UserInfo[]>([]);
 
   // Selection state
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -32,10 +39,13 @@ export default function MemoriesPage() {
   // Detail modal
   const [detailMem, setDetailMem] = useState<MemoryDetail | null>(null);
 
-  // Load domains for filter dropdown
+  // Load domains and users for filter dropdowns
   useEffect(() => {
     api<{ domains: DomainStat[] }>("/stats/domains")
       .then((d) => setDomains(d.domains.map((x) => x.domain)))
+      .catch(() => {});
+    api<UserInfo[]>("/admin/users")
+      .then((u) => setUsers(u))
       .catch(() => {});
   }, []);
 
@@ -78,6 +88,7 @@ export default function MemoriesPage() {
       const body: Record<string, unknown> = { query, limit: 30 };
       if (domain) body.domains = [domain];
       if (memType) body.memory_types = [memType];
+      if (userFilter) body.user = userFilter;
       const res = await api<{ results: BrowseResult[] }>(
         "/search/browse",
         "POST",
@@ -174,6 +185,19 @@ export default function MemoriesPage() {
           <option value="episodic">Episodic</option>
           <option value="procedural">Procedural</option>
         </select>
+        <select
+          className="select select-bordered w-36"
+          value={userFilter}
+          onChange={(e) => setUserFilter(e.target.value)}
+        >
+          <option value="">All users</option>
+          <option value="system">system</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.username}>
+              {u.display_name || u.username}
+            </option>
+          ))}
+        </select>
         <button
           className={`btn btn-primary ${loading ? "loading" : ""}`}
           onClick={search}
@@ -207,6 +231,11 @@ export default function MemoriesPage() {
                       <span className="text-xs text-base-content/50">
                         {r.domain}
                       </span>
+                      {r.stored_by && (
+                        <span className="badge badge-xs badge-outline badge-info">
+                          {r.stored_by}
+                        </span>
+                      )}
                     </div>
                     <p
                       className="text-sm cursor-pointer hover:text-primary transition-colors line-clamp-3"
@@ -256,6 +285,11 @@ export default function MemoriesPage() {
                       <span className="text-xs text-base-content/50">
                         {r.domain}
                       </span>
+                      {r.stored_by && (
+                        <span className="badge badge-xs badge-outline badge-info">
+                          {r.stored_by}
+                        </span>
+                      )}
                       {r.similarity > 0 && (
                         <span className="text-xs text-base-content/40">
                           {(r.similarity * 100).toFixed(1)}%

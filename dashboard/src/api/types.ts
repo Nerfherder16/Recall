@@ -25,6 +25,7 @@ export interface BrowseResult {
   importance: number;
   created_at: string;
   tags: string[];
+  stored_by: string | null;
 }
 
 export interface MemoryDetail {
@@ -40,6 +41,20 @@ export interface MemoryDetail {
   access_count: number;
   created_at: string;
   last_accessed: string;
+  stored_by: string | null;
+}
+
+export interface UserInfo {
+  id: number;
+  username: string;
+  display_name: string | null;
+  is_admin: boolean;
+  created_at: string;
+  last_active_at: string | null;
+}
+
+export interface CreateUserResponse extends UserInfo {
+  api_key: string;
 }
 
 export interface AuditEntry {

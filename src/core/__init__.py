@@ -16,6 +16,7 @@ from .models import (
     RetrievalResult,
     Session,
     SignalType,
+    User,
 )
 
 __all__ = [
@@ -44,4 +45,5 @@ __all__ = [
     "SignalType",
     "DetectedSignal",
     "AntiPattern",
+    "User",
 ]

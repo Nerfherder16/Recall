@@ -1,5 +1,6 @@
 """
-PostgreSQL storage for audit log, session archive, and metrics persistence.
+PostgreSQL storage for audit log, session archive, metrics persistence,
+and user management.
 
 Uses raw asyncpg (no ORM) — consistent with the rest of the codebase.
 All write operations are fire-and-forget: Postgres failures never block
@@ -7,6 +8,7 @@ the main operation.
 """
 
 import json
+import secrets
 from datetime import datetime
 from typing import Any
 
@@ -19,6 +21,18 @@ logger = structlog.get_logger()
 
 # SQL for table creation (run on connect)
 _CREATE_TABLES = """
+CREATE TABLE IF NOT EXISTS users (
+    id              SERIAL PRIMARY KEY,
+    username        TEXT NOT NULL UNIQUE,
+    api_key         TEXT NOT NULL UNIQUE,
+    display_name    TEXT,
+    is_admin        BOOLEAN NOT NULL DEFAULT false,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_active_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
 CREATE TABLE IF NOT EXISTS audit_log (
     id          BIGSERIAL PRIMARY KEY,
     timestamp   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -26,7 +40,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
     memory_id   TEXT NOT NULL,
     actor       TEXT NOT NULL DEFAULT 'system',
     details     JSONB,
-    session_id  TEXT
+    session_id  TEXT,
+    user_id     INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_audit_log_memory_id ON audit_log(memory_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
@@ -55,6 +70,19 @@ CREATE TABLE IF NOT EXISTS metrics_snapshot (
 CREATE INDEX IF NOT EXISTS idx_metrics_snapshot_timestamp ON metrics_snapshot(timestamp);
 """
 
+# Migration: add user_id column to audit_log if it doesn't exist yet
+_MIGRATE_AUDIT_USER_ID = """
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'audit_log' AND column_name = 'user_id'
+    ) THEN
+        ALTER TABLE audit_log ADD COLUMN user_id INTEGER;
+    END IF;
+END $$;
+"""
+
 
 def _parse_dsn(dsn: str) -> str:
     """Convert SQLAlchemy-style DSN to raw asyncpg DSN.
@@ -78,6 +106,7 @@ class PostgresStore:
 
         async with self.pool.acquire() as conn:
             await conn.execute(_CREATE_TABLES)
+            await conn.execute(_MIGRATE_AUDIT_USER_ID)
 
         logger.info("connected_to_postgres")
 
@@ -98,19 +127,21 @@ class PostgresStore:
         actor: str = "system",
         details: dict[str, Any] | None = None,
         session_id: str | None = None,
+        user_id: int | None = None,
     ):
         """Append an audit entry. Fire-and-forget — never raises."""
         try:
             await self.pool.execute(
                 """
-                INSERT INTO audit_log (action, memory_id, actor, details, session_id)
-                VALUES ($1, $2, $3, $4::jsonb, $5)
+                INSERT INTO audit_log (action, memory_id, actor, details, session_id, user_id)
+                VALUES ($1, $2, $3, $4::jsonb, $5, $6)
                 """,
                 action,
                 memory_id,
                 actor,
                 json.dumps(details) if details else None,
                 session_id,
+                user_id,
             )
         except Exception as e:
             logger.warning("audit_log_write_failed", error=str(e), action=action, memory_id=memory_id)
@@ -154,9 +185,100 @@ class PostgresStore:
                 "actor": r["actor"],
                 "details": json.loads(r["details"]) if r["details"] else None,
                 "session_id": r["session_id"],
+                "user_id": r["user_id"] if "user_id" in r.keys() else None,
             }
             for r in rows
         ]
+
+    # =============================================================
+    # USER MANAGEMENT
+    # =============================================================
+
+    async def create_user(
+        self,
+        username: str,
+        display_name: str | None = None,
+        is_admin: bool = False,
+    ) -> dict[str, Any]:
+        """Create a new user with a generated API key. Returns full user dict including api_key."""
+        api_key = f"rc_{secrets.token_urlsafe(32)}"
+        row = await self.pool.fetchrow(
+            """
+            INSERT INTO users (username, api_key, display_name, is_admin)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, username, api_key, display_name, is_admin, created_at, last_active_at
+            """,
+            username,
+            api_key,
+            display_name,
+            is_admin,
+        )
+        return {
+            "id": row["id"],
+            "username": row["username"],
+            "api_key": row["api_key"],
+            "display_name": row["display_name"],
+            "is_admin": row["is_admin"],
+            "created_at": row["created_at"].isoformat(),
+            "last_active_at": None,
+        }
+
+    async def get_user_by_api_key(self, api_key: str) -> dict[str, Any] | None:
+        """Look up a user by API key. Returns user dict or None."""
+        row = await self.pool.fetchrow(
+            """
+            SELECT id, username, display_name, is_admin, created_at, last_active_at
+            FROM users WHERE api_key = $1
+            """,
+            api_key,
+        )
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "username": row["username"],
+            "display_name": row["display_name"],
+            "is_admin": row["is_admin"],
+            "created_at": row["created_at"].isoformat(),
+            "last_active_at": row["last_active_at"].isoformat() if row["last_active_at"] else None,
+        }
+
+    async def list_users(self) -> list[dict[str, Any]]:
+        """List all users (without API keys)."""
+        rows = await self.pool.fetch(
+            """
+            SELECT id, username, display_name, is_admin, created_at, last_active_at
+            FROM users ORDER BY created_at ASC
+            """
+        )
+        return [
+            {
+                "id": r["id"],
+                "username": r["username"],
+                "display_name": r["display_name"],
+                "is_admin": r["is_admin"],
+                "created_at": r["created_at"].isoformat(),
+                "last_active_at": r["last_active_at"].isoformat() if r["last_active_at"] else None,
+            }
+            for r in rows
+        ]
+
+    async def delete_user(self, user_id: int) -> bool:
+        """Delete a user by ID. Returns True if deleted, False if not found."""
+        result = await self.pool.execute(
+            "DELETE FROM users WHERE id = $1", user_id
+        )
+        return result == "DELETE 1"
+
+    async def update_user_last_active(self, user_id: int):
+        """Touch last_active_at. Fire-and-forget — never raises."""
+        try:
+            await self.pool.execute(
+                "UPDATE users SET last_active_at = now() WHERE id = $1",
+                user_id,
+            )
+        except Exception as e:
+            logger.warning("user_last_active_update_failed", user_id=user_id, error=str(e))
 
     # =============================================================
     # SESSION ARCHIVE

@@ -9,6 +9,7 @@ import MemoriesPage from "./pages/MemoriesPage";
 import SessionsPage from "./pages/SessionsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignalsPage from "./pages/SignalsPage";
+import UsersPage from "./pages/UsersPage";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { apiKey, setApiKey } = useAuth();
@@ -61,6 +62,7 @@ export default function App() {
                 <Route path="sessions" element={<SessionsPage />} />
                 <Route path="signals" element={<SignalsPage />} />
                 <Route path="audit" element={<AuditPage />} />
+                <Route path="users" element={<UsersPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -39,6 +39,7 @@ class SearchRequest(BaseModel):
     current_task: str | None = None
     since: datetime | None = None
     until: datetime | None = None
+    user: str | None = None  # Filter by username
 
 
 class SearchResult(BaseModel):
@@ -53,6 +54,7 @@ class SearchResult(BaseModel):
     graph_distance: int
     importance: float
     tags: list[str]
+    stored_by: str | None = None
 
 
 class SearchResponse(BaseModel):
@@ -74,6 +76,7 @@ class BrowseResult(BaseModel):
     importance: float
     created_at: str
     tags: list[str]
+    stored_by: str | None = None
 
 
 class BrowseResponse(BaseModel):
@@ -104,6 +107,7 @@ class TimelineEntry(BaseModel):
     domain: str
     created_at: str
     importance: float
+    stored_by: str | None = None
 
 
 class TimelineResponse(BaseModel):
@@ -163,6 +167,7 @@ async def browse_memories(request: Request, body: SearchRequest):
             current_task=body.current_task,
             since=body.since,
             until=body.until,
+            username=body.user,
         )
 
         pipeline = await create_retrieval_pipeline()
@@ -178,6 +183,7 @@ async def browse_memories(request: Request, body: SearchRequest):
                 importance=r.memory.importance,
                 created_at=r.memory.created_at.isoformat(),
                 tags=r.memory.tags,
+                stored_by=r.memory.username,
             )
             for r in results
         ]
@@ -245,6 +251,7 @@ async def timeline_view(request: Request, body: TimelineRequest):
                 domain=payload.get("domain", "general"),
                 created_at=payload.get("created_at", ""),
                 importance=payload.get("importance", 0.5),
+                stored_by=payload.get("username"),
             )
             for mid, payload in points
         ]
@@ -292,6 +299,7 @@ async def search_memories(request: Request, body: SearchRequest):
             current_task=body.current_task,
             since=body.since,
             until=body.until,
+            username=body.user,
         )
 
         # Execute retrieval
@@ -310,6 +318,7 @@ async def search_memories(request: Request, body: SearchRequest):
                 graph_distance=r.graph_distance,
                 importance=r.memory.importance,
                 tags=r.memory.tags,
+                stored_by=r.memory.username,
             )
             for r in results
         ]

@@ -4,22 +4,26 @@ Admin endpoints for triggering maintenance operations on-demand.
 - POST /admin/consolidate  — merge similar memories
 - POST /admin/decay        — apply importance decay
 - GET  /admin/ollama       — proxy Ollama model/status info
+- POST /admin/users        — create user
+- GET  /admin/users        — list users
+- DELETE /admin/users/{id}  — delete user
 """
 
 from typing import Any
 
 import httpx
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from src.api.rate_limit import limiter
 from src.core.config import get_settings
+from src.core.models import User
 
 from src.core.consolidation import MemoryConsolidator
 from src.core.embeddings import get_embedding_service
 from src.core.models import MemoryType
-from src.storage import get_neo4j_store, get_qdrant_store
+from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store
 from src.workers.decay import DecayWorker
 
 logger = structlog.get_logger()
@@ -172,3 +176,76 @@ async def ollama_info(request: Request):
             result["running"] = []
 
     return result
+
+
+# =============================================================
+# USER MANAGEMENT
+# =============================================================
+
+
+class CreateUserRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$")
+    display_name: str | None = Field(default=None, max_length=100)
+    is_admin: bool = False
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    display_name: str | None
+    is_admin: bool
+    created_at: str
+    last_active_at: str | None
+
+
+class CreateUserResponse(UserResponse):
+    api_key: str  # Only returned once on creation
+
+
+@router.post("/users", response_model=CreateUserResponse)
+async def create_user(body: CreateUserRequest, request: Request):
+    """Create a new user with a generated API key. The key is shown only once."""
+    try:
+        pg = await get_postgres_store()
+        user_data = await pg.create_user(
+            username=body.username,
+            display_name=body.display_name,
+            is_admin=body.is_admin,
+        )
+        logger.info("user_created", username=body.username, user_id=user_data["id"])
+        return CreateUserResponse(**user_data)
+    except Exception as e:
+        err = str(e).lower()
+        if "unique" in err or "duplicate" in err:
+            raise HTTPException(status_code=409, detail=f"Username '{body.username}' already exists")
+        logger.error("create_user_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/users", response_model=list[UserResponse])
+async def list_users(request: Request):
+    """List all users (API keys are never returned)."""
+    try:
+        pg = await get_postgres_store()
+        users = await pg.list_users()
+        return [UserResponse(**u) for u in users]
+    except Exception as e:
+        logger.error("list_users_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: int, request: Request):
+    """Delete a user. Their memories remain attributed to them."""
+    try:
+        pg = await get_postgres_store()
+        deleted = await pg.delete_user(user_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="User not found")
+        logger.info("user_deleted", user_id=user_id)
+        return {"deleted": True, "user_id": user_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("delete_user_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -121,6 +121,7 @@ class RetrievalPipeline:
             session_id=query.session_id if query.session_id else None,
             since=query.since.isoformat() if query.since else None,
             until=query.until.isoformat() if query.until else None,
+            username=query.username,
         )
 
         for memory_id, similarity, payload in search_results:
@@ -405,6 +406,8 @@ class RetrievalPipeline:
             session_id=payload.get("session_id"),
             superseded_by=payload.get("superseded_by"),
             parent_ids=payload.get("parent_ids", []),
+            user_id=payload.get("user_id"),
+            username=payload.get("username"),
         )
 
 

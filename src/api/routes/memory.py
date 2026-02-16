@@ -6,15 +6,17 @@ from datetime import datetime
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from src.api.auth import require_auth
 from src.core import (
     Memory,
     MemorySource,
     MemoryType,
     Relationship,
     RelationshipType,
+    User,
     get_embedding_service,
 )
 from src.core.embeddings import OllamaUnavailableError, content_hash
@@ -67,6 +69,7 @@ class MemoryResponse(BaseModel):
     access_count: int
     created_at: str
     last_accessed: str
+    stored_by: str | None = None
 
 
 class CreateRelationshipRequest(BaseModel):
@@ -85,7 +88,11 @@ class CreateRelationshipRequest(BaseModel):
 
 
 @router.post("/store", response_model=StoreMemoryResponse)
-async def store_memory(request: StoreMemoryRequest, background_tasks: BackgroundTasks):
+async def store_memory(
+    request: StoreMemoryRequest,
+    background_tasks: BackgroundTasks,
+    user: User | None = Depends(require_auth),
+):
     """
     Store a new memory.
 
@@ -107,6 +114,8 @@ async def store_memory(request: StoreMemoryRequest, background_tasks: Background
             confidence=request.confidence,
             session_id=request.session_id,
             metadata=request.metadata,
+            user_id=user.id if user else None,
+            username=user.username if user else None,
         )
 
         # Dedup check: reject if identical content already exists
@@ -151,9 +160,11 @@ async def store_memory(request: StoreMemoryRequest, background_tasks: Background
         # Audit log (fire-and-forget)
         pg = await get_postgres_store()
         await pg.log_audit(
-            "create", memory.id, actor="user",
+            "create", memory.id,
+            actor=user.username if user else "user",
             session_id=request.session_id,
             details={"type": memory.memory_type.value, "domain": memory.domain},
+            user_id=user.id if user else None,
         )
 
         # Trigger sub-embedding extraction in background
@@ -202,6 +213,7 @@ async def get_memory(memory_id: str):
             access_count=payload.get("access_count", 0),
             created_at=payload.get("created_at", ""),
             last_accessed=payload.get("last_accessed", ""),
+            stored_by=payload.get("username"),
         )
 
     except HTTPException:
@@ -216,7 +228,7 @@ async def get_memory(memory_id: str):
 
 
 @router.delete("/{memory_id}")
-async def delete_memory(memory_id: str):
+async def delete_memory(memory_id: str, user: User | None = Depends(require_auth)):
     """Delete a memory."""
     try:
         qdrant = await get_qdrant_store()
@@ -234,7 +246,11 @@ async def delete_memory(memory_id: str):
 
         # Audit log (fire-and-forget)
         pg = await get_postgres_store()
-        await pg.log_audit("delete", memory_id, actor="user")
+        await pg.log_audit(
+            "delete", memory_id,
+            actor=user.username if user else "user",
+            user_id=user.id if user else None,
+        )
 
         return {"deleted": True, "id": memory_id}
 
@@ -347,7 +363,7 @@ class BatchDeleteResponse(BaseModel):
 
 
 @router.post("/batch/store", response_model=BatchStoreResponse)
-async def batch_store_memories(request: BatchStoreRequest):
+async def batch_store_memories(request: BatchStoreRequest, user: User | None = Depends(require_auth)):
     """
     Store multiple memories in one request.
 
@@ -378,6 +394,8 @@ async def batch_store_memories(request: BatchStoreRequest):
                     confidence=item.confidence,
                     session_id=item.session_id,
                     metadata=item.metadata,
+                    user_id=user.id if user else None,
+                    username=user.username if user else None,
                 )
 
                 # Dedup check
@@ -420,9 +438,11 @@ async def batch_store_memories(request: BatchStoreRequest):
 
                 # Audit (fire-and-forget)
                 await pg.log_audit(
-                    "create", memory.id, actor="user",
+                    "create", memory.id,
+                    actor=user.username if user else "user",
                     session_id=item.session_id,
                     details={"type": memory.memory_type.value, "domain": memory.domain, "batch": True},
+                    user_id=user.id if user else None,
                 )
 
                 results.append(BatchStoreResult(
@@ -460,7 +480,7 @@ async def batch_store_memories(request: BatchStoreRequest):
 
 
 @router.post("/batch/delete", response_model=BatchDeleteResponse)
-async def batch_delete_memories(request: BatchDeleteRequest):
+async def batch_delete_memories(request: BatchDeleteRequest, user: User | None = Depends(require_auth)):
     """
     Delete multiple memories in one request.
 
@@ -486,7 +506,12 @@ async def batch_delete_memories(request: BatchDeleteRequest):
                 await qdrant.delete(memory_id)
                 await neo4j.delete_memory(memory_id)
 
-                await pg.log_audit("delete", memory_id, actor="user", details={"batch": True})
+                await pg.log_audit(
+                    "delete", memory_id,
+                    actor=user.username if user else "user",
+                    details={"batch": True},
+                    user_id=user.id if user else None,
+                )
                 deleted += 1
 
             except Exception as e:

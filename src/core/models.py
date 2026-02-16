@@ -53,6 +53,15 @@ class RelationshipType(str, Enum):
     PART_OF = "part_of"  # Hierarchical containment
 
 
+class User(BaseModel):
+    """A user identity resolved from an API key."""
+
+    id: int
+    username: str
+    display_name: str | None = None
+    is_admin: bool = False
+
+
 class Memory(BaseModel):
     """
     The atomic unit of the recall system.
@@ -92,6 +101,10 @@ class Memory(BaseModel):
     parent_ids: list[str] = Field(default_factory=list)  # Source memories
     superseded_by: str | None = None  # If replaced by newer memory
     session_id: str | None = None  # Session where created
+
+    # User attribution (nullable for backward compat with legacy data)
+    user_id: int | None = None
+    username: str | None = None
 
     # Metadata for extensibility
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -172,6 +185,7 @@ class MemoryQuery(BaseModel):
     min_confidence: float = 0.0
     since: datetime | None = None
     until: datetime | None = None
+    username: str | None = None  # Filter by creator username
 
     # Graph options
     expand_relationships: bool = True

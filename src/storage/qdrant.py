@@ -74,6 +74,8 @@ class QdrantStore:
             ("session_id", "keyword"),
             ("content_hash", "keyword"),
             ("created_at", "datetime"),
+            ("user_id", "integer"),
+            ("username", "keyword"),
         ]
 
         for field, field_type in indexes:
@@ -114,6 +116,8 @@ class QdrantStore:
                 "superseded_by": memory.superseded_by,
                 "parent_ids": memory.parent_ids,
                 "metadata": memory.metadata,
+                "user_id": memory.user_id,
+                "username": memory.username,
             },
         )
 
@@ -136,6 +140,7 @@ class QdrantStore:
         session_id: str | None = None,
         since: str | None = None,
         until: str | None = None,
+        username: str | None = None,
     ) -> list[tuple[str, float, dict[str, Any]]]:
         """
         Search for similar memories.
@@ -144,6 +149,14 @@ class QdrantStore:
         """
         # Build filter conditions
         conditions = []
+
+        if username:
+            conditions.append(
+                FieldCondition(
+                    key="username",
+                    match=MatchValue(value=username),
+                )
+            )
 
         if memory_types:
             conditions.append(
