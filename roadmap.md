@@ -103,6 +103,18 @@
 
 ---
 
+## Phase 13: Multi-User Support — COMPLETE (commit 8aa7f73)
+- **Per-user API keys**: PostgreSQL `users` table (username, api_key, display_name, is_admin, last_active_at). Keys auto-generated with `rc_` prefix.
+- **Auth middleware**: Extracted to `src/api/auth.py`. Resolves Bearer token → User object. Check order: (1) auth disabled → None, (2) RECALL_API_KEY → system admin User(id=0), (3) users table lookup → User(id=N), (4) reject 401. Backward compatible — existing master key still works.
+- **User attribution**: Memory model gains `user_id`/`username` (nullable for legacy data). Stored in Qdrant payload (with indexes), Neo4j node properties, and audit log.
+- **Admin endpoints**: `POST /admin/users` (create, returns one-time API key), `GET /admin/users` (list without keys), `DELETE /admin/users/{id}` (remove user, memories stay).
+- **Search filtering**: `user` param on SearchRequest filters by username via Qdrant FieldCondition. `stored_by` field added to BrowseResult, SearchResult, TimelineEntry, MemoryResponse.
+- **Dashboard**: Users page (create/list/delete with API key reveal modal), `stored_by` badges on memory cards (grid + list views), user filter dropdown on Memories page, "Users" link in sidebar.
+- **Migration**: Idempotent — `CREATE TABLE IF NOT EXISTS` for users table, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for audit_log.user_id. No data migration needed.
+- **Shared visibility by default**: All users see all memories; `user` filter is optional.
+
+---
+
 ## Deferred (Post Phase 12 Evaluation)
 
 ### Prospective Memory Triggers
@@ -213,7 +225,7 @@ FastAPI API (:8200)
     ├── /session/*    — session lifecycle
     ├── /ingest/*     — turn ingestion + signal detection
     ├── /observe/*    — file-change observer (fact extraction)
-    ├── /admin/*      — export, import, reconcile, audit, sessions, ollama
+    ├── /admin/*      — export, import, reconcile, audit, sessions, ollama, users
     ├── /events/*     — SSE stream for dashboard
     ├── /health       — public health check
     ├── /metrics      — Prometheus format

@@ -59,6 +59,8 @@ Next session --> recall-retrieve.js surfaces those memories
 
 No configuration needed. No CLAUDE.md instructions. The hooks create a closed-loop memory system that works organically.
 
+When context reaches 90%, the **statusline** automatically triggers a handoff — sending the transcript to your local LLM (Ollama) for summarization and storing it to Recall. Session knowledge survives compaction.
+
 ## Architecture
 
 ```
@@ -78,7 +80,7 @@ FastAPI API (:8200)
     |-- /session/*    session lifecycle + working memory
     |-- /ingest/*     turn ingestion + signal detection
     |-- /observe/*    file-change observer (fact extraction)
-    |-- /admin/*      export, import, reconcile, audit, sessions, ollama
+    |-- /admin/*      export, import, reconcile, audit, sessions, ollama, users
     |-- /events/*     SSE stream for real-time dashboard
     |-- /health       public health check
     |-- /metrics      Prometheus format
@@ -154,10 +156,11 @@ Recall breaks each memory into **atomic facts** at store time, embedding each on
 
 ### React Dashboard
 Full single-page app at `/dashboard` built with React + Vite + Tailwind + DaisyUI:
-- **Memories** — Browse, search, bulk select/delete, detail modals
+- **Memories** — Browse, search, bulk select/delete, detail modals, `stored_by` badges, user filter
 - **Sessions** — Expandable cards with turn timelines
 - **Signals** — Review pending auto-detected signals
 - **Audit** — Full mutation history with relative timestamps
+- **Users** — Create/list/delete users, one-time API key reveal
 - **LLM** — Ollama model status, running models, RAM/VRAM usage
 - **Settings** — Maintenance operations, theme toggle
 - Real-time updates via Server-Sent Events
@@ -170,6 +173,7 @@ Full single-page app at `/dashboard` built with React + Vite + Tailwind + DaisyU
 ### Prerequisites
 - Docker & Docker Compose
 - Ollama running somewhere on your network with `bge-large` and `qwen3:14b` models
+- Node.js (for Claude Code hooks and MCP server)
 
 ### Option 1: Deploy Script (Recommended)
 
@@ -228,6 +232,8 @@ Once enabled:
 - `/health` remains public for monitoring
 - The startup log will show `auth_enabled=True`
 
+**Multi-user support:** Create per-user API keys via `POST /admin/users`. Each user's memories are attributed with `stored_by` and can be filtered with the `user` search parameter. All users see all memories by default (shared visibility).
+
 Generate a strong key:
 ```bash
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -259,18 +265,29 @@ curl -X POST http://localhost:8200/search/browse \
 
 ---
 
-## Claude Code Integration (MCP Server)
+## Claude Code Integration (MCP Server + Hooks + Statusline)
 
-Recall ships with an MCP server that gives Claude Code direct access to the memory system.
+Recall ships with an MCP server, organic memory hooks, and a context-aware statusline. The installer configures everything in one command.
 
-### Setup
+### Quick Install
 
 ```bash
-cd mcp-server
-npm install
+cd mcp-server && npm install && cd ..
+node install.js
+# Follow the prompt for your Recall host, or:
+node install.js --host http://YOUR_SERVER:8200
 ```
 
-Add to your `~/.claude.json` under `mcpServers`:
+This configures:
+- **MCP Server** — `recall_*` tools in Claude Code
+- **Hooks** — auto-retrieve, auto-store, session summaries
+- **Statusline** — context usage bar with auto-handoff at 90%
+
+To uninstall: `node install.js --uninstall`
+
+### Manual Setup
+
+If you prefer manual configuration, add to `~/.claude.json` under `mcpServers`:
 
 ```json
 {
@@ -285,7 +302,7 @@ Add to your `~/.claude.json` under `mcpServers`:
 }
 ```
 
-> **Note:** If auth is disabled (no `RECALL_API_KEY` set on the server), you can omit the `RECALL_API_KEY` env var from the MCP config.
+> **Note:** If auth is disabled (no `RECALL_API_KEY` set on the server), you can omit the `RECALL_API_KEY` env var.
 
 Restart Claude Code. The `recall_*` tools will be available.
 
@@ -317,6 +334,7 @@ All hooks are Node.js (CommonJS) scripts in `hooks/`. They run automatically —
 | `context-monitor.js` | PostToolUse | Estimates token usage from transcript size, warns at 150K+ |
 | `stop-guard.js` | Stop | Blocks stop if uncommitted git changes exist |
 | `session-save.js` | Stop | Auto-saves session state to Recall |
+| `recall-statusline.js` | Statusline | Context usage bar; at 90% triggers Ollama summary → stores handoff to Recall |
 
 ### Slash Commands
 
@@ -506,6 +524,9 @@ Capture a session snapshot as a memory.
 #### `GET /admin/audit` - Query PostgreSQL audit log
 #### `GET /admin/sessions` - Archived session history
 #### `GET /admin/ollama` - Ollama model status and resource usage
+#### `POST /admin/users` - Create a user (returns one-time API key with `rc_` prefix)
+#### `GET /admin/users` - List all users (without API keys)
+#### `DELETE /admin/users/{id}` - Delete a user (memories remain)
 
 ### System
 
@@ -629,7 +650,9 @@ docker compose restart api worker
 - **Reconcile** — detect and repair Qdrant/Neo4j inconsistencies
 - **Audit log** — every mutation logged to PostgreSQL
 - **Graceful degradation** — API returns 503 when Ollama is down; workers skip and retry
-- **Bearer token auth** — optional API key via `RECALL_API_KEY`
+- **Bearer token auth** — master key via `RECALL_API_KEY` + per-user keys via admin API
+- **Multi-user support** — per-user API keys with `rc_` prefix, `stored_by` attribution, user filter on search
+- **Context-aware handoff** — statusline monitors usage %, auto-summarizes via Ollama at 90%, stores to Recall
 - **Error sanitization** — internal details never leaked to clients
 - **Input validation** — content length, turn count, and field size limits
 - **Configurable CORS** — restrict origins via `RECALL_ALLOWED_ORIGINS`
@@ -646,7 +669,7 @@ Superseded memories (merged during consolidation) are marked in both stores and 
 
 ## Project Status
 
-Active development through 12 phases of iterative refinement:
+Active development through 13 phases of iterative refinement:
 
 - [x] Core API (store, search, context, sessions)
 - [x] Vector storage (Qdrant) with content-hash deduplication
@@ -670,6 +693,9 @@ Active development through 12 phases of iterative refinement:
 - [x] Spreading activation (Collins & Loftus graph traversal)
 - [x] Interference/inhibition (contradiction suppression, deduplication)
 - [x] LLM-scored poignancy (Stanford Generative Agents inspired importance)
+- [x] Multi-user support (per-user API keys, user attribution, shared visibility)
+- [x] One-command installer (`node install.js` — MCP + hooks + statusline)
+- [x] Context-aware handoff (statusline monitors %, Ollama summarizes at 90%)
 - [ ] Scheduled backups
 
 ## License
