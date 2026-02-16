@@ -104,7 +104,7 @@ ARQ Worker (background jobs)
     v
 Ollama (local LLM inference)
     |-- qwen3:14b     signal detection, consolidation, fact extraction
-    |-- bge-large     embeddings (1024 dimensions)
+    |-- qwen3-embedding:0.6b  embeddings (1024 dimensions)
 ```
 
 ## Core Features
@@ -172,7 +172,7 @@ Full single-page app at `/dashboard` built with React + Vite + Tailwind + DaisyU
 
 ### Prerequisites
 - Docker & Docker Compose
-- Ollama running somewhere on your network with `bge-large` and `qwen3:14b` models
+- Ollama running somewhere on your network with `qwen3-embedding:0.6b` and `qwen3:14b` models
 - Node.js (for Claude Code hooks and MCP server)
 
 ### Option 1: Deploy Script (Recommended)
@@ -194,7 +194,7 @@ cd Recall
 
 The deploy script will:
 1. Check Docker and Ollama prerequisites
-2. Pull the `bge-large` embedding model if missing
+2. Pull the `qwen3-embedding:0.6b` embedding model if missing
 3. Create a `.env` configuration file
 4. Build and start the full stack (6 containers)
 5. Wait for health checks to pass
@@ -204,7 +204,7 @@ The deploy script will:
 
 ```bash
 # Pull required models
-ollama pull bge-large
+ollama pull qwen3-embedding:0.6b
 ollama pull qwen3:14b
 
 # Edit docker-compose.yml to set your RECALL_OLLAMA_HOST
@@ -364,7 +364,7 @@ Authorization: Bearer <your-api-key>
 ### Memory Operations
 
 #### `POST /memory/store`
-Store a new memory. The content is embedded with BGE-large and stored in both vector (Qdrant) and graph (Neo4j) storage.
+Store a new memory. The content is embedded with Qwen3-Embedding and stored in both vector (Qdrant) and graph (Neo4j) storage.
 
 **Request:**
 ```json
@@ -564,7 +564,7 @@ All configuration is via environment variables (prefix `RECALL_`):
 | `RECALL_API_KEY` | *(empty)* | API key for bearer auth (empty = auth disabled) |
 | `RECALL_ALLOWED_ORIGINS` | `*` | Comma-separated CORS origins |
 | `RECALL_OLLAMA_HOST` | `http://192.168.50.62:11434` | Ollama API endpoint |
-| `RECALL_EMBEDDING_MODEL` | `bge-large` | Ollama embedding model |
+| `RECALL_EMBEDDING_MODEL` | `qwen3-embedding:0.6b` | Ollama embedding model |
 | `RECALL_EMBEDDING_DIMS` | `1024` | Embedding dimensions |
 | `RECALL_SIGNAL_DETECTION_MODEL` | `qwen3:14b` | LLM for signal detection |
 | `RECALL_SIGNAL_CONFIDENCE_AUTO_STORE` | `0.75` | Auto-store threshold |

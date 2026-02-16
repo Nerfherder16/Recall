@@ -4,7 +4,7 @@
 #
 # Prerequisites:
 #   - Docker & Docker Compose installed
-#   - Ollama running with bge-large model (or specify host)
+#   - Ollama running with qwen3-embedding:0.6b model (or specify host)
 
 set -e
 
@@ -66,13 +66,13 @@ else
 fi
 
 # Check/pull embedding model
-log "Checking for bge-large embedding model..."
+log "Checking for qwen3-embedding:0.6b embedding model..."
 MODELS=$(curl -s "$OLLAMA_HOST/api/tags" 2>/dev/null || echo '{"models":[]}')
-if echo "$MODELS" | grep -q "bge-large"; then
-    log "bge-large model found"
+if echo "$MODELS" | grep -q "qwen3-embedding"; then
+    log "qwen3-embedding model found"
 else
-    log "Pulling bge-large model (this may take a few minutes)..."
-    curl -X POST "$OLLAMA_HOST/api/pull" -d '{"name":"bge-large"}' || warn "Could not pull model - will retry on first use"
+    log "Pulling qwen3-embedding:0.6b model (this may take a few minutes)..."
+    curl -X POST "$OLLAMA_HOST/api/pull" -d '{"name":"qwen3-embedding:0.6b"}' || warn "Could not pull model - will retry on first use"
 fi
 
 # Create .env file if it doesn't exist
@@ -139,8 +139,8 @@ fi
 
 # Warm up embedding model
 log "Warming up embedding model..."
-curl -s -X POST "$OLLAMA_HOST/api/embeddings" \
-    -d '{"model":"bge-large","prompt":"warmup"}' > /dev/null 2>&1 || true
+curl -s -X POST "$OLLAMA_HOST/api/embed" \
+    -d '{"model":"qwen3-embedding:0.6b","input":"warmup"}' > /dev/null 2>&1 || true
 
 # Final status
 echo ""

@@ -3,7 +3,7 @@
 #
 # Prerequisites:
 #   - Docker Desktop installed and running
-#   - Ollama running with bge-large model
+#   - Ollama running with qwen3-embedding:0.6b model
 
 param(
     [string]$OllamaHost = "http://192.168.50.62:11434",
@@ -46,15 +46,15 @@ try {
 }
 
 # Check/pull model
-Log "Checking for bge-large embedding model..."
+Log "Checking for qwen3-embedding:0.6b embedding model..."
 try {
     $models = Invoke-RestMethod -Uri "$OllamaHost/api/tags" -ErrorAction SilentlyContinue
-    $hasBge = $models.models | Where-Object { $_.name -like "*bge-large*" }
-    if ($hasBge) {
-        Log "bge-large model found"
+    $hasQwen = $models.models | Where-Object { $_.name -like "*qwen3-embedding*" }
+    if ($hasQwen) {
+        Log "qwen3-embedding model found"
     } else {
-        Log "Pulling bge-large model..."
-        Invoke-RestMethod -Uri "$OllamaHost/api/pull" -Method Post -Body '{"name":"bge-large"}' -ErrorAction SilentlyContinue
+        Log "Pulling qwen3-embedding:0.6b model..."
+        Invoke-RestMethod -Uri "$OllamaHost/api/pull" -Method Post -Body '{"name":"qwen3-embedding:0.6b"}' -ErrorAction SilentlyContinue
     }
 } catch {
     Warn "Could not check/pull model - will retry on first use"
@@ -116,7 +116,7 @@ if ($health.status -eq "healthy") {
 # Warm up model
 Log "Warming up embedding model..."
 try {
-    Invoke-RestMethod -Uri "$OllamaHost/api/embeddings" -Method Post -Body '{"model":"bge-large","prompt":"warmup"}' -ErrorAction SilentlyContinue | Out-Null
+    Invoke-RestMethod -Uri "$OllamaHost/api/embed" -Method Post -Body '{"model":"qwen3-embedding:0.6b","input":"warmup"}' -ErrorAction SilentlyContinue | Out-Null
 } catch {}
 
 # Done

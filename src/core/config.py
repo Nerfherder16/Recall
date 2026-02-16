@@ -43,8 +43,8 @@ class Settings(BaseSettings):
 
     # Ollama (Embeddings)
     ollama_host: str = "http://192.168.50.62:11434"
-    embedding_model: str = "bge-large"
-    embedding_dimensions: int = 1024  # BGE-large uses 1024 dims
+    embedding_model: str = "qwen3-embedding:0.6b"
+    embedding_dimensions: int = 1024  # Qwen3-Embedding-0.6B uses 1024 dims
 
     # Memory Settings
     default_importance: float = 0.5

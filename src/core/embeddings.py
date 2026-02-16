@@ -1,8 +1,8 @@
 """
 Embedding generation for semantic memory.
 
-Uses Ollama with BGE-large-en-v1.5 for high-quality local embeddings.
-BGE-large produces 1024-dimensional vectors optimized for retrieval.
+Uses Ollama with Qwen3-Embedding-0.6B for high-quality local embeddings.
+Qwen3-Embedding produces 1024-dimensional vectors with MTEB ~68-70.
 """
 
 import hashlib
@@ -24,10 +24,12 @@ class EmbeddingService:
     """
     Generate embeddings via Ollama.
 
-    BGE-large-en-v1.5 characteristics:
+    Qwen3-Embedding-0.6B characteristics:
     - 1024 dimensions
-    - Excellent for retrieval tasks
-    - Supports passage prefixing for better results
+    - MTEB ~68-70 (superior to BGE-large ~64)
+    - 639MB VRAM (smaller than BGE-large 1.3GB)
+    - Supports instruction-based query prefixing
+    - Native batch embedding via /api/embed
     """
 
     def __init__(self):
@@ -78,14 +80,18 @@ class EmbeddingService:
         Args:
             text: The text to embed
             prefix: "passage" for stored content, "query" for search queries
-                   BGE models benefit from these prefixes
+                   Qwen3-Embedding uses instruction prefix for queries
 
         Returns:
             1024-dimensional embedding vector
         """
-        # BGE models work better with prefixes
+        # Qwen3-Embedding uses instruction prefix for queries
         if prefix == "query":
-            prefixed_text = f"Represent this sentence for searching relevant passages: {text}"
+            prefixed_text = (
+                "Instruct: Given a web search query, retrieve relevant "
+                "passages that answer the query\n"
+                f"Query:{text}"
+            )
         else:
             prefixed_text = text
 
@@ -93,16 +99,19 @@ class EmbeddingService:
         start = time.time()
         try:
             response = await self.client.post(
-                f"{self.settings.ollama_host}/api/embeddings",
+                f"{self.settings.ollama_host}/api/embed",
                 json={
                     "model": self.settings.embedding_model,
-                    "prompt": prefixed_text,
+                    "input": prefixed_text,
                 },
             )
 
             if response.status_code == 200:
                 data = response.json()
-                embedding = data.get("embedding", [])
+                embeddings = data.get("embeddings", [])
+                if not embeddings:
+                    raise EmbeddingError("Ollama returned empty embeddings array")
+                embedding = embeddings[0]
 
                 if len(embedding) != self.settings.embedding_dimensions:
                     logger.warning(
@@ -129,12 +138,50 @@ class EmbeddingService:
         self, texts: list[str], prefix: str = "passage"
     ) -> list[list[float]]:
         """
-        Generate embeddings for multiple texts.
+        Generate embeddings for multiple texts using native batch API.
 
-        Note: Ollama doesn't support batch embedding natively,
-        so we process sequentially. Consider parallel processing
-        for large batches.
+        Sends all texts in a single /api/embed request.
+        Falls back to sequential on error.
         """
+        if not texts:
+            return []
+
+        # Apply query prefix if needed
+        if prefix == "query":
+            processed = [
+                "Instruct: Given a web search query, retrieve relevant "
+                "passages that answer the query\n"
+                f"Query:{t}"
+                for t in texts
+            ]
+        else:
+            processed = texts
+
+        try:
+            response = await self.client.post(
+                f"{self.settings.ollama_host}/api/embed",
+                json={
+                    "model": self.settings.embedding_model,
+                    "input": processed,
+                },
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                embeddings = data.get("embeddings", [])
+                if len(embeddings) == len(texts):
+                    return embeddings
+
+                logger.warning(
+                    "batch_embedding_count_mismatch",
+                    expected=len(texts),
+                    actual=len(embeddings),
+                )
+
+        except Exception as e:
+            logger.warning("batch_embedding_failed_falling_back", error=str(e))
+
+        # Fallback: sequential
         embeddings = []
         for text in texts:
             embedding = await self.embed(text, prefix)
