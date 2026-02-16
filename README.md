@@ -59,7 +59,7 @@ Next session --> recall-retrieve.js surfaces those memories
 
 No configuration needed. No CLAUDE.md instructions. The hooks create a closed-loop memory system that works organically.
 
-When context reaches 90%, the **statusline** automatically triggers a handoff — sending the transcript to your local LLM (Ollama) for summarization and storing it to Recall. Session knowledge survives compaction.
+When context reaches 65%, the **statusline** automatically triggers a handoff — sending the transcript to your local LLM (Ollama) for summarization and storing it to Recall. Session knowledge survives auto-compact.
 
 ## Architecture
 
@@ -334,7 +334,7 @@ All hooks are Node.js (CommonJS) scripts in `hooks/`. They run automatically —
 | `context-monitor.js` | PostToolUse | Estimates token usage from transcript size, warns at 150K+ |
 | `stop-guard.js` | Stop | Blocks stop if uncommitted git changes exist |
 | `session-save.js` | Stop | Auto-saves session state to Recall |
-| `recall-statusline.js` | Statusline | Context usage bar; at 90% triggers Ollama summary → stores handoff to Recall |
+| `recall-statusline.js` | Statusline | Context usage bar; at 65% triggers Ollama summary → stores handoff to Recall |
 
 ### Slash Commands
 
@@ -638,6 +638,40 @@ Source code is volume-mounted (`./src:/app/src`), so:
 docker compose restart api worker
 ```
 
+### Simulation Testbed
+
+A comprehensive stress test and quality measurement framework. Run against your live API to benchmark performance and catch regressions.
+
+```bash
+# Full run (all 5 suites, ~15min)
+python -m tests.simulation.testbed
+
+# Individual suites
+python -m tests.simulation.testbed --suites lifecycle        # Decay, reinforcement, consolidation
+python -m tests.simulation.testbed --suites retrieval        # Precision/recall/MRR, graph expansion
+python -m tests.simulation.testbed --suites stress           # Concurrent load, dedup, throughput
+python -m tests.simulation.testbed --suites signals          # Signal detection quality (requires Ollama)
+python -m tests.simulation.testbed --suites time_accel       # 28-day lifecycle simulation
+
+# Compare two runs
+python -m tests.simulation.testbed --compare reports/run-A.json reports/run-B.json
+
+# Clean up a previous run's data
+python -m tests.simulation.testbed --cleanup-only <run_id>
+```
+
+Each run produces a timestamped JSON report in `tests/simulation/reports/` with per-suite metrics, latency percentiles, and observations. Use `--compare` to diff two reports side by side.
+
+| Suite | What It Measures | Duration |
+|-------|-----------------|----------|
+| **lifecycle** | Decay curves, reinforcement delta, consolidation merge rate | ~2min |
+| **retrieval** | Precision@K, recall, MRR, negative precision, graph expansion, inhibition | ~3min |
+| **stress** | Concurrent store/search throughput, dedup under concurrency, batch + load | ~20s |
+| **signals** | Detection rate, auto-store vs pending, type match rate, confidence distribution | ~3min |
+| **time_accel** | 28-day simulation: survival curve, population dynamics, consolidation frequency | ~5min |
+
+Suites use domain isolation (`testbed-{suite}-{run_id}`) and automatic cleanup so production data is unaffected.
+
 ---
 
 ## Operational Features
@@ -652,7 +686,7 @@ docker compose restart api worker
 - **Graceful degradation** — API returns 503 when Ollama is down; workers skip and retry
 - **Bearer token auth** — master key via `RECALL_API_KEY` + per-user keys via admin API
 - **Multi-user support** — per-user API keys with `rc_` prefix, `stored_by` attribution, user filter on search
-- **Context-aware handoff** — statusline monitors usage %, auto-summarizes via Ollama at 90%, stores to Recall
+- **Context-aware handoff** — statusline monitors usage %, auto-summarizes via Ollama at 65% (before auto-compact), stores to Recall
 - **Error sanitization** — internal details never leaked to clients
 - **Input validation** — content length, turn count, and field size limits
 - **Configurable CORS** — restrict origins via `RECALL_ALLOWED_ORIGINS`
@@ -695,7 +729,8 @@ Active development through 13 phases of iterative refinement:
 - [x] LLM-scored poignancy (Stanford Generative Agents inspired importance)
 - [x] Multi-user support (per-user API keys, user attribution, shared visibility)
 - [x] One-command installer (`node install.js` — MCP + hooks + statusline)
-- [x] Context-aware handoff (statusline monitors %, Ollama summarizes at 90%)
+- [x] Context-aware handoff (statusline monitors %, Ollama summarizes at 65%)
+- [x] Simulation testbed (5 suites: lifecycle, retrieval, stress, signals, time acceleration)
 - [ ] Scheduled backups
 
 ## License
