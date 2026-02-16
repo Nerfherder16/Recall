@@ -48,6 +48,29 @@
 - Dashboard: audit log viewer, session history, memory search, signal review
 - 11 new integration tests (109 fast total, 138 including slow/LLM)
 
+### Phase 9: Claude-Pilot Patterns
+- **3-Layer Search**: browse (120-char summaries) → get (full detail) → timeline (chronological)
+- **Sub-embeddings**: `recall_memories_facts` Qdrant collection, parent_id linked, 1.15x score boost
+- **Observer**: PostToolUse hook → POST /observe/file-change → LLM fact extraction → auto-store
+- **Hooks** (all CommonJS, in `hooks/`): lint-check, observe-edit, context-monitor, session-save, stop-guard
+- **Dashboard**: React+Vite+Tailwind+DaisyUI SPA at `dashboard/`, builds to `src/api/static/dashboard/`
+- **SSE**: GET /events/stream for real-time dashboard updates
+- **MCP tools**: recall_search → browse, recall_search_full → full content, recall_timeline → chronological
+- 10 new integration tests (119 fast total, 148 including slow/LLM)
+
+### Phase 10: Dashboard Redesign
+- **Collapsible sidebar**: 224px ↔ 64px, persisted to localStorage, mobile overlay at <768px
+- **Dark/light theme**: DaisyUI `data-theme` swap, init script prevents flash, persisted
+- **Toast notifications**: success/error/info, auto-dismiss 3s, bottom-right fixed stack
+- **Memories**: auto-browse on mount, grid/list toggle, bulk select+delete, detail modal
+- **Sessions**: expandable cards with vertical turn timeline (lazy-loads turns)
+- **Audit**: auto-load on mount, null-safe `details` field, relative timestamps, badge formatting
+- **Signals**: session dropdown, auto-load on select
+- **Settings**: maintenance ops (consolidation/decay/reconcile/export), theme toggle
+- **LLM panel**: GET /admin/ollama proxies Ollama API, shows model table + running model cards
+- **SSE reconnect fix**: mountedRef + recursive connect()
+- **Simulation**: `tests/simulation/build_hub_sim.py` — 1-hour, 5-agent stress test (commit dc1051a)
+
 ---
 
 ## Open Issues
@@ -65,41 +88,86 @@
 
 ---
 
-## Phase 9 Options (Not Yet Started)
+## Phase 11: Organic Memory Hooks (Next)
 
-### Option A: Backup & Resilience
-- Scheduled Qdrant snapshots + Neo4j dump
-- Offsite backup to external storage
-- Restore verification testing
-- Closes I10
+### Problem
+Recall's storage side works (observer hooks extract facts from file edits), but the **retrieval side is broken** — nothing queries Recall before the agent starts working. Phase 10's simulation generated 85 memories about Build Hub architecture, but when actually building Build Hub Desktop, none were retrieved. Memory is useless if it's never consulted.
 
-### Option B: MCP Client Enhancement
-- Richer context assembly for Claude Code
-- Better working memory management
-- Cross-session memory continuity
+### Solution: Close the Retrieval Loop
+
+```
+User types message
+       ↓
+[UserPromptSubmit hook]  ← NEW (recall-retrieve.js)
+  → queries Recall: POST /search/browse with user's message
+  → outputs top 3-5 relevant memories as context
+  → agent sees them naturally in conversation
+       ↓
+Agent works (edits files)
+       ↓
+[PostToolUse hook]  ← EXISTS (observe-edit.js)
+  → extracts facts from file changes
+  → stores to Recall
+       ↓
+[Stop hook]  ← NEW (recall-session-summary.js)
+  → summarizes what was built/fixed in the session
+  → stores to Recall for next-session continuity
+```
+
+### Files to Create/Modify
+1. **`hooks/recall-retrieve.js`** — UserPromptSubmit hook
+   - Reads user's message from stdin
+   - POST /search/browse with message as query, limit=5
+   - Outputs formatted memories to stdout (Claude sees as context)
+   - Filters by relevance score threshold (>0.3)
+   - Fast path: skip if message is very short (<10 chars) or a greeting
+
+2. **`hooks/recall-session-summary.js`** — Stop hook
+   - Reads conversation transcript or last N messages
+   - Generates a 2-3 sentence summary of what was accomplished
+   - POST /memory/store with domain="work", source="system"
+   - Includes project path and key decisions made
+
+3. **`~/.claude/settings.json`** — Add UserPromptSubmit hook config
+   - Point to recall-retrieve.js for all user messages
+   - Point to recall-session-summary.js for Stop events
+
+### Success Criteria
+- Opening a new Claude Code session about a previously-discussed project should automatically surface relevant memories
+- No CLAUDE.md instructions needed — hooks handle everything
+- Latency budget: <500ms for retrieval (browse endpoint is fast)
+- No false positives on greetings or trivial messages
 
 ---
 
 ## Architecture Reference
 
 ```
+Claude Code Hooks (client-side)
+    ├── UserPromptSubmit → recall-retrieve.js (query memories)     ← Phase 11
+    ├── PostToolUse      → observe-edit.js (extract & store facts)  ← Phase 9
+    └── Stop             → recall-session-summary.js (store summary) ← Phase 11
+    │
+    ▼
 Client (Claude Code / MCP)
     │
     ▼
 FastAPI API (:8200)
-    ├── /memory/*     — CRUD + relationships
-    ├── /search/*     — semantic + graph search
+    ├── /memory/*     — CRUD + relationships + batch ops
+    ├── /search/*     — browse (summaries) / full / timeline
     ├── /session/*    — session lifecycle
     ├── /ingest/*     — turn ingestion + signal detection
-    ├── /admin/*      — export, import, reconcile, audit, sessions
+    ├── /observe/*    — file-change observer (fact extraction)
+    ├── /admin/*      — export, import, reconcile, audit, sessions, ollama
+    ├── /events/*     — SSE stream for dashboard
     ├── /health       — public health check
     ├── /metrics      — Prometheus format
-    ├── /stats        — system statistics
-    └── /dashboard    — ops dashboard (HTML)
+    ├── /stats        — system + domain statistics
+    └── /dashboard    — React SPA (DaisyUI)
     │
     ▼
 Storage Layer
-    ├── Qdrant        — vector store (source of truth for memories)
+    ├── Qdrant        — vector store (memories + sub-embeddings/facts)
     ├── Neo4j         — graph store (relationships, traversal)
     ├── Redis         — volatile (sessions, working memory, turns, cache)
     └── PostgreSQL    — durable metadata (audit log, session archive, metrics)
@@ -113,6 +181,6 @@ ARQ Worker (background jobs)
     │
     ▼
 Ollama (192.168.50.62:11434)
-    ├── qwen3:14b     — LLM (signals, consolidation, patterns)
+    ├── qwen3:14b     — LLM (signals, consolidation, patterns, fact extraction)
     └── bge-large     — embeddings (1024 dims)
 ```

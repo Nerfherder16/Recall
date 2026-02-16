@@ -103,12 +103,39 @@ Recall is designed like biological memory:
 - Session snapshots on Stop hook capture what was worked on
 
 ### Claude Code Hooks
-- **Lint check** - Runs ruff (Python) and eslint (JS/TS) after every Write/Edit, auto-fixes first
-- **Observer** - Async, fire-and-forget observation of code edits
-- **Context monitor** - Estimates token usage from transcript size, warns at 150K+
-- **Stop guard** - Blocks stop if uncommitted git changes exist (exit code 2)
-- **Session save** - Auto-saves session state to Recall on stop
+- **Memory retrieval** (`UserPromptSubmit`) - Queries Recall on every user prompt and injects relevant memories as context. Skips trivial messages (<15 chars, greetings, slash commands, confirmations). This is the organic retrieval loop — no CLAUDE.md instructions needed
+- **Observer** (`PostToolUse`) - Async, fire-and-forget extraction of facts from code edits
+- **Session summary** (`Stop`) - Reads the transcript, extracts user messages, and stores an episodic session summary so the next session has continuity
+- **Lint check** (`PostToolUse`) - Runs ruff (Python) and eslint (JS/TS) after every Write/Edit, auto-fixes first
+- **Context monitor** (`PostToolUse`) - Estimates token usage from transcript size, warns at 150K+
+- **Stop guard** (`Stop`) - Blocks stop if uncommitted git changes exist (exit code 2)
+- **Session save** (`Stop`) - Auto-saves session state to Recall on stop
 - All hooks are Node.js (CommonJS) scripts in `hooks/`
+
+### Organic Memory Loop
+The hooks create a closed-loop memory system that works without any configuration in CLAUDE.md:
+
+```
+User types prompt
+       ↓
+[recall-retrieve.js]  ← UserPromptSubmit
+  Queries POST /search/browse with user's message
+  Injects top 5 relevant memories (similarity > 0.25)
+       ↓
+Agent works (edits files)
+       ↓
+[observe-edit.js]  ← PostToolUse (Write|Edit)
+  Sends file changes to POST /observe/file-change
+  LLM extracts facts → stored as memories
+       ↓
+Session ends
+       ↓
+[recall-session-summary.js]  ← Stop
+  Reads transcript, extracts user messages
+  Stores episodic summary to Recall
+       ↓
+Next session → recall-retrieve.js surfaces those memories
+```
 
 ### React Dashboard
 - Full SPA at `/dashboard` built with React + Vite + Tailwind + DaisyUI
@@ -918,6 +945,8 @@ Active development. Current state:
 - [x] Claude Code hooks (lint, observer, context monitor, stop guard)
 - [x] React SPA dashboard (6 views, SSE real-time updates)
 - [x] Server-Sent Events endpoint
+- [x] Organic memory loop (auto-retrieve on prompt, auto-store on edit, session summaries)
+- [ ] Project-scoped memory (auto-filter by working directory)
 - [ ] Scheduled backups
 
 ## License
