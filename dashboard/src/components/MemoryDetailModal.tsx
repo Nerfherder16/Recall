@@ -1,8 +1,9 @@
 import { useRef, useEffect, useState } from "react";
-import { X, PushPin, Sparkle } from "@phosphor-icons/react";
+import { X, PushPin, Sparkle, Lock, ShieldCheck } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type { MemoryDetail } from "../api/types";
 import Badge from "./Badge";
+import { ForceProfile } from "./ForceProfile";
 import { useToastContext } from "../context/ToastContext";
 
 function shouldSuggestPin(m: MemoryDetail): boolean {
@@ -75,6 +76,16 @@ export default function MemoryDetailModal({
             {memory.pinned && (
               <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 text-amber-400 px-1.5 py-0.5 text-[10px] font-medium">
                 <PushPin size={10} weight="fill" /> Pinned
+              </span>
+            )}
+            {memory.durability === "permanent" && (
+              <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 text-[10px] font-medium">
+                <Lock size={10} weight="fill" /> Permanent
+              </span>
+            )}
+            {memory.durability === "durable" && (
+              <span className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/10 text-cyan-400 px-1.5 py-0.5 text-[10px] font-medium">
+                <ShieldCheck size={10} weight="fill" /> Durable
               </span>
             )}
           </div>
@@ -151,6 +162,14 @@ export default function MemoryDetailModal({
             { label: "Stability", val: memory.stability.toFixed(3) },
             { label: "Confidence", val: memory.confidence.toFixed(3) },
             { label: "Accesses", val: memory.access_count },
+            { label: "Durability", val: memory.durability || "ephemeral" },
+            {
+              label: "Initial Imp.",
+              val:
+                memory.initial_importance != null
+                  ? memory.initial_importance.toFixed(3)
+                  : "—",
+            },
           ].map((item) => (
             <div
               key={item.label}
@@ -170,6 +189,8 @@ export default function MemoryDetailModal({
           <span>Created: {formatDate(memory.created_at)}</span>
           <span>Last access: {formatDate(memory.last_accessed)}</span>
         </div>
+
+        <ForceProfile memoryId={memory.id} />
       </div>
       <form method="dialog" className="modal-backdrop">
         <button>close</button>

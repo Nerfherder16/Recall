@@ -18,6 +18,7 @@ import structlog
 from .config import get_settings
 from .embeddings import get_embedding_service
 from .models import (
+    Durability,
     Memory,
     MemoryQuery,
     MemoryType,
@@ -90,6 +91,13 @@ class RetrievalPipeline:
                     # Boost score if found via both vector and graph
                     existing = results[result.memory.id]
                     existing.score *= 1.2
+
+        # Stage 3.5: Document-sibling boost
+        if query.expand_relationships and results:
+            sibling_results = await self._document_sibling_boost(results)
+            for result in sibling_results:
+                if result.memory.id not in results:
+                    results[result.memory.id] = result
 
         # Stage 4: Context filtering
         if query.session_id or query.current_file or query.current_task:
@@ -258,6 +266,53 @@ class RetrievalPipeline:
                 )
 
         return results
+
+    async def _document_sibling_boost(
+        self, results: dict[str, RetrievalResult],
+    ) -> list[RetrievalResult]:
+        """
+        Stage 3.5: Document-sibling boost.
+
+        When a seed memory came from a document (has document_id),
+        find sibling memories from the same document and include them
+        with a moderate score boost.
+        """
+        from src.storage.neo4j_documents import Neo4jDocumentStore
+
+        sibling_results = []
+        doc_store = Neo4jDocumentStore(self.neo4j.driver)
+
+        for memory_id, result in list(results.items())[:5]:
+            doc_id = result.memory.metadata.get("document_id")
+            if not doc_id:
+                continue
+
+            try:
+                sibling_ids = await doc_store.find_document_siblings(
+                    memory_id, doc_id, limit=5,
+                )
+            except Exception:
+                continue
+
+            for sib_id in sibling_ids:
+                if sib_id in results:
+                    continue
+                qdrant_result = await self.qdrant.get(sib_id)
+                if not qdrant_result:
+                    continue
+                _, payload = qdrant_result
+                memory = self._payload_to_memory(sib_id, payload)
+                sibling_results.append(
+                    RetrievalResult(
+                        memory=memory,
+                        score=0.3 * memory.importance,
+                        similarity=0.0,
+                        graph_distance=1,
+                        retrieval_path=[memory_id, sib_id],
+                    )
+                )
+
+        return sibling_results
 
     async def _context_filter(
         self, results: dict[str, RetrievalResult], query: MemoryQuery
@@ -496,6 +551,8 @@ class RetrievalPipeline:
             user_id=payload.get("user_id"),
             username=payload.get("username"),
             pinned=payload.get("pinned") == "true",
+            durability=Durability(payload["durability"]) if payload.get("durability") else None,
+            initial_importance=payload.get("initial_importance"),
         )
 
 

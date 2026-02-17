@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from src.api.auth import require_auth
 from src.core import (
+    Durability,
     Memory,
     MemorySource,
     MemoryType,
@@ -41,6 +42,7 @@ class StoreMemoryRequest(BaseModel):
     tags: list[str] = Field(default=[], max_length=50)
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    durability: str | None = Field(default=None, pattern="^(ephemeral|durable|permanent)$")
     session_id: str | None = None
     metadata: dict[str, Any] = {}
 
@@ -52,6 +54,8 @@ class StoreMemoryResponse(BaseModel):
     content_hash: str
     created: bool
     message: str
+    durability: str | None = None
+    initial_importance: float | None = None
 
 
 class MemoryResponse(BaseModel):
@@ -71,6 +75,8 @@ class MemoryResponse(BaseModel):
     last_accessed: str
     stored_by: str | None = None
     pinned: bool = False
+    durability: str | None = None
+    initial_importance: float | None = None
 
 
 class CreateRelationshipRequest(BaseModel):
@@ -103,6 +109,9 @@ async def store_memory(
     - Added to working memory if session_id provided
     """
     try:
+        # Resolve durability
+        durability = Durability(request.durability) if request.durability else None
+
         # Create memory object
         memory = Memory(
             content=request.content,
@@ -117,6 +126,8 @@ async def store_memory(
             metadata=request.metadata,
             user_id=user.id if user else None,
             username=user.username if user else None,
+            durability=durability,
+            initial_importance=request.importance,
         )
 
         # Dedup check: reject if identical content already exists
@@ -128,6 +139,8 @@ async def store_memory(
                 content_hash=memory.content_hash,
                 created=False,
                 message="Duplicate memory — identical content already stored",
+                durability=request.durability,
+                initial_importance=request.importance,
             )
 
         # Generate embedding
@@ -164,7 +177,12 @@ async def store_memory(
             "create", memory.id,
             actor=user.username if user else "user",
             session_id=request.session_id,
-            details={"type": memory.memory_type.value, "domain": memory.domain},
+            details={
+                "type": memory.memory_type.value,
+                "domain": memory.domain,
+                "importance": request.importance,
+                "durability": request.durability,
+            },
             user_id=user.id if user else None,
         )
 
@@ -180,6 +198,8 @@ async def store_memory(
             content_hash=memory.content_hash,
             created=True,
             message="Memory stored successfully",
+            durability=request.durability,
+            initial_importance=memory.initial_importance,
         )
 
     except OllamaUnavailableError:
@@ -497,6 +517,83 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
 
 
 # =============================================================
+# DURABILITY ENDPOINT (must be before /{memory_id} catch-all)
+# =============================================================
+
+
+class UpdateDurabilityRequest(BaseModel):
+    """Request to update memory durability."""
+
+    durability: str = Field(..., pattern="^(ephemeral|durable|permanent)$")
+
+
+@router.put("/{memory_id}/durability")
+async def update_durability(
+    memory_id: str,
+    request: UpdateDurabilityRequest,
+    user: User | None = Depends(require_auth),
+):
+    """Update durability classification of a memory."""
+    try:
+        qdrant = await get_qdrant_store()
+        result = await qdrant.get(memory_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Memory not found")
+
+        await qdrant.update_durability(memory_id, request.durability)
+        neo4j = await get_neo4j_store()
+        await neo4j.update_durability(memory_id, request.durability)
+
+        pg = await get_postgres_store()
+        await pg.log_audit(
+            "update_durability", memory_id,
+            actor=user.username if user else "user",
+            user_id=user.id if user else None,
+            details={"durability": request.durability},
+        )
+
+        return {"id": memory_id, "durability": request.durability}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        logger.error("update_durability_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# FORCE PROFILE (must come before /{memory_id} catch-all)
+# =============================================================
+
+
+@router.get("/{memory_id}/forces")
+async def get_force_profile(memory_id: str):
+    """Get the force profile for a memory — all forces acting on its importance."""
+    try:
+        from src.core.health import create_health_computer
+
+        computer = await create_health_computer()
+        result = await computer.compute_forces(memory_id)
+
+        if result is None:
+            raise HTTPException(status_code=404, detail="Memory not found")
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        logger.error("force_profile_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
 # MEMORY CRUD (/{memory_id} routes — must come after static paths)
 # =============================================================
 
@@ -528,6 +625,8 @@ async def get_memory(memory_id: str):
             last_accessed=payload.get("last_accessed", ""),
             stored_by=payload.get("username"),
             pinned=payload.get("pinned") == "true",
+            durability=payload.get("durability"),
+            initial_importance=payload.get("initial_importance"),
         )
 
     except HTTPException:

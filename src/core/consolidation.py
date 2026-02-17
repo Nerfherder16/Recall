@@ -19,6 +19,7 @@ from .embeddings import OllamaUnavailableError, content_hash, get_embedding_serv
 from .llm import LLMError, get_llm
 from .models import (
     ConsolidationResult,
+    Durability,
     Memory,
     MemorySource,
     MemoryType,
@@ -206,6 +207,16 @@ class MemoryConsolidator:
         for m in cluster:
             all_tags.update(m.tags)
 
+        # Inherit highest durability from cluster
+        durability_order = {Durability.EPHEMERAL: 0, Durability.DURABLE: 1, Durability.PERMANENT: 2}
+        best_durability = None
+        for m in cluster:
+            if m.durability and (
+                best_durability is None
+                or durability_order.get(m.durability, 0) > durability_order.get(best_durability, 0)
+            ):
+                best_durability = m.durability
+
         # Create merged memory
         merged = Memory(
             content=merged_content,
@@ -219,6 +230,8 @@ class MemoryConsolidator:
             confidence=max_confidence,
             access_count=total_access,
             parent_ids=[m.id for m in cluster],
+            durability=best_durability,
+            initial_importance=min(1.0, avg_importance + 0.1),
         )
 
         # Generate embedding for merged content

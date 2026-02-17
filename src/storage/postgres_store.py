@@ -363,6 +363,180 @@ class PostgresStore:
         except Exception as e:
             logger.warning("metrics_snapshot_write_failed", error=str(e))
 
+    # =============================================================
+    # HEALTH DASHBOARD QUERIES
+    # =============================================================
+
+    async def get_feedback_stats(self, days: int = 30) -> dict[str, Any]:
+        """Get daily feedback stats (useful/not_useful) for the last N days."""
+        rows = await self.pool.fetch(
+            """
+            SELECT
+                date_trunc('day', timestamp) AS day,
+                COUNT(*) FILTER (WHERE details->>'useful' = 'true') AS positive,
+                COUNT(*) FILTER (WHERE details->>'useful' = 'false') AS negative,
+                COUNT(*) AS total
+            FROM audit_log
+            WHERE action = 'feedback'
+              AND timestamp > now() - make_interval(days => $1)
+            GROUP BY day
+            ORDER BY day ASC
+            """,
+            days,
+        )
+        daily = [
+            {
+                "date": r["day"].isoformat(),
+                "positive": r["positive"],
+                "negative": r["negative"],
+                "total": r["total"],
+            }
+            for r in rows
+        ]
+        total_pos = sum(d["positive"] for d in daily)
+        total_neg = sum(d["negative"] for d in daily)
+        total_all = total_pos + total_neg
+        return {
+            "positive_rate": round(total_pos / total_all, 4) if total_all > 0 else 0.0,
+            "total_positive": total_pos,
+            "total_negative": total_neg,
+            "daily": daily,
+        }
+
+    async def get_action_counts(self, days: int = 30) -> dict[str, int]:
+        """Get action type breakdown for the last N days."""
+        rows = await self.pool.fetch(
+            """
+            SELECT action, COUNT(*) AS cnt
+            FROM audit_log
+            WHERE timestamp > now() - make_interval(days => $1)
+            GROUP BY action
+            ORDER BY cnt DESC
+            """,
+            days,
+        )
+        return {r["action"]: r["cnt"] for r in rows}
+
+    async def get_feedback_for_memory(self, memory_id: str) -> list[dict[str, Any]]:
+        """Get per-memory feedback history."""
+        rows = await self.pool.fetch(
+            """
+            SELECT timestamp, action, details
+            FROM audit_log
+            WHERE memory_id = $1 AND action = 'feedback'
+            ORDER BY timestamp ASC
+            """,
+            memory_id,
+        )
+        return [
+            {
+                "timestamp": r["timestamp"].isoformat(),
+                "details": json.loads(r["details"]) if r["details"] else {},
+            }
+            for r in rows
+        ]
+
+    async def get_feedback_similarity_distribution(self, days: int = 30) -> list[dict[str, Any]]:
+        """Get similarity score histogram for feedback entries."""
+        rows = await self.pool.fetch(
+            """
+            SELECT
+                width_bucket(
+                    COALESCE((details->>'similarity')::float, 0),
+                    0, 1, 10
+                ) AS bucket,
+                COUNT(*) AS cnt
+            FROM audit_log
+            WHERE action = 'feedback'
+              AND timestamp > now() - make_interval(days => $1)
+              AND details->>'similarity' IS NOT NULL
+            GROUP BY bucket
+            ORDER BY bucket
+            """,
+            days,
+        )
+        return [
+            {
+                "bucket": r["bucket"],
+                "range_start": round((r["bucket"] - 1) * 0.1, 1),
+                "range_end": round(r["bucket"] * 0.1, 1),
+                "count": r["cnt"],
+            }
+            for r in rows
+        ]
+
+    async def get_noisy_memories(self, min_negative: int = 3, days: int = 7) -> list[dict[str, Any]]:
+        """Find memories with excessive negative feedback."""
+        rows = await self.pool.fetch(
+            """
+            SELECT
+                memory_id,
+                COUNT(*) FILTER (WHERE details->>'useful' = 'false') AS negative_count,
+                COUNT(*) AS total_feedback
+            FROM audit_log
+            WHERE action = 'feedback'
+              AND timestamp > now() - make_interval(days => $1)
+            GROUP BY memory_id
+            HAVING COUNT(*) FILTER (WHERE details->>'useful' = 'false') >= $2
+            ORDER BY negative_count DESC
+            LIMIT 50
+            """,
+            days,
+            min_negative,
+        )
+        return [
+            {
+                "memory_id": r["memory_id"],
+                "negative_count": r["negative_count"],
+                "total_feedback": r["total_feedback"],
+            }
+            for r in rows
+        ]
+
+    async def get_feedback_starved_memories(self, min_accesses: int = 5) -> list[dict[str, Any]]:
+        """Find memories with many accesses but zero feedback."""
+        # This uses a subquery to find memory_ids with feedback
+        rows = await self.pool.fetch(
+            """
+            SELECT memory_id
+            FROM audit_log
+            WHERE action = 'access'
+            GROUP BY memory_id
+            HAVING COUNT(*) >= $1
+              AND memory_id NOT IN (
+                  SELECT DISTINCT memory_id
+                  FROM audit_log
+                  WHERE action = 'feedback'
+              )
+            LIMIT 50
+            """,
+            min_accesses,
+        )
+        return [{"memory_id": r["memory_id"]} for r in rows]
+
+    async def get_importance_timeline(self, memory_id: str) -> list[dict[str, Any]]:
+        """Reconstruct importance timeline for a memory from audit entries."""
+        rows = await self.pool.fetch(
+            """
+            SELECT timestamp, action, details
+            FROM audit_log
+            WHERE memory_id = $1
+              AND action IN ('store', 'feedback', 'decay', 'update_importance', 'update_durability')
+            ORDER BY timestamp ASC
+            """,
+            memory_id,
+        )
+        events = []
+        for r in rows:
+            details = json.loads(r["details"]) if r["details"] else {}
+            events.append({
+                "timestamp": r["timestamp"].isoformat(),
+                "action": r["action"],
+                "importance": details.get("importance"),
+                "details": details,
+            })
+        return events
+
     async def get_metrics_history(self, hours: int = 24) -> list[dict[str, Any]]:
         """Get metrics snapshots from the last N hours."""
         rows = await self.pool.fetch(

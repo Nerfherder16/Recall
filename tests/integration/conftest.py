@@ -53,6 +53,7 @@ class CleanupTracker:
     client: httpx.AsyncClient
     memory_ids: list[str] = field(default_factory=list)
     session_ids: list[str] = field(default_factory=list)
+    document_ids: list[str] = field(default_factory=list)
 
     def track_memory(self, memory_id: str):
         self.memory_ids.append(memory_id)
@@ -60,8 +61,18 @@ class CleanupTracker:
     def track_session(self, session_id: str):
         self.session_ids.append(session_id)
 
+    def track_document(self, doc_id: str):
+        self.document_ids.append(doc_id)
+
     async def teardown(self):
         """Delete all tracked resources. Errors are suppressed."""
+        # Delete documents first (cascade deletes child memories)
+        for did in self.document_ids:
+            try:
+                await self.client.delete(f"{API_BASE}/document/{did}")
+            except Exception:
+                pass
+
         for sid in self.session_ids:
             try:
                 await self.client.post(

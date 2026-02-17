@@ -81,6 +81,8 @@ class QdrantStore:
             ("username", "keyword"),
             ("pinned", "keyword"),
             ("access_count", "integer"),
+            ("durability", "keyword"),
+            ("document_id", "keyword"),
         ]
 
         for field, field_type in indexes:
@@ -124,6 +126,9 @@ class QdrantStore:
                 "user_id": memory.user_id,
                 "username": memory.username,
                 "pinned": "true" if memory.pinned else "false",
+                "durability": memory.durability.value if memory.durability else None,
+                "initial_importance": memory.initial_importance,
+                "document_id": memory.metadata.get("document_id"),
             },
         )
 
@@ -295,6 +300,82 @@ class QdrantStore:
             },
             points=[memory_id],
         )
+
+    async def update_durability(self, memory_id: str, durability: str | None):
+        """Update the durability classification of a memory."""
+        await self.client.set_payload(
+            collection_name=self.collection,
+            payload={"durability": durability},
+            points=[memory_id],
+        )
+
+    async def count_pinned(self) -> int:
+        """Count pinned memories."""
+        result = await self.client.count(
+            collection_name=self.collection,
+            count_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="pinned",
+                        match=MatchValue(value="true"),
+                    )
+                ]
+            ),
+        )
+        return result.count
+
+    async def get_importance_distribution(self) -> list[dict[str, Any]]:
+        """Get count of memories in importance bands."""
+        bands = []
+        ranges = [
+            ("0.0-0.2", 0.0, 0.2),
+            ("0.2-0.4", 0.2, 0.4),
+            ("0.4-0.6", 0.4, 0.6),
+            ("0.6-0.8", 0.6, 0.8),
+            ("0.8-1.0", 0.8, 1.01),
+        ]
+        for label, low, high in ranges:
+            result = await self.client.count(
+                collection_name=self.collection,
+                count_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="importance",
+                            range=Range(gte=low, lt=high),
+                        )
+                    ]
+                ),
+            )
+            bands.append({"range": label, "count": result.count})
+        return bands
+
+    async def scroll_by_document_id(
+        self, doc_id: str,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """Scroll all memories belonging to a document."""
+        all_points = []
+        offset = None
+        while True:
+            points, next_offset = await self.client.scroll(
+                collection_name=self.collection,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="document_id",
+                            match=MatchValue(value=doc_id),
+                        )
+                    ]
+                ),
+                limit=100,
+                offset=offset,
+                with_payload=True,
+            )
+            for point in points:
+                all_points.append((str(point.id), point.payload or {}))
+            if next_offset is None:
+                break
+            offset = next_offset
+        return all_points
 
     async def mark_superseded(self, memory_id: str, superseded_by: str):
         """Mark a memory as superseded by another."""

@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse
 
 from src.api.rate_limit import limiter
 
-from src.core import Memory, MemorySource, MemoryType, get_settings
+from src.core import Durability, Memory, MemorySource, MemoryType, get_settings
 from src.core.embeddings import OllamaUnavailableError, content_hash, get_embedding_service
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store
 
@@ -145,6 +145,15 @@ async def import_memories(
 
         # Build Memory object
         try:
+            # Parse durability if present
+            dur_val = mem_data.get("durability")
+            durability = None
+            if dur_val:
+                try:
+                    durability = Durability(dur_val)
+                except ValueError:
+                    pass
+
             memory = Memory(
                 id=memory_id,
                 content=mem_data.get("content", ""),
@@ -161,6 +170,8 @@ async def import_memories(
                 superseded_by=mem_data.get("superseded_by"),
                 parent_ids=mem_data.get("parent_ids", []),
                 metadata=mem_data.get("metadata", {}),
+                durability=durability,
+                initial_importance=mem_data.get("initial_importance"),
             )
         except Exception as e:
             logger.warning("import_bad_memory", line=line_num, error=str(e))

@@ -13,6 +13,8 @@ import {
   Sun,
   Moon,
   Warning,
+  Heartbeat,
+  FilePdf,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 
@@ -24,6 +26,8 @@ const links: { to: string; label: string; icon: Icon }[] = [
   { to: "/dashboard/anti-patterns", label: "Anti-Patterns", icon: Warning },
   { to: "/dashboard/audit", label: "Audit Log", icon: FileText },
   { to: "/dashboard/users", label: "Users", icon: Users },
+  { to: "/dashboard/health", label: "Health", icon: Heartbeat },
+  { to: "/dashboard/documents", label: "Documents", icon: FilePdf },
   { to: "/dashboard/settings", label: "Settings", icon: GearSix },
 ];
 

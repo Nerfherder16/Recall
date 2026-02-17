@@ -21,6 +21,14 @@ def generate_id() -> str:
     return str(uuid4())
 
 
+class Durability(str, Enum):
+    """How resistant a memory is to decay."""
+
+    EPHEMERAL = "ephemeral"  # Debug sessions, workarounds, temporary context
+    DURABLE = "durable"  # Architecture decisions, design patterns, conventions
+    PERMANENT = "permanent"  # IPs, ports, URLs, paths, hardware specs
+
+
 class MemoryType(str, Enum):
     """Classification of memory by cognitive function."""
 
@@ -51,6 +59,7 @@ class RelationshipType(str, Enum):
     CONTRADICTS = "contradicts"  # Conflicting information
     REQUIRES = "requires"  # Dependency relationship
     PART_OF = "part_of"  # Hierarchical containment
+    EXTRACTED_FROM = "extracted_from"  # Memory extracted from document
 
 
 class User(BaseModel):
@@ -92,6 +101,8 @@ class Memory(BaseModel):
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)  # How certain we are
     access_count: int = 0  # Reinforcement counter
     pinned: bool = False  # Immune to decay when True
+    durability: Durability | None = None  # Decay resistance tier
+    initial_importance: float | None = None  # Importance at creation (for force profile)
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -250,6 +261,7 @@ class DetectedSignal(BaseModel):
     suggested_domain: str | None = None
     suggested_tags: list[str] = Field(default_factory=list)
     suggested_importance: float | None = None  # LLM-scored 0.0-1.0
+    suggested_durability: str | None = None  # LLM-classified durability tier
     context: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -278,3 +290,31 @@ class AntiPattern(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     user_id: int | None = None
     username: str | None = None
+
+
+# =============================================================
+# DOCUMENT MEMORY
+# =============================================================
+
+
+class Document(BaseModel):
+    """
+    A document that has been ingested into the memory system.
+
+    Documents produce child memories via EXTRACTED_FROM edges.
+    Children inherit the document's domain and durability.
+    """
+
+    id: str = Field(default_factory=generate_id)
+    filename: str
+    file_hash: str  # SHA-256 of file content
+    file_type: str  # pdf, markdown, text
+    domain: str = "general"
+    durability: Durability | None = None
+    pinned: bool = False
+    memory_count: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    user_id: int | None = None
+    username: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)

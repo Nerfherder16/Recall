@@ -66,6 +66,20 @@ class Neo4jStore:
                 """
             )
 
+            # Document constraints
+            await session.run(
+                """
+                CREATE CONSTRAINT document_id IF NOT EXISTS
+                FOR (d:Document) REQUIRE d.id IS UNIQUE
+                """
+            )
+            await session.run(
+                """
+                CREATE INDEX document_domain_idx IF NOT EXISTS
+                FOR (d:Document) ON (d.domain)
+                """
+            )
+
         logger.info("connected_to_neo4j")
 
     async def create_memory_node(self, memory: Memory):
@@ -86,7 +100,9 @@ class Neo4jStore:
                     m.content_preview = $preview,
                     m.user_id = $user_id,
                     m.pinned = $pinned,
-                    m.stability = $stability
+                    m.stability = $stability,
+                    m.durability = $durability,
+                    m.initial_importance = $initial_importance
                 """,
                 id=memory.id,
                 memory_type=memory.memory_type.value,
@@ -97,6 +113,8 @@ class Neo4jStore:
                 user_id=memory.user_id,
                 pinned=memory.pinned,
                 stability=memory.stability,
+                durability=memory.durability.value if memory.durability else None,
+                initial_importance=memory.initial_importance,
             )
 
         logger.debug("created_memory_node", id=memory.id)
@@ -348,6 +366,54 @@ class Neo4jStore:
                 id=memory_id,
                 pinned=pinned,
             )
+
+    async def update_durability(self, memory_id: str, durability: str | None):
+        """Update durability in graph node."""
+        async with self.driver.session() as session:
+            await session.run(
+                """
+                MATCH (m:Memory {id: $id})
+                SET m.durability = $durability
+                """,
+                id=memory_id,
+                durability=durability,
+            )
+
+    async def get_avg_edge_strength(self) -> tuple[float, int]:
+        """Get average RELATED_TO edge strength and count."""
+        async with self.driver.session() as session:
+            result = await session.run(
+                """
+                MATCH ()-[r:RELATED_TO]->()
+                RETURN avg(coalesce(r.strength, 0.5)) AS avg_strength,
+                       count(r) AS edge_count
+                """
+            )
+            record = await result.single()
+            if record:
+                return (
+                    record["avg_strength"] or 0.0,
+                    record["edge_count"] or 0,
+                )
+            return (0.0, 0)
+
+    async def get_high_gravity_memories(self, min_strength: float = 2.0) -> list[dict[str, Any]]:
+        """Find memories with high total RELATED_TO strength but low importance."""
+        async with self.driver.session() as session:
+            result = await session.run(
+                """
+                MATCH (m:Memory)-[r:RELATED_TO]-()
+                WHERE m.superseded_by IS NULL
+                WITH m, sum(coalesce(r.strength, 0.5)) AS total_strength
+                WHERE total_strength >= $min_strength AND m.importance < 0.3
+                RETURN m.id AS id, m.importance AS importance,
+                       total_strength, m.domain AS domain
+                ORDER BY total_strength DESC
+                LIMIT 50
+                """,
+                min_strength=min_strength,
+            )
+            return await result.data()
 
     async def update_stability(self, memory_id: str, stability: float):
         """Update stability in graph node."""

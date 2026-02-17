@@ -66,6 +66,12 @@ class DecayWorker:
                 stats["stable"] += 1
                 continue
 
+            # Permanent memories never decay
+            durability = payload.get("durability")
+            if durability == "permanent":
+                stats["stable"] += 1
+                continue
+
             importance = payload.get("importance", 0.5)
             stability = payload.get("stability", 0.1)
             last_accessed_str = payload.get("last_accessed")
@@ -78,6 +84,10 @@ class DecayWorker:
 
             # Calculate effective decay rate (stability reduces decay)
             effective_decay = base_decay_rate * (1 - stability)
+
+            # Durable memories decay 85% slower
+            if durability == "durable":
+                effective_decay *= 0.15
 
             # Apply decay
             new_importance = importance * ((1 - effective_decay) ** hours_since_access)

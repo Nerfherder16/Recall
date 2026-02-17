@@ -4,6 +4,8 @@ import {
   Trash,
   PushPin,
   Sparkle,
+  Lock,
+  ShieldCheck,
 } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type {
@@ -15,6 +17,25 @@ import type {
 
 function shouldSuggestPin(r: BrowseResult): boolean {
   return !r.pinned && r.importance >= 0.7 && r.access_count >= 10;
+}
+
+function DurabilityBadge({ durability }: { durability: string | null }) {
+  if (!durability || durability === "ephemeral") return null;
+  if (durability === "permanent") {
+    return (
+      <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 text-[10px] font-medium">
+        <Lock size={10} weight="fill" /> Permanent
+      </span>
+    );
+  }
+  if (durability === "durable") {
+    return (
+      <span className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/10 text-cyan-400 px-1.5 py-0.5 text-[10px] font-medium">
+        <ShieldCheck size={10} weight="fill" /> Durable
+      </span>
+    );
+  }
+  return null;
 }
 import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
@@ -79,6 +100,7 @@ export default function MemoriesPage() {
           similarity: e.similarity || 0,
           pinned: e.pinned ?? false,
           access_count: e.access_count ?? 0,
+          durability: e.durability ?? null,
         })),
       );
     } catch {
@@ -294,6 +316,7 @@ export default function MemoriesPage() {
                         <Sparkle size={10} weight="fill" /> Pin?
                       </button>
                     )}
+                    <DurabilityBadge durability={r.durability} />
                   </div>
                   <p
                     className="text-sm cursor-pointer hover:text-primary transition-colors line-clamp-3"
@@ -381,6 +404,7 @@ export default function MemoriesPage() {
                         <Sparkle size={10} weight="fill" /> Pin?
                       </button>
                     )}
+                    <DurabilityBadge durability={r.durability} />
                     {r.similarity > 0 && (
                       <span className="text-xs text-base-content/30 tabular-nums">
                         {(r.similarity * 100).toFixed(1)}%

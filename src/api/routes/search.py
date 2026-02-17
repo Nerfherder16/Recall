@@ -56,6 +56,7 @@ class SearchResult(BaseModel):
     tags: list[str]
     stored_by: str | None = None
     pinned: bool = False
+    durability: str | None = None
 
 
 class SearchResponse(BaseModel):
@@ -80,6 +81,7 @@ class BrowseResult(BaseModel):
     stored_by: str | None = None
     pinned: bool = False
     access_count: int = 0
+    durability: str | None = None
 
 
 class BrowseResponse(BaseModel):
@@ -113,6 +115,7 @@ class TimelineEntry(BaseModel):
     stored_by: str | None = None
     pinned: bool = False
     access_count: int = 0
+    durability: str | None = None
 
 
 class TimelineResponse(BaseModel):
@@ -191,6 +194,7 @@ async def browse_memories(request: Request, body: SearchRequest):
                 stored_by=r.memory.username,
                 pinned=r.memory.pinned,
                 access_count=r.memory.access_count,
+                durability=r.memory.durability.value if r.memory.durability else None,
             )
             for r in results
         ]
@@ -261,6 +265,7 @@ async def timeline_view(request: Request, body: TimelineRequest):
                 stored_by=payload.get("username"),
                 pinned=payload.get("pinned") == "true",
                 access_count=payload.get("access_count", 0),
+                durability=payload.get("durability"),
             )
             for mid, payload in points
         ]
@@ -329,6 +334,7 @@ async def search_memories(request: Request, body: SearchRequest):
                 tags=r.memory.tags,
                 stored_by=r.memory.username,
                 pinned=r.memory.pinned,
+                durability=r.memory.durability.value if r.memory.durability else None,
             )
             for r in results
         ]

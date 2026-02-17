@@ -7,6 +7,8 @@ from .models import (
     AntiPattern,
     ConsolidationResult,
     DetectedSignal,
+    Document,
+    Durability,
     Memory,
     MemoryQuery,
     MemorySource,
@@ -33,6 +35,7 @@ __all__ = [
     "LLMError",
     "get_llm",
     # Models
+    "Durability",
     "Memory",
     "MemoryType",
     "MemorySource",
@@ -45,5 +48,6 @@ __all__ = [
     "SignalType",
     "DetectedSignal",
     "AntiPattern",
+    "Document",
     "User",
 ]

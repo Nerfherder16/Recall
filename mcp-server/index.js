@@ -108,6 +108,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 "Importance score 0-1 (default 0.5). Higher = slower decay",
             },
+            durability: {
+              type: "string",
+              enum: ["ephemeral", "durable", "permanent"],
+              description:
+                "Decay resistance: ephemeral (normal), durable (85% slower), permanent (never decays). Use permanent for IPs, ports, URLs, paths.",
+            },
           },
           required: ["content", "memory_type"],
         },
@@ -384,6 +390,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (args.domain) body.domain = args.domain;
         if (args.tags) body.tags = args.tags;
         if (args.importance !== undefined) body.importance = args.importance;
+        if (args.durability) body.durability = args.durability;
 
         const result = await recallAPI("/memory/store", "POST", body);
         return {

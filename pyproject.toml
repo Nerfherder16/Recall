@@ -39,6 +39,9 @@ dependencies = [
     # SSE
     "sse-starlette>=1.6.0",
 
+    # PDF parsing
+    "pymupdf>=1.24.0",
+
     # Utilities
     "structlog>=24.1.0",
     "tenacity>=8.2.0",

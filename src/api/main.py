@@ -23,7 +23,7 @@ from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, g
 
 from .auth import require_auth
 from .rate_limit import limiter
-from .routes import admin, events, ingest, memory, observe, ops, search, session
+from .routes import admin, documents, events, health_dashboard, ingest, memory, observe, ops, search, session
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -174,6 +174,14 @@ app.include_router(
 )
 app.include_router(
     events.router, prefix="/events", tags=["events"],
+    dependencies=[Depends(require_auth)],
+)
+app.include_router(
+    health_dashboard.router, prefix="/admin", tags=["health"],
+    dependencies=[Depends(require_auth)],
+)
+app.include_router(
+    documents.router, prefix="/document", tags=["documents"],
     dependencies=[Depends(require_auth)],
 )
 

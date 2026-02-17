@@ -41,6 +41,17 @@ SIGNAL_IMPORTANCE: dict[SignalType, float] = {
     SignalType.WARNING: 0.7,
 }
 
+SIGNAL_DURABILITY: dict[SignalType, str] = {
+    SignalType.FACT: "durable",
+    SignalType.DECISION: "durable",
+    SignalType.PATTERN: "durable",
+    SignalType.WORKFLOW: "durable",
+    SignalType.PREFERENCE: "durable",
+    SignalType.ERROR_FIX: "ephemeral",
+    SignalType.CONTRADICTION: "ephemeral",
+    SignalType.WARNING: "durable",
+}
+
 PROMPT_TEMPLATE = """Analyze the following conversation and extract important signals that should be remembered.
 
 For each signal, identify:
@@ -48,8 +59,14 @@ For each signal, identify:
 - content: a clear, self-contained description of what should be remembered (include enough context to be useful standalone)
 - confidence: 0.0-1.0 how confident you are this is worth remembering
 - importance: 1-10 how poignant or impactful this memory is (see scale below)
+- durability: one of "ephemeral", "durable", "permanent" (see classification below)
 - domain: topic area (e.g., "docker", "python", "infrastructure", "project-recall")
 - tags: relevant tags as a list of strings
+
+Durability classification:
+- ephemeral: debug sessions, temporary workarounds, one-off fixes, session-specific context
+- durable: architecture decisions, design patterns, conventions, learned workflows
+- permanent: IP addresses, ports, URLs, file paths, hardware specs, credential locations, API keys
 
 Importance scale (1-10):
 1-2: Trivial, routine observations (e.g., "ran npm install")
@@ -192,6 +209,12 @@ class SignalDetector:
                     except (ValueError, TypeError):
                         pass
 
+                # Parse durability classification
+                suggested_durability = None
+                raw_durability = item.get("durability")
+                if raw_durability and raw_durability in ("ephemeral", "durable", "permanent"):
+                    suggested_durability = raw_durability
+
                 signal = DetectedSignal(
                     signal_type=signal_type,
                     content=item["content"],
@@ -200,6 +223,7 @@ class SignalDetector:
                     suggested_domain=item.get("domain"),
                     suggested_tags=item.get("tags", []),
                     suggested_importance=suggested_importance,
+                    suggested_durability=suggested_durability,
                 )
                 signals.append(signal)
 

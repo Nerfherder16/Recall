@@ -20,7 +20,9 @@ from src.core.embeddings import OllamaUnavailableError
 from src.core.metrics import get_metrics
 from src.core.embeddings import content_hash
 from src.core.models import AntiPattern, SignalType
+from src.core.models import Durability
 from src.core.signal_detector import (
+    SIGNAL_DURABILITY,
     SIGNAL_IMPORTANCE,
     SIGNAL_TO_MEMORY_TYPE,
     SignalDetector,
@@ -159,6 +161,16 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
             )
             return None
 
+        # Resolve durability: LLM suggestion → signal-type default → ephemeral
+        durability_str = (
+            signal.suggested_durability
+            or SIGNAL_DURABILITY.get(signal.signal_type, "ephemeral")
+        )
+        try:
+            durability = Durability(durability_str)
+        except ValueError:
+            durability = Durability.EPHEMERAL
+
         memory = Memory(
             content=signal.content,
             content_hash=chash,
@@ -170,6 +182,8 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
             confidence=signal.confidence,
             session_id=session_id,
             metadata={"auto_detected": True},
+            durability=durability,
+            initial_importance=importance,
         )
 
         # Generate embedding

@@ -9,6 +9,7 @@ import json
 import structlog
 
 from src.core import Memory, MemorySource, MemoryType, get_embedding_service
+from src.core.models import Durability
 from src.core.embeddings import OllamaUnavailableError, content_hash
 from src.core.llm import get_llm
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store
@@ -113,6 +114,8 @@ async def _run_extraction(observation: dict):
             importance=0.4,
             confidence=0.6,
             metadata={"observer": True, "source_file": file_path},
+            durability=Durability.DURABLE,
+            initial_importance=0.4,
         )
 
         try:
@@ -186,6 +189,8 @@ async def save_session_snapshot(session_id: str, summary: str | None):
             confidence=0.9,
             session_id=session_id,
             metadata={"snapshot": True},
+            durability=Durability.EPHEMERAL,
+            initial_importance=0.3,
         )
 
         embedding_service = await get_embedding_service()
