@@ -61,6 +61,11 @@ class DecayWorker:
         for memory_id, payload in results:
             stats["processed"] += 1
 
+            # Pinned memories are immune to decay
+            if payload.get("pinned") == "true":
+                stats["stable"] += 1
+                continue
+
             importance = payload.get("importance", 0.5)
             stability = payload.get("stability", 0.1)
             last_accessed_str = payload.get("last_accessed")

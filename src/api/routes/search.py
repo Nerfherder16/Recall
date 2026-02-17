@@ -55,6 +55,7 @@ class SearchResult(BaseModel):
     importance: float
     tags: list[str]
     stored_by: str | None = None
+    pinned: bool = False
 
 
 class SearchResponse(BaseModel):
@@ -77,6 +78,7 @@ class BrowseResult(BaseModel):
     created_at: str
     tags: list[str]
     stored_by: str | None = None
+    pinned: bool = False
 
 
 class BrowseResponse(BaseModel):
@@ -184,6 +186,7 @@ async def browse_memories(request: Request, body: SearchRequest):
                 created_at=r.memory.created_at.isoformat(),
                 tags=r.memory.tags,
                 stored_by=r.memory.username,
+                pinned=r.memory.pinned,
             )
             for r in results
         ]
@@ -319,6 +322,7 @@ async def search_memories(request: Request, body: SearchRequest):
                 importance=r.memory.importance,
                 tags=r.memory.tags,
                 stored_by=r.memory.username,
+                pinned=r.memory.pinned,
             )
             for r in results
         ]
@@ -413,7 +417,22 @@ async def assemble_context(request: Request, body: ContextRequest):
                     breakdown[type_key] += 1
                     memories_used += 1
 
+            # Separate anti-pattern warnings from regular memories
+            warnings = []
+            for r in results:
+                meta = r.memory.metadata or {}
+                if meta.get("is_anti_pattern"):
+                    warning_text = meta.get("warning", r.memory.content)
+                    alt = meta.get("alternative")
+                    line = f"- WARNING: {warning_text}"
+                    if alt:
+                        line += f" -> Instead: {alt}"
+                    warnings.append(line)
+
             # Format each type
+            if warnings:
+                context_parts.append("## Warnings (things to avoid)\n" + "\n".join(warnings))
+
             if by_type["semantic"]:
                 context_parts.append("## Known Facts\n" + "\n".join(f"- {c}" for c in by_type["semantic"]))
 

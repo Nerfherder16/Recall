@@ -1,11 +1,14 @@
-import { useRef, useEffect } from "react";
-import { X } from "@phosphor-icons/react";
+import { useRef, useEffect, useState } from "react";
+import { X, PushPin } from "@phosphor-icons/react";
+import { api } from "../api/client";
 import type { MemoryDetail } from "../api/types";
 import Badge from "./Badge";
+import { useToastContext } from "../context/ToastContext";
 
 interface Props {
   memory: MemoryDetail | null;
   onClose: () => void;
+  onUpdate?: (updated: MemoryDetail) => void;
 }
 
 function formatDate(iso: string): string {
@@ -16,8 +19,14 @@ function formatDate(iso: string): string {
   }
 }
 
-export default function MemoryDetailModal({ memory, onClose }: Props) {
+export default function MemoryDetailModal({
+  memory,
+  onClose,
+  onUpdate,
+}: Props) {
   const ref = useRef<HTMLDialogElement>(null);
+  const { addToast } = useToastContext();
+  const [pinning, setPinning] = useState(false);
 
   useEffect(() => {
     if (memory) {
@@ -29,6 +38,27 @@ export default function MemoryDetailModal({ memory, onClose }: Props) {
 
   if (!memory) return null;
 
+  async function togglePin() {
+    if (!memory || pinning) return;
+    setPinning(true);
+    try {
+      if (memory.pinned) {
+        await api(`/memory/${memory.id}/pin`, "DELETE");
+        memory.pinned = false;
+        addToast("Memory unpinned", "success");
+      } else {
+        await api(`/memory/${memory.id}/pin`, "POST");
+        memory.pinned = true;
+        addToast("Memory pinned", "success");
+      }
+      if (onUpdate) onUpdate({ ...memory });
+    } catch {
+      addToast("Failed to update pin status", "error");
+    } finally {
+      setPinning(false);
+    }
+  }
+
   return (
     <dialog ref={ref} className="modal" onClose={onClose}>
       <div className="rounded-2xl bg-base-100 border border-base-content/5 p-6 max-w-2xl w-full">
@@ -38,13 +68,34 @@ export default function MemoryDetailModal({ memory, onClose }: Props) {
             <span className="text-sm text-base-content/40">
               {memory.domain}
             </span>
+            {memory.pinned && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 text-amber-400 px-1.5 py-0.5 text-[10px] font-medium">
+                <PushPin size={10} weight="fill" /> Pinned
+              </span>
+            )}
           </div>
-          <button
-            className="rounded-lg p-1.5 hover:bg-base-content/5 transition-colors"
-            onClick={onClose}
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              className={`rounded-lg p-1.5 transition-colors ${
+                memory.pinned
+                  ? "text-amber-400 hover:bg-amber-500/10"
+                  : "text-base-content/30 hover:bg-base-content/5"
+              }`}
+              onClick={togglePin}
+              disabled={pinning}
+              title={
+                memory.pinned ? "Unpin memory" : "Pin memory (immune to decay)"
+              }
+            >
+              <PushPin size={16} weight={memory.pinned ? "fill" : "regular"} />
+            </button>
+            <button
+              className="rounded-lg p-1.5 hover:bg-base-content/5 transition-colors"
+              onClick={onClose}
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <p className="font-mono text-xs text-base-content/30 mb-3">

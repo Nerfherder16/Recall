@@ -26,6 +26,7 @@ SIGNAL_TO_MEMORY_TYPE: dict[SignalType, MemoryType] = {
     SignalType.FACT: MemoryType.SEMANTIC,
     SignalType.WORKFLOW: MemoryType.PROCEDURAL,
     SignalType.CONTRADICTION: MemoryType.SEMANTIC,
+    SignalType.WARNING: MemoryType.SEMANTIC,
 }
 
 # Importance by signal type
@@ -37,12 +38,13 @@ SIGNAL_IMPORTANCE: dict[SignalType, float] = {
     SignalType.FACT: 0.6,
     SignalType.PREFERENCE: 0.5,
     SignalType.PATTERN: 0.5,
+    SignalType.WARNING: 0.7,
 }
 
 PROMPT_TEMPLATE = """Analyze the following conversation and extract important signals that should be remembered.
 
 For each signal, identify:
-- signal_type: one of "error_fix", "decision", "pattern", "preference", "fact", "workflow", "contradiction"
+- signal_type: one of "error_fix", "decision", "pattern", "preference", "fact", "workflow", "contradiction", "warning"
 - content: a clear, self-contained description of what should be remembered (include enough context to be useful standalone)
 - confidence: 0.0-1.0 how confident you are this is worth remembering
 - importance: 1-10 how poignant or impactful this memory is (see scale below)
@@ -66,6 +68,7 @@ Rules:
 - preference: a user preference for tools, style, or approach
 - pattern: a recurring theme or convention
 - contradiction: information that conflicts with something previously known
+- warning: something that should NOT be done — an anti-pattern, gotcha, or dangerous approach. Content should describe what to avoid AND the better alternative if known
 - Set confidence based on how clearly the signal appears in the conversation
 - Set importance based on the impact and poignancy of the memory, not just the signal type
 - If no signals are found, return an empty array

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { MagnifyingGlass, Trash } from "@phosphor-icons/react";
+import { MagnifyingGlass, Trash, PushPin } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type {
   BrowseResult,
@@ -244,6 +244,11 @@ export default function MemoriesPage() {
                         {r.stored_by}
                       </span>
                     )}
+                    {r.pinned && (
+                      <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-500/10 text-amber-400 px-1.5 py-0.5 text-[10px] font-medium">
+                        <PushPin size={10} weight="fill" /> Pinned
+                      </span>
+                    )}
                   </div>
                   <p
                     className="text-sm cursor-pointer hover:text-primary transition-colors line-clamp-3"
@@ -300,6 +305,11 @@ export default function MemoriesPage() {
                     {r.stored_by && (
                       <span className="inline-flex items-center rounded-md bg-blue-500/10 text-blue-400 px-1.5 py-0.5 text-[10px] font-medium">
                         {r.stored_by}
+                      </span>
+                    )}
+                    {r.pinned && (
+                      <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-500/10 text-amber-400 px-1.5 py-0.5 text-[10px] font-medium">
+                        <PushPin size={10} weight="fill" /> Pinned
                       </span>
                     )}
                     {r.similarity > 0 && (

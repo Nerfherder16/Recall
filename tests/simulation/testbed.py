@@ -22,6 +22,7 @@ from tests.simulation.suites.lifecycle import LifecycleSuite
 from tests.simulation.suites.retrieval_quality import RetrievalQualitySuite
 from tests.simulation.suites.signal_quality import SignalQualitySuite
 from tests.simulation.suites.stress import StressSuite
+from tests.simulation.suites.adaptive import AdaptiveSuite
 from tests.simulation.suites.time_acceleration import TimeAccelerationSuite
 
 SUITE_MAP = {
@@ -30,6 +31,7 @@ SUITE_MAP = {
     "stress": StressSuite,
     "signals": SignalQualitySuite,
     "time_accel": TimeAccelerationSuite,
+    "adaptive": AdaptiveSuite,
 }
 
 

@@ -26,6 +26,7 @@ export interface BrowseResult {
   created_at: string;
   tags: string[];
   stored_by: string | null;
+  pinned: boolean;
 }
 
 export interface MemoryDetail {
@@ -42,6 +43,19 @@ export interface MemoryDetail {
   created_at: string;
   last_accessed: string;
   stored_by: string | null;
+  pinned: boolean;
+}
+
+export interface AntiPattern {
+  id: string;
+  pattern: string;
+  warning: string;
+  alternative: string | null;
+  severity: string;
+  domain: string;
+  tags: string[];
+  times_triggered: number;
+  created_at: string;
 }
 
 export interface UserInfo {

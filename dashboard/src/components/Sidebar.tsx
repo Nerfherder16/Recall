@@ -12,6 +12,7 @@ import {
   CaretRight,
   Sun,
   Moon,
+  Warning,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 
@@ -20,6 +21,7 @@ const links: { to: string; label: string; icon: Icon }[] = [
   { to: "/dashboard/memories", label: "Memories", icon: ClipboardText },
   { to: "/dashboard/sessions", label: "Sessions", icon: Clock },
   { to: "/dashboard/signals", label: "Signals", icon: Lightning },
+  { to: "/dashboard/anti-patterns", label: "Anti-Patterns", icon: Warning },
   { to: "/dashboard/audit", label: "Audit Log", icon: FileText },
   { to: "/dashboard/users", label: "Users", icon: Users },
   { to: "/dashboard/settings", label: "Settings", icon: GearSix },

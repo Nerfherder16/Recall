@@ -11,11 +11,16 @@
  * Failure mode: silent — never block the user.
  */
 
+const { writeFileSync, mkdirSync, existsSync, readFileSync } = require("fs");
+const { join } = require("path");
+
 const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
 const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 const MIN_PROMPT_LENGTH = 15;
 const MAX_RESULTS = 5;
 const MIN_SIMILARITY = 0.25;
+const CACHE_DIR = join(process.env.HOME || process.env.USERPROFILE || "/tmp", ".cache", "recall");
+const INJECTED_FILE = join(CACHE_DIR, "injected.json");
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -56,6 +61,10 @@ function formatContext(results) {
   const lines = results.map((r) => {
     const type = r.memory_type || "memory";
     const summary = r.summary || r.content || "";
+    // Anti-pattern warnings get special formatting
+    if (summary.startsWith("WARNING:")) {
+      return `- [WARNING] ${summary}`;
+    }
     return `- [${type}] ${summary}`;
   });
 
@@ -108,6 +117,21 @@ async function main() {
     );
 
     if (results.length === 0) process.exit(0);
+
+    // Track injected memory IDs for feedback loop
+    try {
+      if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+      let injected = [];
+      try { injected = JSON.parse(readFileSync(INJECTED_FILE, "utf8")); } catch {}
+
+      const entries = results.map((r) => ({
+        memory_id: r.id,
+        timestamp: new Date().toISOString(),
+      }));
+      injected.push(...entries);
+      if (injected.length > 500) injected = injected.slice(-500);
+      writeFileSync(INJECTED_FILE, JSON.stringify(injected));
+    } catch {} // Never block retrieval
 
     const context = formatContext(results);
     if (!context) process.exit(0);

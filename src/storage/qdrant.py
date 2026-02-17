@@ -65,6 +65,9 @@ class QdrantStore:
         # Create facts sub-embedding collection
         await self.ensure_facts_collection()
 
+        # Create anti-patterns collection
+        await self.ensure_anti_patterns_collection()
+
     async def _ensure_indexes(self):
         """Create indexes for efficient filtering."""
         indexes = [
@@ -76,6 +79,7 @@ class QdrantStore:
             ("created_at", "datetime"),
             ("user_id", "integer"),
             ("username", "keyword"),
+            ("pinned", "keyword"),
         ]
 
         for field, field_type in indexes:
@@ -118,6 +122,7 @@ class QdrantStore:
                 "metadata": memory.metadata,
                 "user_id": memory.user_id,
                 "username": memory.username,
+                "pinned": "true" if memory.pinned else "false",
             },
         )
 
@@ -260,6 +265,22 @@ class QdrantStore:
         await self.client.set_payload(
             collection_name=self.collection,
             payload={"importance": importance},
+            points=[memory_id],
+        )
+
+    async def update_pinned(self, memory_id: str, pinned: bool):
+        """Update the pinned status of a memory."""
+        await self.client.set_payload(
+            collection_name=self.collection,
+            payload={"pinned": "true" if pinned else "false"},
+            points=[memory_id],
+        )
+
+    async def update_stability(self, memory_id: str, stability: float):
+        """Update the stability score of a memory."""
+        await self.client.set_payload(
+            collection_name=self.collection,
+            payload={"stability": stability},
             points=[memory_id],
         )
 
@@ -524,6 +545,142 @@ class QdrantStore:
             return info.points_count
         except Exception:
             return 0
+
+    # --- Anti-patterns collection methods ---
+
+    async def ensure_anti_patterns_collection(self):
+        """Create the anti-patterns collection if it doesn't exist."""
+        self.anti_patterns_collection = f"{self.collection}_anti_patterns"
+        collections = await self.client.get_collections()
+        exists = any(c.name == self.anti_patterns_collection for c in collections.collections)
+
+        if not exists:
+            await self.client.create_collection(
+                collection_name=self.anti_patterns_collection,
+                vectors_config=VectorParams(
+                    size=self.settings.embedding_dimensions,
+                    distance=Distance.COSINE,
+                ),
+            )
+            for field_name, field_type in [
+                ("domain", "keyword"),
+                ("severity", "keyword"),
+                ("created_at", "datetime"),
+            ]:
+                try:
+                    await self.client.create_payload_index(
+                        collection_name=self.anti_patterns_collection,
+                        field_name=field_name,
+                        field_schema=field_type,
+                    )
+                except Exception:
+                    pass
+            logger.info("created_anti_patterns_collection", name=self.anti_patterns_collection)
+
+    async def store_anti_pattern(self, anti_pattern, embedding: list[float]) -> str:
+        """Store an anti-pattern with its embedding."""
+        point = PointStruct(
+            id=anti_pattern.id,
+            vector=embedding,
+            payload={
+                "pattern": anti_pattern.pattern,
+                "warning": anti_pattern.warning,
+                "alternative": anti_pattern.alternative,
+                "severity": anti_pattern.severity,
+                "domain": anti_pattern.domain,
+                "tags": anti_pattern.tags,
+                "times_triggered": anti_pattern.times_triggered,
+                "created_at": anti_pattern.created_at.isoformat(),
+                "user_id": anti_pattern.user_id,
+                "username": anti_pattern.username,
+            },
+        )
+        await self.client.upsert(
+            collection_name=self.anti_patterns_collection,
+            points=[point],
+        )
+        return anti_pattern.id
+
+    async def search_anti_patterns(
+        self, query_vector: list[float], limit: int = 5, domain: str | None = None,
+    ) -> list[tuple[str, float, dict[str, Any]]]:
+        """Search anti-patterns by embedding similarity."""
+        conditions = []
+        if domain:
+            conditions.append(
+                FieldCondition(key="domain", match=MatchValue(value=domain))
+            )
+        search_filter = Filter(must=conditions) if conditions else None
+
+        results = await self.client.query_points(
+            collection_name=self.anti_patterns_collection,
+            query=query_vector,
+            limit=limit,
+            query_filter=search_filter,
+            with_payload=True,
+        )
+        return [(str(r.id), r.score, r.payload) for r in results.points]
+
+    async def get_anti_pattern(self, anti_pattern_id: str):
+        """Get an anti-pattern by ID."""
+        results = await self.client.retrieve(
+            collection_name=self.anti_patterns_collection,
+            ids=[anti_pattern_id],
+            with_vectors=True,
+            with_payload=True,
+        )
+        if results:
+            point = results[0]
+            return point.vector, point.payload
+        return None
+
+    async def delete_anti_pattern(self, anti_pattern_id: str):
+        """Delete an anti-pattern."""
+        await self.client.delete(
+            collection_name=self.anti_patterns_collection,
+            points_selector=[anti_pattern_id],
+        )
+
+    async def scroll_anti_patterns(
+        self, domain: str | None = None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """Scroll all anti-patterns."""
+        conditions = []
+        if domain:
+            conditions.append(
+                FieldCondition(key="domain", match=MatchValue(value=domain))
+            )
+        scroll_filter = Filter(must=conditions) if conditions else None
+        all_points = []
+        offset = None
+
+        while True:
+            points, next_offset = await self.client.scroll(
+                collection_name=self.anti_patterns_collection,
+                scroll_filter=scroll_filter,
+                limit=100,
+                offset=offset,
+                with_payload=True,
+            )
+            for point in points:
+                all_points.append((str(point.id), point.payload or {}))
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        return all_points
+
+    async def increment_triggered(self, anti_pattern_id: str):
+        """Increment times_triggered for an anti-pattern."""
+        result = await self.get_anti_pattern(anti_pattern_id)
+        if result:
+            _, payload = result
+            count = payload.get("times_triggered", 0) + 1
+            await self.client.set_payload(
+                collection_name=self.anti_patterns_collection,
+                payload={"times_triggered": count},
+                points=[anti_pattern_id],
+            )
 
     async def count(self) -> int:
         """Get total number of memories."""

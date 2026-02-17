@@ -9,11 +9,14 @@
  * Always exits 0 — never block stopping.
  */
 
-const { readFileSync } = require("fs");
+const { readFileSync, writeFileSync, existsSync } = require("fs");
+const { join } = require("path");
 
 const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
 const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 const MAX_TRANSCRIPT_LINES = 200;
+const CACHE_DIR = join(process.env.HOME || process.env.USERPROFILE || "/tmp", ".cache", "recall");
+const INJECTED_FILE = join(CACHE_DIR, "injected.json");
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -87,6 +90,79 @@ function buildSummary(cwd, userMessages) {
   return summary.slice(0, 2000);
 }
 
+function extractAssistantText(transcriptPath) {
+  try {
+    const content = readFileSync(transcriptPath, "utf8");
+    const lines = content.trim().split("\n").slice(-MAX_TRANSCRIPT_LINES);
+    const texts = [];
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type === "assistant" || entry.role === "assistant") {
+          const text =
+            typeof entry.content === "string"
+              ? entry.content
+              : Array.isArray(entry.content)
+                ? entry.content
+                    .filter((c) => c.type === "text")
+                    .map((c) => c.text)
+                    .join(" ")
+                : "";
+          if (text.length > 10) texts.push(text);
+        }
+      } catch {
+        // Skip malformed lines
+      }
+    }
+    return texts.join(" ").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+async function submitFeedback(transcriptPath) {
+  if (!existsSync(INJECTED_FILE)) return;
+
+  let injected;
+  try {
+    injected = JSON.parse(readFileSync(INJECTED_FILE, "utf8"));
+  } catch {
+    return;
+  }
+  if (!injected || injected.length === 0) return;
+
+  // Deduplicate memory IDs
+  const ids = [...new Set(injected.map((e) => e.memory_id))];
+
+  // Extract assistant text from transcript
+  const assistantText = extractAssistantText(transcriptPath);
+  if (!assistantText || assistantText.length < 50) return;
+
+  const headers = { "Content-Type": "application/json" };
+  if (RECALL_API_KEY) {
+    headers["Authorization"] = `Bearer ${RECALL_API_KEY}`;
+  }
+
+  try {
+    await fetch(`${RECALL_HOST}/memory/feedback`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        injected_ids: ids,
+        assistant_text: assistantText.slice(0, 10000),
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch {
+    // Never block stopping
+  }
+
+  // Clear tracking file
+  try {
+    writeFileSync(INJECTED_FILE, "[]");
+  } catch {}
+}
+
 async function main() {
   const input = await readStdin();
   if (!input) process.exit(0);
@@ -112,6 +188,9 @@ async function main() {
     // Too short — not worth summarizing
     process.exit(0);
   }
+
+  // Submit feedback for injected memories before storing summary
+  await submitFeedback(transcriptPath);
 
   const summary = buildSummary(cwd, userMessages);
   if (!summary) process.exit(0);

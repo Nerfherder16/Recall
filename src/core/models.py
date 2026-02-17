@@ -91,6 +91,7 @@ class Memory(BaseModel):
     stability: float = Field(default=0.1, ge=0.0, le=1.0)  # Resistance to decay
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)  # How certain we are
     access_count: int = 0  # Reinforcement counter
+    pinned: bool = False  # Immune to decay when True
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -236,6 +237,7 @@ class SignalType(str, Enum):
     FACT = "fact"
     WORKFLOW = "workflow"
     CONTRADICTION = "contradiction"
+    WARNING = "warning"
 
 
 class DetectedSignal(BaseModel):
@@ -271,5 +273,8 @@ class AntiPattern(BaseModel):
     alternative: str | None = None  # Better approach
     severity: str = "warning"  # warning, error, info
     domain: str = "general"
+    tags: list[str] = Field(default_factory=list)
     times_triggered: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    user_id: int | None = None
+    username: str | None = None

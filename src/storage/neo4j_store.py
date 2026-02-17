@@ -84,7 +84,9 @@ class Neo4jStore:
                     m.importance = $importance,
                     m.created_at = $created_at,
                     m.content_preview = $preview,
-                    m.user_id = $user_id
+                    m.user_id = $user_id,
+                    m.pinned = $pinned,
+                    m.stability = $stability
                 """,
                 id=memory.id,
                 memory_type=memory.memory_type.value,
@@ -93,6 +95,8 @@ class Neo4jStore:
                 created_at=memory.created_at.isoformat(),
                 preview=memory.content[:100] if memory.content else "",
                 user_id=memory.user_id,
+                pinned=memory.pinned,
+                stability=memory.stability,
             )
 
         logger.debug("created_memory_node", id=memory.id)
@@ -304,6 +308,30 @@ class Neo4jStore:
                 """,
                 id=memory_id,
                 importance=importance,
+            )
+
+    async def update_pinned(self, memory_id: str, pinned: bool):
+        """Update pinned status in graph node."""
+        async with self.driver.session() as session:
+            await session.run(
+                """
+                MATCH (m:Memory {id: $id})
+                SET m.pinned = $pinned
+                """,
+                id=memory_id,
+                pinned=pinned,
+            )
+
+    async def update_stability(self, memory_id: str, stability: float):
+        """Update stability in graph node."""
+        async with self.driver.session() as session:
+            await session.run(
+                """
+                MATCH (m:Memory {id: $id})
+                SET m.stability = $stability
+                """,
+                id=memory_id,
+                stability=stability,
             )
 
     async def delete_memory(self, memory_id: str):

@@ -197,6 +197,62 @@ class TimedRecallClient:
     async def batch_delete(self, ids: list[str]) -> dict | None:
         return await self._request("POST", "/memory/batch/delete", {"ids": ids})
 
+    # ── Pinning ──
+
+    async def pin_memory(self, memory_id: str) -> dict | None:
+        return await self._request("POST", f"/memory/{memory_id}/pin")
+
+    async def unpin_memory(self, memory_id: str) -> dict | None:
+        return await self._request("DELETE", f"/memory/{memory_id}/pin")
+
+    # ── Anti-patterns ──
+
+    async def create_anti_pattern(
+        self,
+        pattern: str,
+        warning: str,
+        alternative: str | None = None,
+        severity: str = "warning",
+        domain: str = "general",
+        tags: list[str] | None = None,
+    ) -> dict | None:
+        body = {
+            "pattern": pattern,
+            "warning": warning,
+            "severity": severity,
+            "domain": domain,
+            "tags": (tags or []) + [self.run_tag()],
+        }
+        if alternative:
+            body["alternative"] = alternative
+        return await self._request("POST", "/memory/anti-pattern", body)
+
+    async def list_anti_patterns(self, domain: str | None = None) -> list[dict]:
+        path = "/memory/anti-patterns"
+        if domain:
+            path += f"?domain={domain}"
+        r = await self._request("GET", path)
+        if isinstance(r, dict):
+            return r.get("anti_patterns", [])
+        if isinstance(r, list):
+            return r
+        return []
+
+    async def delete_anti_pattern(self, ap_id: str) -> dict | None:
+        return await self._request("DELETE", f"/memory/anti-pattern/{ap_id}")
+
+    # ── Feedback ──
+
+    async def submit_feedback(
+        self,
+        injected_ids: list[str],
+        assistant_text: str,
+    ) -> dict | None:
+        return await self._request("POST", "/memory/feedback", {
+            "injected_ids": injected_ids,
+            "assistant_text": assistant_text,
+        })
+
     # ── Relationships ──
 
     async def create_relationship(

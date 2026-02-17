@@ -9,6 +9,7 @@ import MemoriesPage from "./pages/MemoriesPage";
 import SessionsPage from "./pages/SessionsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignalsPage from "./pages/SignalsPage";
+import AntiPatternsPage from "./pages/AntiPatternsPage";
 import UsersPage from "./pages/UsersPage";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -62,6 +63,7 @@ export default function App() {
                 <Route path="memories" element={<MemoriesPage />} />
                 <Route path="sessions" element={<SessionsPage />} />
                 <Route path="signals" element={<SignalsPage />} />
+                <Route path="anti-patterns" element={<AntiPatternsPage />} />
                 <Route path="audit" element={<AuditPage />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="settings" element={<SettingsPage />} />

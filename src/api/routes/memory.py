@@ -70,6 +70,7 @@ class MemoryResponse(BaseModel):
     created_at: str
     last_accessed: str
     stored_by: str | None = None
+    pinned: bool = False
 
 
 class CreateRelationshipRequest(BaseModel):
@@ -188,6 +189,302 @@ async def store_memory(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+# =============================================================
+# ANTI-PATTERN ENDPOINTS (must be before /{memory_id} catch-all)
+# =============================================================
+
+
+class CreateAntiPatternRequest(BaseModel):
+    """Request to create an anti-pattern."""
+
+    pattern: str = Field(..., min_length=1, max_length=5000)
+    warning: str = Field(..., min_length=1, max_length=5000)
+    alternative: str | None = None
+    severity: str = Field(default="warning")
+    domain: str = Field(default="general", max_length=200)
+    tags: list[str] = Field(default=[], max_length=50)
+
+
+class AntiPatternResponse(BaseModel):
+    """Response with anti-pattern details."""
+
+    id: str
+    pattern: str
+    warning: str
+    alternative: str | None
+    severity: str
+    domain: str
+    tags: list[str]
+    times_triggered: int
+    created_at: str
+
+
+@router.post("/anti-pattern", response_model=AntiPatternResponse)
+async def create_anti_pattern(
+    request: CreateAntiPatternRequest,
+    user: User | None = Depends(require_auth),
+):
+    """Create an anti-pattern — a warning about something to avoid."""
+    try:
+        from src.core.models import AntiPattern
+
+        anti_pattern = AntiPattern(
+            pattern=request.pattern,
+            warning=request.warning,
+            alternative=request.alternative,
+            severity=request.severity,
+            domain=request.domain,
+            tags=request.tags,
+            user_id=user.id if user else None,
+            username=user.username if user else None,
+        )
+
+        embedding_service = await get_embedding_service()
+        embedding = await embedding_service.embed(request.pattern)
+
+        qdrant = await get_qdrant_store()
+        await qdrant.store_anti_pattern(anti_pattern, embedding)
+
+        pg = await get_postgres_store()
+        await pg.log_audit(
+            "create_anti_pattern", anti_pattern.id,
+            actor=user.username if user else "user",
+            user_id=user.id if user else None,
+            details={"severity": request.severity, "domain": request.domain},
+        )
+
+        return AntiPatternResponse(
+            id=anti_pattern.id,
+            pattern=anti_pattern.pattern,
+            warning=anti_pattern.warning,
+            alternative=anti_pattern.alternative,
+            severity=anti_pattern.severity,
+            domain=anti_pattern.domain,
+            tags=anti_pattern.tags,
+            times_triggered=0,
+            created_at=anti_pattern.created_at.isoformat(),
+        )
+
+    except OllamaUnavailableError:
+        raise HTTPException(status_code=503, detail="Embedding service unavailable")
+    except Exception as e:
+        logger.error("create_anti_pattern_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/anti-patterns")
+async def list_anti_patterns(domain: str | None = Query(default=None)):
+    """List all anti-patterns, optionally filtered by domain."""
+    try:
+        qdrant = await get_qdrant_store()
+        results = await qdrant.scroll_anti_patterns(domain=domain)
+
+        return {
+            "anti_patterns": [
+                AntiPatternResponse(
+                    id=ap_id,
+                    pattern=payload.get("pattern", ""),
+                    warning=payload.get("warning", ""),
+                    alternative=payload.get("alternative"),
+                    severity=payload.get("severity", "warning"),
+                    domain=payload.get("domain", "general"),
+                    tags=payload.get("tags", []),
+                    times_triggered=payload.get("times_triggered", 0),
+                    created_at=payload.get("created_at", ""),
+                ).model_dump()
+                for ap_id, payload in results
+            ],
+            "total": len(results),
+        }
+
+    except Exception as e:
+        logger.error("list_anti_patterns_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/anti-pattern/{anti_pattern_id}", response_model=AntiPatternResponse)
+async def get_anti_pattern(anti_pattern_id: str):
+    """Get an anti-pattern by ID."""
+    try:
+        qdrant = await get_qdrant_store()
+        result = await qdrant.get_anti_pattern(anti_pattern_id)
+
+        if not result:
+            raise HTTPException(status_code=404, detail="Anti-pattern not found")
+
+        _, payload = result
+        return AntiPatternResponse(
+            id=anti_pattern_id,
+            pattern=payload.get("pattern", ""),
+            warning=payload.get("warning", ""),
+            alternative=payload.get("alternative"),
+            severity=payload.get("severity", "warning"),
+            domain=payload.get("domain", "general"),
+            tags=payload.get("tags", []),
+            times_triggered=payload.get("times_triggered", 0),
+            created_at=payload.get("created_at", ""),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Anti-pattern not found")
+        logger.error("get_anti_pattern_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/anti-pattern/{anti_pattern_id}")
+async def delete_anti_pattern(anti_pattern_id: str, user: User | None = Depends(require_auth)):
+    """Delete an anti-pattern."""
+    try:
+        qdrant = await get_qdrant_store()
+        result = await qdrant.get_anti_pattern(anti_pattern_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Anti-pattern not found")
+
+        await qdrant.delete_anti_pattern(anti_pattern_id)
+
+        pg = await get_postgres_store()
+        await pg.log_audit(
+            "delete_anti_pattern", anti_pattern_id,
+            actor=user.username if user else "user",
+            user_id=user.id if user else None,
+        )
+
+        return {"deleted": True, "id": anti_pattern_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Anti-pattern not found")
+        logger.error("delete_anti_pattern_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# FEEDBACK LOOP (must be before /{memory_id} catch-all)
+# =============================================================
+
+
+class FeedbackRequest(BaseModel):
+    """Request to submit retrieval feedback."""
+
+    injected_ids: list[str] = Field(..., min_length=1, max_length=200)
+    assistant_text: str = Field(..., min_length=50, max_length=15000)
+
+
+class FeedbackResponse(BaseModel):
+    """Response from feedback processing."""
+
+    processed: int
+    useful: int
+    not_useful: int
+    not_found: int
+
+
+@router.post("/feedback", response_model=FeedbackResponse)
+async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(require_auth)):
+    """
+    Submit retrieval feedback.
+
+    Compares assistant output embedding against each injected memory's embedding.
+    Useful memories get importance/stability boosts; not-useful get small penalties.
+    """
+    try:
+        from src.core.retrieval import cosine_similarity
+
+        embedding_service = await get_embedding_service()
+        assistant_embedding = await embedding_service.embed(request.assistant_text)
+
+        qdrant = await get_qdrant_store()
+        neo4j = await get_neo4j_store()
+        pg = await get_postgres_store()
+
+        processed = 0
+        useful = 0
+        not_useful = 0
+        not_found = 0
+
+        for memory_id in request.injected_ids:
+            result = await qdrant.get(memory_id)
+            if not result:
+                not_found += 1
+                continue
+
+            memory_embedding, payload = result
+            processed += 1
+
+            similarity = cosine_similarity(assistant_embedding, memory_embedding)
+            old_importance = payload.get("importance", 0.5)
+            old_stability = payload.get("stability", 0.1)
+
+            if similarity > 0.35:
+                # Useful — boost importance and stability
+                new_importance = min(1.0, old_importance + 0.05)
+                new_stability = min(1.0, old_stability + 0.03)
+                useful += 1
+                is_useful = True
+            else:
+                # Not useful — small penalty
+                new_importance = max(0.01, old_importance - 0.02)
+                new_stability = max(0.0, old_stability - 0.01)
+                not_useful += 1
+                is_useful = False
+
+            # Update Qdrant
+            await qdrant.update_importance(memory_id, new_importance)
+            await qdrant.update_stability(memory_id, new_stability)
+
+            # Update Neo4j
+            await neo4j.update_importance(memory_id, new_importance)
+            await neo4j.update_stability(memory_id, new_stability)
+
+            # Audit log
+            await pg.log_audit(
+                "feedback", memory_id,
+                actor=user.username if user else "system",
+                user_id=user.id if user else None,
+                details={
+                    "useful": is_useful,
+                    "similarity": round(similarity, 4),
+                    "old_importance": round(old_importance, 4),
+                    "new_importance": round(new_importance, 4),
+                    "old_stability": round(old_stability, 4),
+                    "new_stability": round(new_stability, 4),
+                },
+            )
+
+        logger.info(
+            "feedback_processed",
+            processed=processed,
+            useful=useful,
+            not_useful=not_useful,
+            not_found=not_found,
+        )
+
+        return FeedbackResponse(
+            processed=processed,
+            useful=useful,
+            not_useful=not_useful,
+            not_found=not_found,
+        )
+
+    except OllamaUnavailableError:
+        raise HTTPException(status_code=503, detail="Embedding service unavailable")
+    except Exception as e:
+        logger.error("feedback_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# MEMORY CRUD (/{memory_id} routes — must come after static paths)
+# =============================================================
+
+
 @router.get("/{memory_id}", response_model=MemoryResponse)
 async def get_memory(memory_id: str):
     """Get a memory by ID."""
@@ -214,6 +511,7 @@ async def get_memory(memory_id: str):
             created_at=payload.get("created_at", ""),
             last_accessed=payload.get("last_accessed", ""),
             stored_by=payload.get("username"),
+            pinned=payload.get("pinned") == "true",
         )
 
     except HTTPException:
@@ -259,6 +557,70 @@ async def delete_memory(memory_id: str, user: User | None = Depends(require_auth
         if "wrong input" in err or "uuid" in err or "bad request" in err:
             raise HTTPException(status_code=404, detail="Memory not found")
         logger.error("delete_memory_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/{memory_id}/pin")
+async def pin_memory(memory_id: str, user: User | None = Depends(require_auth)):
+    """Pin a memory to make it immune to decay."""
+    try:
+        qdrant = await get_qdrant_store()
+        result = await qdrant.get(memory_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Memory not found")
+
+        await qdrant.update_pinned(memory_id, True)
+        neo4j = await get_neo4j_store()
+        await neo4j.update_pinned(memory_id, True)
+
+        pg = await get_postgres_store()
+        await pg.log_audit(
+            "pin", memory_id,
+            actor=user.username if user else "user",
+            user_id=user.id if user else None,
+        )
+
+        return {"pinned": True, "id": memory_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        logger.error("pin_memory_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/{memory_id}/pin")
+async def unpin_memory(memory_id: str, user: User | None = Depends(require_auth)):
+    """Unpin a memory, making it subject to normal decay."""
+    try:
+        qdrant = await get_qdrant_store()
+        result = await qdrant.get(memory_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Memory not found")
+
+        await qdrant.update_pinned(memory_id, False)
+        neo4j = await get_neo4j_store()
+        await neo4j.update_pinned(memory_id, False)
+
+        pg = await get_postgres_store()
+        await pg.log_audit(
+            "unpin", memory_id,
+            actor=user.username if user else "user",
+            user_id=user.id if user else None,
+        )
+
+        return {"pinned": False, "id": memory_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        err = str(e).lower()
+        if "wrong input" in err or "uuid" in err or "bad request" in err:
+            raise HTTPException(status_code=404, detail="Memory not found")
+        logger.error("unpin_memory_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -531,3 +893,5 @@ async def batch_delete_memories(request: BatchDeleteRequest, user: User | None =
     except Exception as e:
         logger.error("batch_delete_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
+
+

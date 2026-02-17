@@ -19,7 +19,7 @@ from src.core import (
 from src.core.embeddings import OllamaUnavailableError
 from src.core.metrics import get_metrics
 from src.core.embeddings import content_hash
-from src.core.models import SignalType
+from src.core.models import AntiPattern, SignalType
 from src.core.signal_detector import (
     SIGNAL_IMPORTANCE,
     SIGNAL_TO_MEMORY_TYPE,
@@ -78,6 +78,14 @@ async def _run_signal_detection(session_id: str):
 
     for signal in signals:
         if signal.confidence >= settings.signal_confidence_auto_store:
+            # WARNING signals → AntiPattern storage (not regular Memory)
+            if signal.signal_type == SignalType.WARNING:
+                stored = await _store_signal_as_anti_pattern(session_id, signal)
+                if stored:
+                    auto_stored += 1
+                    metrics.increment("recall_signals_detected_total", {"outcome": "auto"})
+                continue
+
             # High confidence — auto-store as memory
             memory_id = await _store_signal_as_memory(session_id, signal)
             if memory_id:
@@ -271,3 +279,54 @@ async def _resolve_contradiction(new_memory_id: str, signal) -> None:
             new_memory=new_memory_id,
             error=str(e),
         )
+
+
+async def _store_signal_as_anti_pattern(session_id: str, signal) -> bool:
+    """
+    Store a WARNING signal as an AntiPattern in the anti-patterns collection.
+
+    Returns True if stored, False on error or duplicate.
+    """
+    try:
+        # Parse pattern/warning from content — first sentence is pattern, rest is warning
+        content = signal.content.strip()
+        parts = content.split(". ", 1)
+        pattern = parts[0].strip()
+        warning = parts[1].strip() if len(parts) > 1 else content
+
+        anti_pattern = AntiPattern(
+            pattern=pattern,
+            warning=warning,
+            severity="warning",
+            domain=signal.suggested_domain or "general",
+            tags=[f"signal:{signal.signal_type.value}"] + signal.suggested_tags,
+        )
+
+        try:
+            embedding_service = await get_embedding_service()
+            embedding = await embedding_service.embed(anti_pattern.pattern)
+        except OllamaUnavailableError:
+            logger.warning("anti_pattern_store_ollama_unavailable")
+            return False
+
+        qdrant = await get_qdrant_store()
+        await qdrant.store_anti_pattern(anti_pattern, embedding)
+
+        logger.info(
+            "anti_pattern_auto_stored",
+            id=anti_pattern.id,
+            domain=anti_pattern.domain,
+        )
+
+        pg = await get_postgres_store()
+        await pg.log_audit(
+            "create_anti_pattern", anti_pattern.id, actor="signal",
+            session_id=session_id,
+            details={"severity": anti_pattern.severity, "domain": anti_pattern.domain},
+        )
+
+        return True
+
+    except Exception as e:
+        logger.error("anti_pattern_store_error", error=str(e))
+        return False

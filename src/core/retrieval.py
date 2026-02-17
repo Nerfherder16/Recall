@@ -94,6 +94,13 @@ class RetrievalPipeline:
         if query.session_id or query.current_file or query.current_task:
             results = await self._context_filter(results, query)
 
+        # Stage 4.5: Anti-pattern check
+        if query_embedding:
+            anti_results = await self._check_anti_patterns(query, query_embedding)
+            for result in anti_results:
+                if result.memory.id not in results:
+                    results[result.memory.id] = result
+
         # Stage 5: Final ranking
         ranked = self._rank_results(list(results.values()), query)
 
@@ -365,12 +372,86 @@ class RetrievalPipeline:
         result.sort(key=lambda r: r.score, reverse=True)
         return result
 
+    async def _check_anti_patterns(
+        self, query: MemoryQuery, embedding: list[float],
+    ) -> list[RetrievalResult]:
+        """Stage 4.5: Check anti-patterns collection for relevant warnings."""
+        results = []
+        try:
+            domain = None
+            if query.domains:
+                domain = query.domains[0]
+            elif query.current_file:
+                # Extract domain hint from file path
+                parts = query.current_file.replace("\\", "/").split("/")
+                domain = parts[-1].split(".")[0] if parts else None
+
+            matches = await self.qdrant.search_anti_patterns(
+                query_vector=embedding,
+                limit=3,
+                domain=domain,
+            )
+
+            for ap_id, similarity, payload in matches:
+                if similarity < 0.3:
+                    continue
+
+                # Build a synthetic Memory to carry the anti-pattern through the pipeline
+                memory = Memory(
+                    id=ap_id,
+                    content=f"WARNING: {payload.get('warning', '')}",
+                    memory_type=MemoryType.SEMANTIC,
+                    domain=payload.get("domain", "general"),
+                    tags=payload.get("tags", []),
+                    importance=0.8,
+                    stability=1.0,
+                    confidence=0.9,
+                    metadata={
+                        "is_anti_pattern": True,
+                        "warning": payload.get("warning", ""),
+                        "alternative": payload.get("alternative"),
+                        "severity": payload.get("severity", "warning"),
+                        "pattern": payload.get("pattern", ""),
+                    },
+                )
+
+                # Apply domain-match boost (1.4x, higher than normal 1.3x)
+                score = similarity * 0.8  # base score
+                if domain and payload.get("domain") == domain:
+                    score *= 1.4
+
+                results.append(
+                    RetrievalResult(
+                        memory=memory,
+                        score=score,
+                        similarity=similarity,
+                        graph_distance=0,
+                        retrieval_path=[ap_id],
+                    )
+                )
+
+                # Increment trigger count (fire-and-forget)
+                try:
+                    await self.qdrant.increment_triggered(ap_id)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            logger.debug("anti_pattern_check_error", error=str(e))
+
+        return results
+
     async def _track_access(self, results: list[RetrievalResult]):
         """Track that these memories were accessed (reinforcement)."""
         now = datetime.utcnow()
 
         for result in results:
             memory = result.memory
+
+            # Skip anti-patterns — they live in a separate collection
+            if memory.metadata.get("is_anti_pattern"):
+                continue
+
             memory.access_count += 1
             memory.last_accessed = now
 
@@ -408,7 +489,18 @@ class RetrievalPipeline:
             parent_ids=payload.get("parent_ids", []),
             user_id=payload.get("user_id"),
             username=payload.get("username"),
+            pinned=payload.get("pinned") == "true",
         )
+
+
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
 
 
 async def create_retrieval_pipeline():
