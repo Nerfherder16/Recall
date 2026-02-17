@@ -3,10 +3,11 @@ Phase 9 integration tests — 3-layer search, timeline, sub-embeddings, observer
 """
 
 import asyncio
+import os
 
 import pytest
 
-API_BASE = "http://192.168.50.19:8200"
+API_BASE = os.environ.get("RECALL_API_URL", "http://localhost:8200")
 
 
 # =============================================================

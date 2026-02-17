@@ -63,7 +63,7 @@ GROUND_TRUTH_MEMORIES = [
         ],
     },
     {
-        "content": "The homelab Proxmox server uses an RTX 3090 with GPU passthrough to the Ollama VM at 192.168.50.62 for LLM inference.",
+        "content": "The homelab Proxmox server uses an RTX 3090 with GPU passthrough to the Ollama VM for LLM inference.",
         "memory_type": "episodic",
         "importance": 0.8,
         "positive_queries": [

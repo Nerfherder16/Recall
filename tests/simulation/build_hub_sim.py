@@ -9,12 +9,13 @@ Agents communicate through Recall itself — storing decisions as memories,
 searching for each other's work, approving signals, and exercising every endpoint.
 
 Usage:
-    python tests/simulation/build_hub_sim.py [--duration 3600] [--api http://192.168.50.19:8200]
+    python tests/simulation/build_hub_sim.py [--duration 3600] [--api http://localhost:8200]
 """
 
 import argparse
 import asyncio
 import json
+import os
 import random
 import sys
 import time
@@ -33,7 +34,7 @@ except ImportError:
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
 
-DEFAULT_API = "http://192.168.50.19:8200"
+DEFAULT_API = os.environ.get("RECALL_API_URL", "http://localhost:8200")
 DEFAULT_DURATION = 3600  # 1 hour
 API_KEY = "test"
 DOMAIN = "build-hub"

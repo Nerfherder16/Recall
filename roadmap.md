@@ -247,7 +247,7 @@ ARQ Worker (background jobs)
     └── Patterns      — daily at 3:30am
     │
     ▼
-Ollama (192.168.50.62:11434)
+Ollama (localhost:11434)
     ├── qwen3:14b     — LLM (signals, consolidation, patterns, fact extraction)
-    └── bge-large     — embeddings (1024 dims)
+    └── qwen3-embedding:0.6b — embeddings (1024 dims)
 ```

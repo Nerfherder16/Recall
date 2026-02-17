@@ -3,7 +3,7 @@
  * Recall MCP Server
  *
  * Provides Claude Code with direct access to the Recall memory system.
- * Wraps the Recall REST API at http://192.168.50.19:8200
+ * Wraps the Recall REST API
  *
  * Tools:
  *   - recall_store: Store a new memory
@@ -21,7 +21,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Configuration - can override with env vars
-const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
 const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 
 // Helper for API calls
@@ -47,8 +47,10 @@ async function recallAPI(endpoint, method = "GET", body = null) {
     }
     return await response.json();
   } catch (error) {
-    if (error.cause?.code === 'ECONNREFUSED') {
-      throw new Error(`Cannot connect to Recall at ${RECALL_HOST}. Is the API running?`);
+    if (error.cause?.code === "ECONNREFUSED") {
+      throw new Error(
+        `Cannot connect to Recall at ${RECALL_HOST}. Is the API running?`,
+      );
     }
     throw error;
   }
@@ -64,7 +66,7 @@ const server = new Server(
     capabilities: {
       tools: {},
     },
-  }
+  },
 );
 
 // Define available tools
@@ -73,22 +75,26 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "recall_store",
-        description: "Store a memory in Recall. Use this to persist important facts, decisions, fixes, and learnings. Memories are semantically indexed and can be retrieved later.",
+        description:
+          "Store a memory in Recall. Use this to persist important facts, decisions, fixes, and learnings. Memories are semantically indexed and can be retrieved later.",
         inputSchema: {
           type: "object",
           properties: {
             content: {
               type: "string",
-              description: "The memory content to store (be descriptive and specific)",
+              description:
+                "The memory content to store (be descriptive and specific)",
             },
             memory_type: {
               type: "string",
               enum: ["semantic", "episodic", "procedural"],
-              description: "Type: semantic (facts), episodic (events/experiences), procedural (how-to/workflows)",
+              description:
+                "Type: semantic (facts), episodic (events/experiences), procedural (how-to/workflows)",
             },
             domain: {
               type: "string",
-              description: "Optional domain/project name for filtering (e.g., 'recall-project', 'family-hub')",
+              description:
+                "Optional domain/project name for filtering (e.g., 'recall-project', 'family-hub')",
             },
             tags: {
               type: "array",
@@ -99,7 +105,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "number",
               minimum: 0,
               maximum: 1,
-              description: "Importance score 0-1 (default 0.5). Higher = slower decay",
+              description:
+                "Importance score 0-1 (default 0.5). Higher = slower decay",
             },
           },
           required: ["content", "memory_type"],
@@ -107,7 +114,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_search",
-        description: "Search memories. Returns brief summaries (120 chars) — use recall_get for full details on specific results. Token-efficient: prefer this over recall_search_full.",
+        description:
+          "Search memories. Returns brief summaries (120 chars) — use recall_get for full details on specific results. Token-efficient: prefer this over recall_search_full.",
         inputSchema: {
           type: "object",
           properties: {
@@ -136,7 +144,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_search_full",
-        description: "Full-content search returning complete memory content. Use recall_search first for token efficiency, then recall_get for specific items.",
+        description:
+          "Full-content search returning complete memory content. Use recall_search first for token efficiency, then recall_get for specific items.",
         inputSchema: {
           type: "object",
           properties: {
@@ -171,13 +180,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_timeline",
-        description: "Browse memories chronologically around a point in time. Returns brief summaries. Use recall_get for full details.",
+        description:
+          "Browse memories chronologically around a point in time. Returns brief summaries. Use recall_get for full details.",
         inputSchema: {
           type: "object",
           properties: {
             anchor_id: {
               type: "string",
-              description: "Memory ID to center the timeline on (optional — defaults to most recent)",
+              description:
+                "Memory ID to center the timeline on (optional — defaults to most recent)",
             },
             domain: {
               type: "string",
@@ -209,13 +220,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_context",
-        description: "Assemble context from memories for injection into prompts. Returns formatted markdown with sections for different memory types.",
+        description:
+          "Assemble context from memories for injection into prompts. Returns formatted markdown with sections for different memory types.",
         inputSchema: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Context query (what topic to retrieve context about)",
+              description:
+                "Context query (what topic to retrieve context about)",
             },
             domain: {
               type: "string",
@@ -231,7 +244,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_stats",
-        description: "Get Recall system statistics including memory counts by type and domain.",
+        description:
+          "Get Recall system statistics including memory counts by type and domain.",
         inputSchema: {
           type: "object",
           properties: {},
@@ -239,7 +253,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_health",
-        description: "Check Recall system health. Returns status of all services (Qdrant, Neo4j, Redis, etc.)",
+        description:
+          "Check Recall system health. Returns status of all services (Qdrant, Neo4j, Redis, etc.)",
         inputSchema: {
           type: "object",
           properties: {},
@@ -281,7 +296,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_session_start",
-        description: "Start a new Recall session. Call this at the beginning of a conversation or work session. Returns a session ID for use with recall_ingest and recall_session_end.",
+        description:
+          "Start a new Recall session. Call this at the beginning of a conversation or work session. Returns a session ID for use with recall_ingest and recall_session_end.",
         inputSchema: {
           type: "object",
           properties: {
@@ -298,7 +314,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_session_end",
-        description: "End a Recall session. Cleans up pending signals and optionally triggers consolidation of session memories.",
+        description:
+          "End a Recall session. Cleans up pending signals and optionally triggers consolidation of session memories.",
         inputSchema: {
           type: "object",
           properties: {
@@ -308,7 +325,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             trigger_consolidation: {
               type: "boolean",
-              description: "Whether to trigger memory consolidation (default true)",
+              description:
+                "Whether to trigger memory consolidation (default true)",
             },
           },
           required: ["session_id"],
@@ -316,7 +334,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "recall_ingest",
-        description: "Ingest conversation turns for automatic signal detection. Call this after each meaningful exchange to let Recall auto-detect and store important signals (error fixes, decisions, facts, workflows, etc.) as memories. Requires an active session.",
+        description:
+          "Ingest conversation turns for automatic signal detection. Call this after each meaningful exchange to let Recall auto-detect and store important signals (error fixes, decisions, facts, workflows, etc.) as memories. Requires an active session.",
         inputSchema: {
           type: "object",
           properties: {
@@ -389,13 +408,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         if (result.results.length === 0) {
           return {
-            content: [{ type: "text", text: "No memories found matching your query." }],
+            content: [
+              { type: "text", text: "No memories found matching your query." },
+            ],
           };
         }
 
-        const formatted = result.results.map((m, i) =>
-          `${i + 1}. [${(m.similarity * 100).toFixed(1)}%] (${m.memory_type}) ID:${m.id}\n   ${m.summary}`
-        ).join("\n\n");
+        const formatted = result.results
+          .map(
+            (m, i) =>
+              `${i + 1}. [${(m.similarity * 100).toFixed(1)}%] (${m.memory_type}) ID:${m.id}\n   ${m.summary}`,
+          )
+          .join("\n\n");
 
         return {
           content: [
@@ -414,19 +438,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
         if (args.domain) body.domains = [args.domain];
         if (args.memory_type) body.memory_types = [args.memory_type];
-        if (args.min_similarity !== undefined) body.min_similarity = args.min_similarity;
+        if (args.min_similarity !== undefined)
+          body.min_similarity = args.min_similarity;
 
         const result = await recallAPI("/search/query", "POST", body);
 
         if (result.results.length === 0) {
           return {
-            content: [{ type: "text", text: "No memories found matching your query." }],
+            content: [
+              { type: "text", text: "No memories found matching your query." },
+            ],
           };
         }
 
-        const formatted = result.results.map((m, i) =>
-          `${i + 1}. [${(m.similarity * 100).toFixed(1)}%] (${m.memory_type}) ${m.content}`
-        ).join("\n\n");
+        const formatted = result.results
+          .map(
+            (m, i) =>
+              `${i + 1}. [${(m.similarity * 100).toFixed(1)}%] (${m.memory_type}) ${m.content}`,
+          )
+          .join("\n\n");
 
         return {
           content: [
@@ -455,9 +485,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        const formatted = result.entries.map((e, i) =>
-          `${i + 1}. [${e.created_at}] (${e.memory_type}) ID:${e.id}\n   ${e.summary}`
-        ).join("\n\n");
+        const formatted = result.entries
+          .map(
+            (e, i) =>
+              `${i + 1}. [${e.created_at}] (${e.memory_type}) ID:${e.id}\n   ${e.summary}`,
+          )
+          .join("\n\n");
 
         return {
           content: [
@@ -502,9 +535,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "recall_health": {
         const result = await recallAPI("/health");
-        const status = result.status === "healthy" ? "✅ Healthy" : "⚠️ " + result.status;
+        const status =
+          result.status === "healthy" ? "✅ Healthy" : "⚠️ " + result.status;
         const services = Object.entries(result.checks || {})
-          .map(([name, val]) => `  ${String(val).startsWith("ok") ? "✅" : "❌"} ${name}: ${val}`)
+          .map(
+            ([name, val]) =>
+              `  ${String(val).startsWith("ok") ? "✅" : "❌"} ${name}: ${val}`,
+          )
           .join("\n");
 
         return {
@@ -531,11 +568,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "recall_similar": {
         const limit = args.limit || 5;
-        const result = await recallAPI(`/search/similar/${args.id}?limit=${limit}`);
+        const result = await recallAPI(
+          `/search/similar/${args.id}?limit=${limit}`,
+        );
 
-        const formatted = (result.similar || []).map((m, i) =>
-          `${i + 1}. [${(m.similarity * 100).toFixed(1)}%] ${m.content}`
-        ).join("\n\n");
+        const formatted = (result.similar || [])
+          .map(
+            (m, i) =>
+              `${i + 1}. [${(m.similarity * 100).toFixed(1)}%] ${m.content}`,
+          )
+          .join("\n\n");
 
         return {
           content: [
@@ -549,7 +591,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "recall_session_start": {
         const body = {};
-        if (args.working_directory) body.working_directory = args.working_directory;
+        if (args.working_directory)
+          body.working_directory = args.working_directory;
         if (args.current_task) body.current_task = args.current_task;
 
         const result = await recallAPI("/session/start", "POST", body);

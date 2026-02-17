@@ -11,11 +11,13 @@ Tests the full living memory system with realistic scenarios:
 """
 
 import asyncio
+import os
+
 import httpx
 import json
 from datetime import datetime
 
-API_BASE = "http://192.168.50.19:8200"
+API_BASE = os.environ.get("RECALL_API_URL", "http://localhost:8200")
 
 # Test scenarios simulating a real coding session
 SCENARIOS = [

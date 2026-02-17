@@ -11,7 +11,7 @@
 
 const { readFileSync } = require("fs");
 
-const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
 const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 const MAX_TRANSCRIPT_LINES = 200;
 

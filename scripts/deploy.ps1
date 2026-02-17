@@ -1,12 +1,12 @@
 # Recall Memory System - Windows Deployment Script
-# Usage: .\scripts\deploy.ps1 [-OllamaHost "http://192.168.50.62:11434"]
+# Usage: .\scripts\deploy.ps1 [-OllamaHost "http://your-ollama-host:11434"]
 #
 # Prerequisites:
 #   - Docker Desktop installed and running
 #   - Ollama running with qwen3-embedding:0.6b model
 
 param(
-    [string]$OllamaHost = "http://192.168.50.62:11434",
+    [string]$OllamaHost = "http://localhost:11434",
     [int]$RecallPort = 8200
 )
 

@@ -45,7 +45,7 @@ TIME_ACCEL_MEMORIES = {
         {"content": "UPS provides 45 minutes of backup power for the homelab rack.", "importance": 0.5},
         {"content": "Proxmox host uses ZFS mirror for boot drives with weekly scrub.", "importance": 0.6},
         {"content": "DNS resolution goes through OPNsense Unbound with DNSSEC enabled.", "importance": 0.5},
-        {"content": "Home Assistant runs at 192.168.50.20 with Zigbee2MQTT for device control.", "importance": 0.4},
+        {"content": "Home Assistant runs on the local network with Zigbee2MQTT for device control.", "importance": 0.4},
         {"content": "VPS at Racknerd handles reverse proxy with Nginx + certbot for SSL.", "importance": 0.6},
         {"content": "WireGuard tunnel between OPNsense and VPS provides secure remote access.", "importance": 0.7},
         {"content": "MinIO S3-compatible storage runs on CasaOS for backup and media.", "importance": 0.4},

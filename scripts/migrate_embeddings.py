@@ -21,8 +21,8 @@ import time
 
 import httpx
 
-DEFAULT_API_URL = "http://192.168.50.19:8200"
-DEFAULT_OLLAMA_URL = "http://192.168.50.62:11434"
+DEFAULT_API_URL = "http://localhost:8200"
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
 MODEL = "qwen3-embedding:0.6b"
 BACKUP_FILE = "backup_pre_migration.jsonl"
 BATCH_SIZE = 10
@@ -293,7 +293,7 @@ def main():
     )
     parser.add_argument(
         "--qdrant-url",
-        default="http://192.168.50.19:6333",
+        default="http://localhost:6333",
         help="Qdrant URL (direct, not through API)",
     )
     parser.add_argument(

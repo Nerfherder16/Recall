@@ -11,7 +11,7 @@
  * Failure mode: silent — never block the user.
  */
 
-const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
 const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 const MIN_PROMPT_LENGTH = 15;
 const MAX_RESULTS = 5;

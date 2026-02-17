@@ -68,9 +68,9 @@ Then restart Claude Code.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RECALL_HOST` | `http://192.168.50.19:8200` | Recall API endpoint |
+| `RECALL_HOST` | `http://localhost:8200` | Recall API endpoint |
 | `RECALL_API_KEY` | _(empty)_ | API key (if auth enabled) |
-| `OLLAMA_HOST` | `http://192.168.50.62:11434` | Ollama host (for handoff summaries) |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama host (for handoff summaries) |
 | `OLLAMA_MODEL` | `qwen3:14b` | Model for handoff summarization |
 
 ## Hooks & Statusline
@@ -87,7 +87,7 @@ When Claude edits files, the observer hook sends the changes to Recall's `/obser
 When a session ends, the transcript is summarized and stored to Recall as an episodic memory with the project name as domain tag.
 
 ### Context Handoff (Statusline)
-The statusline shows a color-coded context usage bar. At 90%, it spawns a background process that:
+The statusline shows a color-coded context usage bar. At 65%, it spawns a background process that:
 1. Reads the conversation transcript
 2. Sends it to Ollama for a detailed structured summary
 3. Stores the summary to Recall with `context-handoff` tag and importance 0.7

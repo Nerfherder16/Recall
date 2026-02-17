@@ -49,7 +49,7 @@ TEST_CONVERSATIONS = [
         "expected_signals": ["fact"],
         "turns": [
             ("user", "What embedding model are we using and what are its dimensions?"),
-            ("assistant", "We're using bge-large from Ollama for embeddings. It produces 1024-dimensional vectors, which is why the Qdrant collection needs to be created with size=1024. The model runs on the GPU VM at 192.168.50.62."),
+            ("assistant", "We're using bge-large from Ollama for embeddings. It produces 1024-dimensional vectors, which is why the Qdrant collection needs to be created with size=1024. The model runs on the GPU VM."),
             ("user", "How does it compare to nomic-embed-text?"),
             ("assistant", "bge-large produces 1024-dim vectors while nomic-embed-text produces 768-dim vectors. bge-large generally scores higher on retrieval benchmarks like MTEB, especially for technical content. The trade-off is slightly higher memory usage and inference time, but on the RTX 3090 the difference is negligible — about 15ms vs 12ms per embedding."),
         ],
@@ -89,7 +89,7 @@ TEST_CONVERSATIONS = [
         "expected_signals": ["fact", "preference"],
         "turns": [
             ("user", "What port does our Recall API run on?"),
-            ("assistant", "The Recall API runs on port 8200 at http://192.168.50.19:8200. The Docker container maps port 8200 on the host to 8000 inside the container where uvicorn listens."),
+            ("assistant", "The Recall API runs on port 8200 at http://localhost:8200. The Docker container maps port 8200 on the host to 8000 inside the container where uvicorn listens."),
             ("user", "And the dashboard?"),
             ("assistant", "The dashboard is served as static files from the same API server on port 8200, mounted at /dashboard. It's a React SPA built with Vite+Tailwind+DaisyUI that builds to src/api/static/dashboard/."),
             ("user", "I always want to use the dark theme for the dashboard by default."),

@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6380"
 
     # Ollama (Embeddings)
-    ollama_host: str = "http://192.168.50.62:11434"
+    ollama_host: str = "http://localhost:11434"
     embedding_model: str = "qwen3-embedding:0.6b"
     embedding_dimensions: int = 1024  # Qwen3-Embedding-0.6B uses 1024 dims
 

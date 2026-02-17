@@ -281,7 +281,7 @@ node install.js --host http://YOUR_SERVER:8200
 This configures:
 - **MCP Server** — `recall_*` tools in Claude Code
 - **Hooks** — auto-retrieve, auto-store, session summaries
-- **Statusline** — context usage bar with auto-handoff at 90%
+- **Statusline** — context usage bar with auto-handoff at 65%
 
 To uninstall: `node install.js --uninstall`
 
@@ -335,20 +335,6 @@ All hooks are Node.js (CommonJS) scripts in `hooks/`. They run automatically —
 | `stop-guard.js` | Stop | Blocks stop if uncommitted git changes exist |
 | `session-save.js` | Stop | Auto-saves session state to Recall |
 | `recall-statusline.js` | Statusline | Context usage bar; at 65% triggers Ollama summary → stores handoff to Recall |
-
-### Slash Commands
-
-Copy the skill file to your Claude Code skills directory:
-
-```bash
-cp mcp-server/recall-skill.md ~/.claude/skills/recall.md
-```
-
-Then use in Claude Code:
-- `/recall store <content>` - Store a fact, fix, or decision
-- `/recall search <query>` - Find relevant memories
-- `/recall context <topic>` - Get full context on a topic
-- `/recall health` - Check system status
 
 ---
 
@@ -563,7 +549,7 @@ All configuration is via environment variables (prefix `RECALL_`):
 | `RECALL_ENV` | `development` | Environment mode |
 | `RECALL_API_KEY` | *(empty)* | API key for bearer auth (empty = auth disabled) |
 | `RECALL_ALLOWED_ORIGINS` | `*` | Comma-separated CORS origins |
-| `RECALL_OLLAMA_HOST` | `http://192.168.50.62:11434` | Ollama API endpoint |
+| `RECALL_OLLAMA_HOST` | `http://localhost:11434` | Ollama API endpoint |
 | `RECALL_EMBEDDING_MODEL` | `qwen3-embedding:0.6b` | Ollama embedding model |
 | `RECALL_EMBEDDING_DIMS` | `1024` | Embedding dimensions |
 | `RECALL_SIGNAL_DETECTION_MODEL` | `qwen3:14b` | LLM for signal detection |
@@ -614,7 +600,7 @@ arq src.workers.main.WorkerSettings
 
 ### Run tests
 ```bash
-# All tests (requires live API at http://192.168.50.19:8200)
+# All tests (requires live API — set RECALL_API_URL env var or default http://localhost:8200)
 pytest tests/integration/ -v
 
 # Fast tests only (no LLM calls)

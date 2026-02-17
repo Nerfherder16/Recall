@@ -5,6 +5,7 @@ Usable standalone or imported by the testbed orchestrator.
 """
 
 import asyncio
+import os
 import sys
 
 import httpx
@@ -100,7 +101,7 @@ def main():
         sys.exit(1)
 
     run_id = sys.argv[1]
-    api_url = "http://192.168.50.19:8200"
+    api_url = os.environ.get("RECALL_API_URL", "http://localhost:8200")
     api_key = "test"
 
     for i, arg in enumerate(sys.argv):

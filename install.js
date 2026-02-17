@@ -198,7 +198,7 @@ async function install() {
   if (!host) {
     host = await ask(
       "Recall API host",
-      process.env.RECALL_HOST || "http://192.168.50.19:8200",
+      process.env.RECALL_HOST || "http://localhost:8200",
     );
   }
 
@@ -240,7 +240,7 @@ async function install() {
   console.log(`   RECALL_HOST=${host}`);
   console.log("   RECALL_API_KEY=<your-key-if-auth-enabled>");
   console.log(
-    "   OLLAMA_HOST=http://192.168.50.62:11434 (for handoff summarization)",
+    "   OLLAMA_HOST=http://your-ollama-host:11434 (for handoff summarization)",
   );
   console.log("   OLLAMA_MODEL=qwen3:14b (default)");
 

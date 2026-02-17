@@ -64,6 +64,16 @@ logs/
 tests/simulation/reports/
 !tests/simulation/data/
 
+# Migration/import artifacts (may contain personal data)
+backup_pre_migration.jsonl
+familyhub_memories.json
+fh_*.json
+import_familyhub.py
+scripts/import_memory_graph.py
+
+# Dashboard build artifacts
+dashboard/tsconfig.tsbuildinfo
+
 # OS
 .DS_Store
 Thumbs.db

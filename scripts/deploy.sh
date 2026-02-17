@@ -19,7 +19,7 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # Configuration
-OLLAMA_HOST="${1:-http://192.168.50.62:11434}"
+OLLAMA_HOST="${1:-http://localhost:11434}"
 RECALL_PORT="${RECALL_PORT:-8200}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"

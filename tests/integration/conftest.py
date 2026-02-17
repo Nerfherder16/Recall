@@ -1,7 +1,7 @@
 """
 Shared fixtures for Recall integration tests.
 
-All tests hit the live API at http://192.168.50.19:8200.
+All tests hit the live API (default http://localhost:8200).
 Each test gets a unique domain for isolation, and cleanup
 deletes all created resources after each test.
 """
@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 import httpx
 import pytest
 
-API_BASE = "http://192.168.50.19:8200"
+API_BASE = os.environ.get("RECALL_API_URL", "http://localhost:8200")
 API_KEY = os.environ.get("RECALL_API_KEY", "")
 
 

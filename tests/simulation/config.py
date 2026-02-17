@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 class TestbedConfig:
     """Configuration for a testbed run."""
 
-    api_url: str = "http://192.168.50.19:8200"
+    api_url: str = "http://localhost:8200"
     api_key: str = "test"
     run_id: str = field(default_factory=lambda: secrets.token_hex(6))
 
@@ -90,7 +90,7 @@ Examples:
     args = parser.parse_args()
 
     config = TestbedConfig(
-        api_url=args.api or os.environ.get("RECALL_API_URL", "http://192.168.50.19:8200"),
+        api_url=args.api or os.environ.get("RECALL_API_URL", "http://localhost:8200"),
         api_key=args.api_key or os.environ.get("RECALL_API_KEY", "test"),
         suites=[s.strip() for s in args.suites.split(",")],
         timeout_minutes=args.timeout,

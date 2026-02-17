@@ -2,10 +2,10 @@
   "recall": {
     "command": "node",
     "args": [
-      "C:/Users/trg16/Dev/Recall/mcp-server/index.js"
+      "/path/to/Recall/mcp-server/index.js"
     ],
     "env": {
-      "RECALL_HOST": "http://192.168.50.19:8200"
+      "RECALL_HOST": "http://localhost:8200"
     }
   }
 }
