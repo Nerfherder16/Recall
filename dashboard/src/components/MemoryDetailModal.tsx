@@ -1,9 +1,13 @@
 import { useRef, useEffect, useState } from "react";
-import { X, PushPin } from "@phosphor-icons/react";
+import { X, PushPin, Sparkle } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type { MemoryDetail } from "../api/types";
 import Badge from "./Badge";
 import { useToastContext } from "../context/ToastContext";
+
+function shouldSuggestPin(m: MemoryDetail): boolean {
+  return !m.pinned && m.importance >= 0.7 && m.access_count >= 10;
+}
 
 interface Props {
   memory: MemoryDetail | null;
@@ -101,6 +105,28 @@ export default function MemoryDetailModal({
         <p className="font-mono text-xs text-base-content/30 mb-3">
           ID: {memory.id}
         </p>
+
+        {shouldSuggestPin(memory) && (
+          <div className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3 mb-4">
+            <Sparkle
+              size={16}
+              weight="fill"
+              className="text-violet-400 shrink-0"
+            />
+            <p className="text-xs text-violet-300 flex-1">
+              This memory has high importance ({memory.importance.toFixed(2)})
+              and {memory.access_count} accesses — consider pinning it to
+              prevent decay.
+            </p>
+            <button
+              className="rounded-lg bg-violet-600 px-3 py-1 text-xs font-medium text-white hover:bg-violet-500 transition-colors shrink-0"
+              onClick={togglePin}
+              disabled={pinning}
+            >
+              Pin now
+            </button>
+          </div>
+        )}
 
         <div className="bg-base-200 rounded-lg p-4 text-sm whitespace-pre-wrap mb-4 border border-base-content/5">
           {memory.content}

@@ -384,6 +384,7 @@ class FeedbackResponse(BaseModel):
     useful: int
     not_useful: int
     not_found: int
+    relationships_strengthened: int = 0
 
 
 @router.post("/feedback", response_model=FeedbackResponse)
@@ -408,6 +409,7 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
         useful = 0
         not_useful = 0
         not_found = 0
+        useful_memory_ids: list[str] = []
 
         for memory_id in request.injected_ids:
             result = await qdrant.get(memory_id)
@@ -428,6 +430,7 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
                 new_stability = min(1.0, old_stability + 0.03)
                 useful += 1
                 is_useful = True
+                useful_memory_ids.append(memory_id)
             else:
                 # Not useful — small penalty
                 new_importance = max(0.01, old_importance - 0.02)
@@ -458,12 +461,24 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
                 },
             )
 
+        # Strengthen edges between co-retrieved useful memories
+        relationships_strengthened = 0
+        if len(useful_memory_ids) >= 2:
+            from itertools import combinations
+            for id_a, id_b in combinations(useful_memory_ids, 2):
+                try:
+                    await neo4j.strengthen_relationship(id_a, id_b)
+                    relationships_strengthened += 1
+                except Exception:
+                    pass
+
         logger.info(
             "feedback_processed",
             processed=processed,
             useful=useful,
             not_useful=not_useful,
             not_found=not_found,
+            relationships_strengthened=relationships_strengthened,
         )
 
         return FeedbackResponse(
@@ -471,6 +486,7 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
             useful=useful,
             not_useful=not_useful,
             not_found=not_found,
+            relationships_strengthened=relationships_strengthened,
         )
 
     except OllamaUnavailableError:

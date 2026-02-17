@@ -35,8 +35,8 @@ async def test_metrics_endpoint(api_client: httpx.AsyncClient):
 
 
 async def test_dashboard_loads(api_client: httpx.AsyncClient):
-    """GET /dashboard returns HTML."""
-    r = await api_client.get(f"{API_BASE}/dashboard")
+    """GET /dashboard/ returns the React SPA HTML."""
+    r = await api_client.get(f"{API_BASE}/dashboard/", follow_redirects=True)
     assert r.status_code == 200
     assert "text/html" in r.headers.get("content-type", "")
     assert "Recall Dashboard" in r.text

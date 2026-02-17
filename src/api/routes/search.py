@@ -79,6 +79,7 @@ class BrowseResult(BaseModel):
     tags: list[str]
     stored_by: str | None = None
     pinned: bool = False
+    access_count: int = 0
 
 
 class BrowseResponse(BaseModel):
@@ -111,6 +112,7 @@ class TimelineEntry(BaseModel):
     importance: float
     stored_by: str | None = None
     pinned: bool = False
+    access_count: int = 0
 
 
 class TimelineResponse(BaseModel):
@@ -188,6 +190,7 @@ async def browse_memories(request: Request, body: SearchRequest):
                 tags=r.memory.tags,
                 stored_by=r.memory.username,
                 pinned=r.memory.pinned,
+                access_count=r.memory.access_count,
             )
             for r in results
         ]
@@ -257,6 +260,7 @@ async def timeline_view(request: Request, body: TimelineRequest):
                 importance=payload.get("importance", 0.5),
                 stored_by=payload.get("username"),
                 pinned=payload.get("pinned") == "true",
+                access_count=payload.get("access_count", 0),
             )
             for mid, payload in points
         ]

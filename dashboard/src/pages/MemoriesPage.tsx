@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { MagnifyingGlass, Trash, PushPin } from "@phosphor-icons/react";
+import {
+  MagnifyingGlass,
+  Trash,
+  PushPin,
+  Sparkle,
+} from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type {
   BrowseResult,
@@ -7,6 +12,10 @@ import type {
   DomainStat,
   UserInfo,
 } from "../api/types";
+
+function shouldSuggestPin(r: BrowseResult): boolean {
+  return !r.pinned && r.importance >= 0.7 && r.access_count >= 10;
+}
 import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
@@ -69,6 +78,7 @@ export default function MemoriesPage() {
           tags: e.tags || [],
           similarity: e.similarity || 0,
           pinned: e.pinned ?? false,
+          access_count: e.access_count ?? 0,
         })),
       );
     } catch {
@@ -272,6 +282,18 @@ export default function MemoriesPage() {
                         <PushPin size={10} weight="fill" /> Pinned
                       </span>
                     )}
+                    {shouldSuggestPin(r) && (
+                      <button
+                        className="inline-flex items-center gap-0.5 rounded-md bg-violet-500/10 text-violet-400 px-1.5 py-0.5 text-[10px] font-medium hover:bg-violet-500/20 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePin(r.id, false);
+                        }}
+                        title="Frequently accessed — consider pinning"
+                      >
+                        <Sparkle size={10} weight="fill" /> Pin?
+                      </button>
+                    )}
                   </div>
                   <p
                     className="text-sm cursor-pointer hover:text-primary transition-colors line-clamp-3"
@@ -346,6 +368,18 @@ export default function MemoriesPage() {
                       <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-500/10 text-amber-400 px-1.5 py-0.5 text-[10px] font-medium">
                         <PushPin size={10} weight="fill" /> Pinned
                       </span>
+                    )}
+                    {shouldSuggestPin(r) && (
+                      <button
+                        className="inline-flex items-center gap-0.5 rounded-md bg-violet-500/10 text-violet-400 px-1.5 py-0.5 text-[10px] font-medium hover:bg-violet-500/20 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePin(r.id, false);
+                        }}
+                        title="Frequently accessed — consider pinning"
+                      >
+                        <Sparkle size={10} weight="fill" /> Pin?
+                      </button>
                     )}
                     {r.similarity > 0 && (
                       <span className="text-xs text-base-content/30 tabular-nums">

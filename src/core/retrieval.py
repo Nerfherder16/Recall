@@ -9,6 +9,7 @@ Multi-stage retrieval:
 5. Ranking and selection
 """
 
+import math
 from datetime import datetime
 from typing import Any
 
@@ -419,6 +420,11 @@ class RetrievalPipeline:
                 score = similarity * 0.8  # base score
                 if domain and payload.get("domain") == domain:
                     score *= 1.4
+
+                # Escalating boost: repeated warnings get louder
+                times_triggered = payload.get("times_triggered", 0)
+                if times_triggered > 0:
+                    score *= 1.0 + 0.1 * math.log2(1 + times_triggered)
 
                 results.append(
                     RetrievalResult(

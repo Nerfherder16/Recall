@@ -154,6 +154,33 @@ class Neo4jStore:
             type=relationship.relationship_type.value,
         )
 
+    async def strengthen_relationship(
+        self, source_id: str, target_id: str, increment: float = 0.05
+    ):
+        """Increment edge strength between two memories (creates if missing)."""
+        async with self.driver.session() as session:
+            await session.run(
+                """
+                MATCH (a:Memory {id: $source_id}), (b:Memory {id: $target_id})
+                MERGE (a)-[r:RELATED_TO]-(b)
+                ON CREATE SET r.strength = 0.5 + $increment,
+                              r.created_at = datetime()
+                ON MATCH SET r.strength = CASE
+                    WHEN r.strength + $increment > 1.0 THEN 1.0
+                    ELSE r.strength + $increment
+                END
+                """,
+                source_id=source_id,
+                target_id=target_id,
+                increment=increment,
+            )
+        logger.debug(
+            "strengthened_relationship",
+            source=source_id,
+            target=target_id,
+            increment=increment,
+        )
+
     async def find_related(
         self,
         memory_id: str,

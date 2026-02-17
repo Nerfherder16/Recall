@@ -80,6 +80,7 @@ class QdrantStore:
             ("user_id", "integer"),
             ("username", "keyword"),
             ("pinned", "keyword"),
+            ("access_count", "integer"),
         ]
 
         for field, field_type in indexes:

@@ -188,13 +188,9 @@ async def test_rate_limit_headers_present(api_client: httpx.AsyncClient):
 
 
 async def test_dashboard_serves_html(api_client: httpx.AsyncClient):
-    """GET /dashboard returns HTML with the new sections."""
-    r = await api_client.get(f"{API_BASE}/dashboard")
+    """GET /dashboard/ returns the React SPA with root mount point."""
+    r = await api_client.get(f"{API_BASE}/dashboard/", follow_redirects=True)
     assert r.status_code == 200
     html = r.text
-    assert "Audit Log" in html
-    assert "Session History" in html
-    assert "Memory Search" in html
-    assert "Signal Review" in html
-    assert "loadAuditLog" in html
-    assert "searchMemories" in html
+    assert "Recall Dashboard" in html
+    assert '<div id="root">' in html

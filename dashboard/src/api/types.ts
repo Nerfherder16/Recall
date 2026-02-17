@@ -27,6 +27,7 @@ export interface BrowseResult {
   tags: string[];
   stored_by: string | null;
   pinned: boolean;
+  access_count: number;
 }
 
 export interface MemoryDetail {
