@@ -46,7 +46,8 @@ class TestbedConfig:
 
     @property
     def all_suite_names(self) -> list[str]:
-        return ["lifecycle", "retrieval", "stress", "signals", "time_accel", "adaptive"]
+        return ["lifecycle", "retrieval", "stress", "signals", "time_accel", "adaptive",
+                "durability", "documents"]
 
     @property
     def resolved_suites(self) -> list[str]:

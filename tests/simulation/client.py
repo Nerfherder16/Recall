@@ -30,6 +30,8 @@ class TimedRecallClient:
         self.tracked_ids: list[str] = []
         # Tracked session IDs for cleanup
         self.tracked_sessions: list[str] = []
+        # Tracked document IDs for cleanup
+        self.tracked_documents: list[str] = []
         # 429 count
         self.rate_limited: int = 0
 
@@ -159,17 +161,21 @@ class TimedRecallClient:
         tags: list[str] | None = None,
         importance: float = 0.5,
         session_id: str | None = None,
+        durability: str | None = None,
     ) -> dict | None:
         """Store a memory tagged with the run ID. Returns full response dict."""
         all_tags = [self.run_tag()] + (tags or [])
-        r = await self._request("POST", "/memory/store", {
+        body = {
             "content": content,
             "memory_type": memory_type,
             "domain": domain,
             "tags": all_tags,
             "importance": importance,
             "session_id": session_id,
-        })
+        }
+        if durability:
+            body["durability"] = durability
+        r = await self._request("POST", "/memory/store", body)
         if r and r.get("id"):
             self.tracked_ids.append(r["id"])
         return r
@@ -351,10 +357,127 @@ class TimedRecallClient:
     async def ollama_info(self) -> dict | None:
         return await self._request("GET", "/admin/ollama")
 
+    # ── Durability ──
+
+    async def put_durability(self, memory_id: str, durability: str) -> dict | None:
+        """Set durability tier on a memory."""
+        client = await self._get_client()
+        op_key = "PUT /memory/{id}/durability"
+        t0 = time.monotonic()
+        try:
+            r = await client.put(
+                f"{self.base}/memory/{memory_id}/durability",
+                json={"durability": durability},
+            )
+            self.latencies[op_key].append(time.monotonic() - t0)
+            if r.status_code == 429:
+                self.rate_limited += 1
+                return None
+            if r.status_code >= 400:
+                return None
+            return r.json() if r.text else {}
+        except Exception:
+            self.latencies[op_key].append(time.monotonic() - t0)
+            return None
+
+    # ── Documents ──
+
+    async def ingest_document(
+        self,
+        content: bytes,
+        filename: str,
+        domain: str,
+        file_type: str = "text",
+        durability: str | None = None,
+    ) -> dict | None:
+        """Upload a file for document ingestion (multipart).
+        Uses a separate client without Content-Type header so httpx can
+        set multipart/form-data with boundary automatically."""
+        op_key = "POST /document/ingest"
+        t0 = time.monotonic()
+        try:
+            files = {"file": (filename, content, "text/plain")}
+            data = {"domain": domain, "file_type": file_type}
+            if durability:
+                data["durability"] = durability
+            # Must NOT include Content-Type — httpx sets it for multipart
+            upload_headers = {"Authorization": f"Bearer {self.api_key}"}
+            async with httpx.AsyncClient(timeout=self._timeout) as upload_client:
+                r = await upload_client.post(
+                    f"{self.base}/document/ingest",
+                    files=files,
+                    data=data,
+                    headers=upload_headers,
+                )
+            self.latencies[op_key].append(time.monotonic() - t0)
+            if r.status_code == 429:
+                self.rate_limited += 1
+                return None
+            if r.status_code >= 400:
+                return None
+            result = r.json()
+            # Track document and child IDs for cleanup
+            if result and result.get("document", {}).get("id"):
+                self.tracked_documents.append(result["document"]["id"])
+            if result and result.get("child_ids"):
+                self.tracked_ids.extend(result["child_ids"])
+            return result
+        except Exception:
+            self.latencies[op_key].append(time.monotonic() - t0)
+            return None
+
+    async def list_documents(self, domain: str | None = None) -> list[dict]:
+        path = "/document/"
+        if domain:
+            path += f"?domain={domain}"
+        r = await self._request("GET", path)
+        return r if isinstance(r, list) else []
+
+    async def get_document(self, doc_id: str) -> dict | None:
+        return await self._request("GET", f"/document/{doc_id}")
+
+    async def delete_document(self, doc_id: str) -> dict | None:
+        return await self._request("DELETE", f"/document/{doc_id}")
+
+    async def pin_document(self, doc_id: str) -> dict | None:
+        return await self._request("POST", f"/document/{doc_id}/pin")
+
+    async def unpin_document(self, doc_id: str) -> dict | None:
+        return await self._request("DELETE", f"/document/{doc_id}/pin")
+
+    async def update_document(self, doc_id: str, **fields) -> dict | None:
+        """PATCH document (domain, durability)."""
+        client = await self._get_client()
+        op_key = "PATCH /document/{id}"
+        t0 = time.monotonic()
+        try:
+            r = await client.patch(
+                f"{self.base}/document/{doc_id}",
+                json=fields,
+            )
+            self.latencies[op_key].append(time.monotonic() - t0)
+            if r.status_code == 429:
+                self.rate_limited += 1
+                return None
+            if r.status_code >= 400:
+                return None
+            return r.json() if r.text else {}
+        except Exception:
+            self.latencies[op_key].append(time.monotonic() - t0)
+            return None
+
     # ── Cleanup ──
 
     async def cleanup(self):
-        """Delete all tracked memories and end all tracked sessions."""
+        """Delete all tracked documents, memories, and end all tracked sessions."""
+        # Delete documents first (cascade deletes children)
+        for doc_id in self.tracked_documents:
+            try:
+                await self.delete_document(doc_id)
+                await asyncio.sleep(0.3)
+            except Exception:
+                pass
+
         # End open sessions
         for sid in self.tracked_sessions:
             try:
