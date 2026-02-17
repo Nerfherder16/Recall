@@ -72,7 +72,7 @@ class TestAntiPatternEscalation:
 
             # Search with a query related to the anti-pattern
             r = await api_client.post(
-                f"{API_BASE}/search/full",
+                f"{API_BASE}/search/query",
                 json={
                     "query": "SQL query string concatenation user input",
                     "domains": ["test-v21-hardening"],
