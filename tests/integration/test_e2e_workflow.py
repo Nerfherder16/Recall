@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from tests.integration.conftest import API_BASE
+from tests.integration.conftest import API_BASE, request_with_retry
 
 EMBED_DELAY = 0.5
 
@@ -75,7 +75,8 @@ class TestFullSessionWorkflow:
         await asyncio.sleep(EMBED_DELAY)
 
         # 5. Search for related information
-        r = await api_client.post(
+        r = await request_with_retry(
+            api_client, "post",
             f"{API_BASE}/search/query",
             json={
                 "query": "auth token refresh bug",
@@ -88,7 +89,8 @@ class TestFullSessionWorkflow:
         assert len(results) >= 1
 
         # 6. Assemble context
-        r = await api_client.post(
+        r = await request_with_retry(
+            api_client, "post",
             f"{API_BASE}/search/context",
             json={
                 "query": "authentication token handling",
@@ -169,7 +171,8 @@ class TestMultiDomainCrossReference:
         )
         await asyncio.sleep(EMBED_DELAY)
 
-        r = await api_client.post(
+        r = await request_with_retry(
+            api_client, "post",
             f"{API_BASE}/search/query",
             json={
                 "query": "user API authentication flow",

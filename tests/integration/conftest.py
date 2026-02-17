@@ -6,6 +6,7 @@ Each test gets a unique domain for isolation, and cleanup
 deletes all created resources after each test.
 """
 
+import asyncio
 import os
 import uuid
 from dataclasses import dataclass, field
@@ -15,6 +16,29 @@ import pytest
 
 API_BASE = os.environ.get("RECALL_API_URL", "http://localhost:8200")
 API_KEY = os.environ.get("RECALL_API_KEY", "")
+
+
+# =============================================================
+# Rate-limit retry helper
+# =============================================================
+
+
+async def request_with_retry(
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    max_retries: int = 5,
+    **kwargs,
+) -> httpx.Response:
+    """Execute an HTTP request, retrying on 429 with Retry-After backoff."""
+    for attempt in range(max_retries + 1):
+        r = await getattr(client, method)(url, **kwargs)
+        if r.status_code != 429 or attempt == max_retries:
+            return r
+        # Wait at least 10s — the 30/minute window needs real time to clear
+        retry_after = max(int(r.headers.get("Retry-After", 10)), 10)
+        await asyncio.sleep(retry_after)
+    return r
 
 
 # =============================================================

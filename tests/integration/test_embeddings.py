@@ -13,7 +13,7 @@ import asyncio
 
 import pytest
 
-from tests.integration.conftest import API_BASE
+from tests.integration.conftest import API_BASE, request_with_retry
 
 EMBED_DELAY = 0.5
 
@@ -112,7 +112,8 @@ class TestEmbeddings:
         )
         await asyncio.sleep(EMBED_DELAY)
 
-        r = await api_client.post(
+        r = await request_with_retry(
+            api_client, "post",
             f"{API_BASE}/search/query",
             json={
                 "query": "container orchestration",
@@ -166,7 +167,8 @@ class TestEmbeddings:
         )
         await asyncio.sleep(EMBED_DELAY)
 
-        r = await api_client.post(
+        r = await request_with_retry(
+            api_client, "post",
             f"{API_BASE}/search/query",
             json={
                 "query": "database with JSON support",
