@@ -110,6 +110,7 @@ class TimelineEntry(BaseModel):
     created_at: str
     importance: float
     stored_by: str | None = None
+    pinned: bool = False
 
 
 class TimelineResponse(BaseModel):
@@ -255,6 +256,7 @@ async def timeline_view(request: Request, body: TimelineRequest):
                 created_at=payload.get("created_at", ""),
                 importance=payload.get("importance", 0.5),
                 stored_by=payload.get("username"),
+                pinned=payload.get("pinned") == "true",
             )
             for mid, payload in points
         ]

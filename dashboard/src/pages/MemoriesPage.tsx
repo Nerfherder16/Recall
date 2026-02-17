@@ -68,6 +68,7 @@ export default function MemoriesPage() {
           ...e,
           tags: e.tags || [],
           similarity: e.similarity || 0,
+          pinned: e.pinned ?? false,
         })),
       );
     } catch {
@@ -132,6 +133,28 @@ export default function MemoriesPage() {
       addToast("Memory deleted", "success");
     } catch {
       addToast("Failed to delete memory", "error");
+    }
+  }
+
+  async function togglePin(id: string, currentlyPinned: boolean) {
+    try {
+      if (currentlyPinned) {
+        await api(`/memory/${id}/pin`, "DELETE");
+      } else {
+        await api(`/memory/${id}/pin`, "POST");
+      }
+      setResults((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, pinned: !currentlyPinned } : r)),
+      );
+      if (detailMem && detailMem.id === id) {
+        setDetailMem({ ...detailMem, pinned: !currentlyPinned });
+      }
+      addToast(
+        currentlyPinned ? "Memory unpinned" : "Memory pinned",
+        "success",
+      );
+    } catch {
+      addToast("Failed to update pin status", "error");
     }
   }
 
@@ -267,9 +290,21 @@ export default function MemoriesPage() {
                         </span>
                       ))}
                     </div>
-                    <span className="text-xs text-base-content/30 tabular-nums">
-                      imp: {r.importance.toFixed(2)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className={`rounded-lg p-1.5 transition-colors shrink-0 ${r.pinned ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-base-content/30 hover:text-amber-400 hover:bg-amber-500/10"}`}
+                        onClick={() => togglePin(r.id, r.pinned)}
+                        title={r.pinned ? "Unpin" : "Pin"}
+                      >
+                        <PushPin
+                          size={14}
+                          weight={r.pinned ? "fill" : "regular"}
+                        />
+                      </button>
+                      <span className="text-xs text-base-content/30 tabular-nums">
+                        imp: {r.importance.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -335,13 +370,22 @@ export default function MemoriesPage() {
                     </div>
                   )}
                 </div>
-                <button
-                  className="rounded-lg p-1.5 text-base-content/30 hover:text-error hover:bg-error/10 transition-colors shrink-0"
-                  onClick={() => deleteSingle(r.id)}
-                  title="Delete"
-                >
-                  <Trash size={16} />
-                </button>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <button
+                    className={`rounded-lg p-1.5 transition-colors ${r.pinned ? "text-amber-400 hover:text-amber-300 hover:bg-amber-500/10" : "text-base-content/30 hover:text-amber-400 hover:bg-amber-500/10"}`}
+                    onClick={() => togglePin(r.id, r.pinned)}
+                    title={r.pinned ? "Unpin" : "Pin"}
+                  >
+                    <PushPin size={16} weight={r.pinned ? "fill" : "regular"} />
+                  </button>
+                  <button
+                    className="rounded-lg p-1.5 text-base-content/30 hover:text-error hover:bg-error/10 transition-colors"
+                    onClick={() => deleteSingle(r.id)}
+                    title="Delete"
+                  >
+                    <Trash size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
