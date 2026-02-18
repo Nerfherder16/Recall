@@ -554,3 +554,80 @@ async def bootstrap_graph(request: Request):
     except Exception as e:
         logger.error("graph_bootstrap_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# IMPORTANCE REHABILITATION
+# =============================================================
+
+
+class RehabilitateResponse(BaseModel):
+    processed: int
+    rehabilitated: int
+
+
+@router.post("/importance/rehabilitate", response_model=RehabilitateResponse)
+@limiter.limit("5/minute")
+async def rehabilitate_importance(request: Request):
+    """
+    Rehabilitate floor-level memories that were over-decayed.
+
+    Boosts importance for memories where:
+    - access_count >= 3 or pinned: boost to max(importance, initial_importance * 0.5, 0.3)
+    - durability is "durable" or "permanent": boost to max(importance, 0.2)
+
+    Only targets memories with importance < 0.05.
+    Idempotent — safe to run multiple times.
+    """
+    try:
+        qdrant = await get_qdrant_store()
+        neo4j = await get_neo4j_store()
+
+        memories = await qdrant.scroll_all()
+
+        processed = 0
+        rehabilitated = 0
+
+        for memory_id, payload in memories:
+            importance = payload.get("importance", 0.5)
+
+            # Only rehabilitate floor-level memories
+            if importance >= 0.05:
+                continue
+
+            processed += 1
+            new_importance = importance
+
+            access_count = payload.get("access_count", 0)
+            pinned = payload.get("pinned") == "true"
+            durability = payload.get("durability")
+            initial_importance = payload.get("initial_importance")
+
+            # High-access or pinned memories deserve rehabilitation
+            if access_count >= 3 or pinned:
+                base = (initial_importance or 0.5) * 0.5
+                new_importance = max(new_importance, base, 0.3)
+
+            # Durable/permanent memories should not be at floor level
+            if durability in ("durable", "permanent"):
+                new_importance = max(new_importance, 0.2)
+
+            if new_importance > importance:
+                await qdrant.update_importance(memory_id, new_importance)
+                await neo4j.update_importance(memory_id, new_importance)
+                rehabilitated += 1
+
+        logger.info(
+            "importance_rehabilitation_complete",
+            processed=processed,
+            rehabilitated=rehabilitated,
+        )
+
+        return RehabilitateResponse(
+            processed=processed,
+            rehabilitated=rehabilitated,
+        )
+
+    except Exception as e:
+        logger.error("importance_rehabilitation_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
