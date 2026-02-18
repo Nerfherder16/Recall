@@ -12,6 +12,7 @@ import re
 import structlog
 
 from .config import get_settings
+from .domains import normalize_domain
 from .llm import LLMError, get_llm
 from .models import DetectedSignal, MemorySource, MemoryType, SignalType
 
@@ -56,6 +57,7 @@ PROMPT_TEMPLATE = """Extract signals from the conversation below. Return a JSON 
 
 Signal types: error_fix, decision, pattern, preference, fact, workflow, contradiction, warning
 Durability: ephemeral (temp fixes), durable (decisions/patterns), permanent (IPs/ports/paths)
+Domain must be one of: general, infrastructure, development, testing, security, api, database, frontend, devops, networking, ai-ml, tooling, configuration, documentation, sessions
 
 Each signal: {{"signal_type": str, "content": str, "confidence": 0.0-1.0, "importance": 1-10, "durability": str, "domain": str, "tags": [str]}}
 
@@ -66,7 +68,7 @@ Example input:
 [assistant]: Good find. That's a common issue with Docker bridge networking.
 
 Example output:
-[{{"signal_type": "error_fix", "content": "Redis connections drop on CasaOS Docker. Fix: set tcp-keepalive 60 in redis.conf. Caused by Docker bridge networking.", "confidence": 0.9, "importance": 7, "durability": "durable", "domain": "redis", "tags": ["docker", "casaos", "networking"]}}]
+[{{"signal_type": "error_fix", "content": "Redis connections drop on CasaOS Docker. Fix: set tcp-keepalive 60 in redis.conf. Caused by Docker bridge networking.", "confidence": 0.9, "importance": 7, "durability": "durable", "domain": "infrastructure", "tags": ["docker", "casaos", "networking"]}}]
 
 Example input:
 [user]: I prefer using bun over npm for all new projects.
@@ -215,7 +217,7 @@ class SignalDetector:
                     content=item["content"],
                     confidence=confidence,
                     source=MemorySource.SYSTEM,
-                    suggested_domain=item.get("domain"),
+                    suggested_domain=normalize_domain(item.get("domain", "general")),
                     suggested_tags=item.get("tags", []),
                     suggested_importance=suggested_importance,
                     suggested_durability=suggested_durability,

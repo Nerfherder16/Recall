@@ -9,6 +9,7 @@ import json
 import structlog
 
 from src.core import Memory, MemorySource, MemoryType, get_embedding_service
+from src.core.domains import normalize_domain
 from src.core.models import Durability
 from src.core.embeddings import OllamaUnavailableError, content_hash
 from src.core.llm import get_llm
@@ -30,6 +31,8 @@ Extract ONLY concrete, reusable facts:
 - Dependencies and their usage patterns
 
 Skip: variable names, obvious code, temporary debug changes, formatting-only changes.
+
+Domain must be one of: general, infrastructure, development, testing, security, api, database, frontend, devops, networking, ai-ml, tooling, configuration, documentation, sessions
 
 Return JSON array: [{{"fact": "...", "domain": "...", "tags": ["..."]}}]
 Return [] if nothing worth remembering."""
@@ -94,7 +97,7 @@ async def _run_extraction(observation: dict):
         if not fact_text or len(fact_text) < 10:
             continue
 
-        domain = fact_data.get("domain", "general")
+        domain = normalize_domain(fact_data.get("domain", "general"))
         tags = fact_data.get("tags", [])
 
         chash = content_hash(fact_text)
