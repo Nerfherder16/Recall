@@ -6,9 +6,31 @@
  * should never block coding.
  */
 
+const { extname } = require("path");
+
 const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
 const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 const MAX_CONTENT_SIZE = 10000;
+
+// Skip binary, generated, and irrelevant file types
+const SKIP_EXTENSIONS = new Set([
+  ".lock", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+  ".woff", ".woff2", ".ttf", ".eot", ".map", ".min.js", ".min.css",
+  ".pyc", ".pyo", ".whl", ".zip", ".tar", ".gz", ".exe", ".dll",
+  ".so", ".dylib", ".pdf", ".mp3", ".mp4", ".wav", ".avi",
+]);
+const SKIP_DIRS = ["node_modules", ".git", "__pycache__", "dist", "build", ".next", ".venv"];
+
+function shouldSkipFile(filePath) {
+  if (!filePath) return true;
+  const lower = filePath.replace(/\\/g, "/").toLowerCase();
+  if (SKIP_DIRS.some((d) => lower.includes(`/${d}/`) || lower.includes(`\\${d}\\`))) return true;
+  const ext = extname(lower);
+  if (SKIP_EXTENSIONS.has(ext)) return true;
+  // Check compound extensions like .min.js
+  if (lower.endsWith(".min.js") || lower.endsWith(".min.css")) return true;
+  return false;
+}
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -35,7 +57,7 @@ async function main() {
   const toolName = parsed.tool_name || "Write";
   const filePath = toolInput.file_path || toolInput.path || "";
 
-  if (!filePath) process.exit(0);
+  if (!filePath || shouldSkipFile(filePath)) process.exit(0);
 
   const body = {
     file_path: filePath,
@@ -58,18 +80,16 @@ async function main() {
     headers["Authorization"] = `Bearer ${RECALL_API_KEY}`;
   }
 
-  try {
-    await fetch(`${RECALL_HOST}/observe/file-change`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(5000),
-    });
-  } catch {
-    // Ignore — don't block coding
-  }
+  // Fire-and-forget — don't await, exit immediately
+  fetch(`${RECALL_HOST}/observe/file-change`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => {}); // Swallow errors silently
 
-  process.exit(0);
+  // Give fetch a moment to send the request, then exit
+  setTimeout(() => process.exit(0), 100);
 }
 
 main().catch(() => process.exit(0));
