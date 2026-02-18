@@ -477,7 +477,7 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
             await neo4j.update_importance(memory_id, new_importance)
             await neo4j.update_stability(memory_id, new_stability)
 
-            # Audit log
+            # Audit log — enriched with memory features for ML training
             await pg.log_audit(
                 "feedback", memory_id,
                 actor=user.username if user else "system",
@@ -489,6 +489,14 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
                     "new_importance": round(new_importance, 4),
                     "old_stability": round(old_stability, 4),
                     "new_stability": round(new_stability, 4),
+                    "importance": round(old_importance, 4),
+                    "stability": round(old_stability, 4),
+                    "confidence": round(float(payload.get("confidence", 0.5)), 4),
+                    "access_count": int(payload.get("access_count", 0)),
+                    "domain": payload.get("domain", ""),
+                    "memory_type": payload.get("memory_type", ""),
+                    "durability": payload.get("durability"),
+                    "pinned": payload.get("pinned") == "true",
                 },
             )
 

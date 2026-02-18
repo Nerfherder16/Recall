@@ -25,7 +25,7 @@ from src.core.consolidation import MemoryConsolidator
 from src.core.domains import normalize_domain
 from src.core.embeddings import get_embedding_service
 from src.core.models import MemoryType
-from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store
+from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, get_redis_store
 from src.workers.decay import DecayWorker
 
 logger = structlog.get_logger()
@@ -762,4 +762,63 @@ async def rehabilitate_importance(request: Request):
 
     except Exception as e:
         logger.error("importance_rehabilitation_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# ML RERANKER
+# =============================================================
+
+
+@router.post("/ml/retrain-ranker")
+@limiter.limit("1/minute")
+async def retrain_ranker(request: Request):
+    """Train or retrain the retrieval reranker from feedback data."""
+    try:
+        from src.core.reranker_trainer import train_reranker
+
+        pg = await get_postgres_store()
+        qdrant = await get_qdrant_store()
+        redis = await get_redis_store()
+
+        result = await train_reranker(pg, qdrant, redis)
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="sklearn not installed — required for training",
+        )
+    except Exception as e:
+        logger.error("retrain_ranker_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/ml/reranker-status")
+async def reranker_status(request: Request):
+    """Get current reranker model status."""
+    import json
+    from src.core.reranker import REDIS_KEY
+
+    try:
+        redis = await get_redis_store()
+        raw = await redis.client.get(REDIS_KEY)
+
+        if not raw:
+            return {"status": "not_trained"}
+
+        data = json.loads(raw)
+        return {
+            "status": "trained",
+            "trained_at": data.get("trained_at"),
+            "n_samples": data.get("n_samples"),
+            "cv_score": data.get("cv_score"),
+            "features": data.get("features"),
+            "class_distribution": data.get("class_distribution"),
+        }
+
+    except Exception as e:
+        logger.error("reranker_status_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")

@@ -113,8 +113,10 @@ class RetrievalPipeline:
                 if result.memory.id not in results:
                     results[result.memory.id] = result
 
-        # Stage 5: Final ranking
-        ranked = self._rank_results(list(results.values()), query)
+        # Stage 5: Final ranking (ML reranker or legacy formula)
+        from .reranker import get_reranker
+        reranker = await get_reranker(self.redis)
+        ranked = self._rank_results(list(results.values()), query, reranker)
 
         # Stage 5.5: Inhibition — suppress contradictions and near-duplicates
         ranked = await self._inhibit(ranked)
@@ -356,9 +358,13 @@ class RetrievalPipeline:
         return filtered
 
     def _rank_results(
-        self, results: list[RetrievalResult], query: MemoryQuery
+        self, results: list[RetrievalResult], query: MemoryQuery, reranker=None,
     ) -> list[RetrievalResult]:
-        """Stage 5: Final ranking."""
+        """Stage 5: Final ranking. Uses ML reranker if available, else legacy formula."""
+        if reranker is not None:
+            return reranker.score_results(results)
+
+        # Legacy formula
         for result in results:
             memory = result.memory
 
