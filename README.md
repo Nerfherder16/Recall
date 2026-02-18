@@ -78,7 +78,7 @@ FastAPI API (:8200)
     |-- /memory/*     CRUD + relationships + batch + pinning + anti-patterns + feedback
     |-- /search/*     browse (summaries) / full / timeline / context
     |-- /session/*    session lifecycle + working memory
-    |-- /ingest/*     turn ingestion + signal detection
+    |-- /ingest/*     turn ingestion + ML pre-filter + signal detection
     |-- /observe/*    file-change observer (fact extraction)
     |-- /admin/*      export, import, reconcile, audit, sessions, ollama, users, ml
     |-- /events/*     SSE stream for real-time dashboard
@@ -102,6 +102,11 @@ ARQ Worker (background jobs)
     |-- Patterns        daily at 3:30am (extract recurring themes)
     |
     v
+ML Classifiers (pure-math inference, no external deps)
+    |-- Signal classifier  TF-IDF + logistic regression pre-filter (~0.08ms)
+    |-- Retrieval reranker logistic regression trained from feedback
+    |
+    v
 Ollama (local LLM inference)
     |-- qwen3:14b     signal detection, consolidation, fact extraction
     |-- qwen3-embedding:0.6b  embeddings (1024 dimensions)
@@ -112,7 +117,7 @@ Ollama (local LLM inference)
 ### Memory Formation
 | Mechanism | Inspiration | Implementation |
 |-----------|-------------|----------------|
-| **Signal Detection** | Selective attention — not everything becomes long-term memory | LLM analyzes conversations, extracts facts/decisions/bugs/workflows with confidence scores |
+| **Signal Detection** | Selective attention — not everything becomes long-term memory | ML classifier pre-filters in 0.08ms; only likely signals proceed to LLM for extraction of facts/decisions/bugs/workflows with confidence scores |
 | **Poignancy Scoring** | Amygdala-gated encoding — emotional significance determines memory strength | 1-10 importance scale: production bugs score 8, routine facts score 4 |
 | **Observer Hooks** | Incidental encoding — we remember things we weren't trying to learn | File edits are automatically analyzed for extractable facts |
 | **Content-Hash Dedup** | Pattern separation — the hippocampus prevents overlapping memories | Identical content detected and deduplicated at store time |
@@ -143,6 +148,7 @@ Ollama (local LLM inference)
 | **Anti-Patterns** | Amygdala danger memory — the brain prioritizes threats | Dedicated collection of "what NOT to do" warnings; injected into retrieval when relevant |
 | **Feedback Loop** | Reinforcement learning — reward shapes future behavior | Session-end hook compares injected memories to assistant output via cosine similarity; adjusts importance/stability |
 | **ML-Trained Reranking** | Synaptic weight tuning — connections that fire together strengthen | Logistic regression trained on 150+ feedback events; baked-in scaler weights stored in Redis; pure-math inference (no sklearn at runtime) |
+| **ML Signal Pre-Filter** | Reticular activating system — fast subcortical filter before slow cortical processing | TF-IDF + logistic regression classifier gates LLM signal detection; 0.08ms vs 2-5s per conversation; skips greetings and chitchat |
 | **Pinning** | Long-term potentiation — repeatedly activated synapses become permanent | Pin endpoint marks memories as decay-immune; unpin restores normal decay |
 
 ### Storage Architecture
@@ -518,7 +524,7 @@ Find memories semantically similar to a given memory.
 ### Conversation Ingestion (Signal Detection)
 
 #### `POST /ingest/turns`
-Ingest conversation turns for automatic signal detection. The LLM analyzes turns in the background and auto-stores important signals as memories.
+Ingest conversation turns for automatic signal detection. An ML classifier (TF-IDF + logistic regression) pre-filters conversations in ~0.08ms — only those likely to contain signals proceed to the LLM for full analysis (2-5s). This reduces Ollama load by skipping greetings, chitchat, and routine commands.
 
 **Request:**
 ```json
@@ -574,6 +580,8 @@ Capture a session snapshot as a memory.
 #### `GET /admin/ollama` - Ollama model status and resource usage
 #### `POST /admin/ml/retrain-ranker` - Train/retrain the ML retrieval reranker from feedback data (rate limited: 1/min)
 #### `GET /admin/ml/reranker-status` - Get reranker model status (trained_at, n_samples, cv_score, features)
+#### `POST /admin/ml/retrain-signal-classifier` - Train/retrain the ML signal classifier from corpus data (rate limited: 1/min)
+#### `GET /admin/ml/signal-classifier-status` - Get signal classifier status (trained_at, n_samples, vocab_size, cv_scores)
 #### `POST /admin/users` - Create a user (returns one-time API key with `rc_` prefix)
 #### `GET /admin/users` - List all users (without API keys)
 #### `DELETE /admin/users/{id}` - Delete a user (memories remain)
@@ -755,7 +763,7 @@ Superseded memories (merged during consolidation) are marked in both stores and 
 
 ## Project Status
 
-Active development through 14 phases of iterative refinement:
+Active development — currently at v2.5:
 
 - [x] Core API (store, search, context, sessions)
 - [x] Vector storage (Qdrant) with content-hash deduplication
@@ -765,7 +773,7 @@ Active development through 14 phases of iterative refinement:
 - [x] Signal detection brain (auto-memory from conversations)
 - [x] Docker Compose deployment with deploy scripts
 - [x] MCP server for Claude Code
-- [x] Integration tests (207 integration + 73 unit tests)
+- [x] Integration tests (207 integration + 106 unit tests)
 - [x] Security (auth, error sanitization, input validation, CORS)
 - [x] LLM-powered consolidation and pattern extraction
 - [x] PostgreSQL audit log & session archive
@@ -787,6 +795,7 @@ Active development through 14 phases of iterative refinement:
 - [x] Retrieval feedback loop (session-end hook evaluates which memories were useful, adjusts importance)
 - [x] Simulation testbed (6 suites: lifecycle, retrieval, stress, signals, time acceleration, adaptive)
 - [x] ML retrieval reranker (logistic regression trained from feedback, pure-math inference, Redis weight storage)
+- [x] ML signal classifier (TF-IDF + logistic regression pre-filter for signal detection — 0.08ms vs 2-5s LLM)
 - [ ] Scheduled backups
 
 ## License
