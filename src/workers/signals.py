@@ -18,11 +18,9 @@ from src.core import (
     get_embedding_service,
     get_settings,
 )
-from src.core.embeddings import OllamaUnavailableError
+from src.core.embeddings import OllamaUnavailableError, content_hash
 from src.core.metrics import get_metrics
-from src.core.embeddings import content_hash
-from src.core.models import AntiPattern, SignalType
-from src.core.models import Durability
+from src.core.models import AntiPattern, Durability, SignalType
 from src.core.signal_detector import (
     SIGNAL_DURABILITY,
     SIGNAL_IMPORTANCE,
@@ -73,6 +71,7 @@ async def _run_signal_detection(session_id: str):
 
     # ML pre-filter: skip expensive LLM call if classifier says "no signal"
     from src.core.signal_classifier import get_signal_classifier
+
     classifier = await get_signal_classifier(redis)
     if classifier is not None:
         prediction = classifier.predict(turns)
@@ -114,25 +113,32 @@ async def _run_signal_detection(session_id: str):
                 continue
 
             # High confidence — auto-store as memory
-            memory_id = await _store_signal_as_memory(session_id, signal)
+            memory_id, mem_embedding = await _store_signal_as_memory(session_id, signal)
             if memory_id:
                 auto_stored += 1
                 metrics.increment("recall_signals_detected_total", {"outcome": "auto"})
-                # Handle contradiction signals — find and supersede conflicting memory
+                # Handle contradiction signals — pass embedding to avoid re-embed
                 if signal.signal_type == SignalType.CONTRADICTION:
-                    await _resolve_contradiction(memory_id, signal)
+                    await _resolve_contradiction(
+                        memory_id,
+                        signal,
+                        embedding=mem_embedding,
+                    )
 
         elif signal.confidence >= settings.signal_confidence_pending:
             # Medium confidence — queue for review
-            await redis.add_pending_signal(session_id, {
-                "signal_type": signal.signal_type.value,
-                "content": signal.content,
-                "confidence": signal.confidence,
-                "domain": signal.suggested_domain or "general",
-                "tags": signal.suggested_tags,
-                "importance": signal.suggested_importance,
-                "durability": signal.suggested_durability,
-            })
+            await redis.add_pending_signal(
+                session_id,
+                {
+                    "signal_type": signal.signal_type.value,
+                    "content": signal.content,
+                    "confidence": signal.confidence,
+                    "domain": signal.suggested_domain or "general",
+                    "tags": signal.suggested_tags,
+                    "importance": signal.suggested_importance,
+                    "durability": signal.suggested_durability,
+                },
+            )
             pending += 1
             metrics.increment("recall_signals_detected_total", {"outcome": "pending"})
 
@@ -146,9 +152,12 @@ async def _run_signal_detection(session_id: str):
         session = await redis.get_session(session_id)
         if session:
             current = int(session.get("signals_detected", 0))
-            await redis.update_session(session_id, {
-                "signals_detected": current + auto_stored,
-            })
+            await redis.update_session(
+                session_id,
+                {
+                    "signals_detected": current + auto_stored,
+                },
+            )
 
     logger.info(
         "signal_detection_complete",
@@ -160,11 +169,14 @@ async def _run_signal_detection(session_id: str):
     )
 
 
-async def _store_signal_as_memory(session_id: str, signal) -> str | None:
+async def _store_signal_as_memory(
+    session_id: str,
+    signal,
+) -> tuple[str | None, list[float] | None]:
     """
     Store a detected signal as a Memory in Qdrant + Neo4j.
 
-    Returns memory ID if stored, None if duplicate or error.
+    Returns (memory_id, embedding) if stored, (None, None) if duplicate or error.
     """
     try:
         memory_type = SIGNAL_TO_MEMORY_TYPE.get(signal.signal_type)
@@ -186,12 +198,11 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
                 signal_type=signal.signal_type.value,
                 existing_id=existing,
             )
-            return None
+            return None, None
 
         # Resolve durability: LLM suggestion → signal-type default → ephemeral
-        durability_str = (
-            signal.suggested_durability
-            or SIGNAL_DURABILITY.get(signal.signal_type, "ephemeral")
+        durability_str = signal.suggested_durability or SIGNAL_DURABILITY.get(
+            signal.signal_type, "ephemeral"
         )
         try:
             durability = Durability(durability_str)
@@ -219,7 +230,7 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
             embedding = await embedding_service.embed(signal.content)
         except OllamaUnavailableError:
             logger.warning("signal_store_ollama_unavailable", signal_type=signal.signal_type.value)
-            return None
+            return None, None
 
         # Store in Qdrant
         await qdrant.store(memory, embedding)
@@ -231,7 +242,7 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
         except Exception as neo4j_err:
             logger.error("neo4j_write_failed_compensating", id=memory.id, error=str(neo4j_err))
             await qdrant.delete(memory.id)
-            return None
+            return None, None
 
         logger.info(
             "signal_auto_stored",
@@ -243,7 +254,9 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
         # Audit log (fire-and-forget)
         pg = await get_postgres_store()
         await pg.log_audit(
-            "create", memory.id, actor="signal",
+            "create",
+            memory.id,
+            actor="signal",
             session_id=session_id,
             details={"signal_type": signal.signal_type.value, "confidence": signal.confidence},
         )
@@ -251,11 +264,12 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
         # Auto-link to similar memories
         try:
             from src.core.auto_linker import auto_link_memory
+
             await auto_link_memory(memory.id, embedding, memory.domain)
         except Exception as link_err:
             logger.debug("signal_auto_link_skipped", error=str(link_err))
 
-        return memory.id
+        return memory.id, embedding
 
     except Exception as e:
         logger.error(
@@ -263,10 +277,15 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
             error=str(e),
             signal_type=signal.signal_type.value,
         )
-        return None
+        return None, None
 
 
-async def _resolve_contradiction(new_memory_id: str, signal) -> None:
+async def _resolve_contradiction(
+    new_memory_id: str,
+    signal,
+    *,
+    embedding: list[float] | None = None,
+) -> None:
     """
     Handle contradiction signals by finding and superseding the conflicting memory.
 
@@ -277,12 +296,17 @@ async def _resolve_contradiction(new_memory_id: str, signal) -> None:
         qdrant = await get_qdrant_store()
         neo4j = await get_neo4j_store()
 
-        try:
-            embedding_service = await get_embedding_service()
-            embedding = await embedding_service.embed(signal.content)
-        except OllamaUnavailableError:
-            logger.warning("contradiction_resolution_ollama_unavailable", new_memory=new_memory_id)
-            return
+        # Use passed embedding or generate new one
+        if embedding is None:
+            try:
+                embedding_service = await get_embedding_service()
+                embedding = await embedding_service.embed(signal.content)
+            except OllamaUnavailableError:
+                logger.warning(
+                    "contradiction_resolution_ollama_unavailable",
+                    new_memory=new_memory_id,
+                )
+                return
 
         # Search for the memory being contradicted
         similar = await qdrant.search(
@@ -368,7 +392,9 @@ async def _store_signal_as_anti_pattern(session_id: str, signal) -> bool:
 
         pg = await get_postgres_store()
         await pg.log_audit(
-            "create_anti_pattern", anti_pattern.id, actor="signal",
+            "create_anti_pattern",
+            anti_pattern.id,
+            actor="signal",
             session_id=session_id,
             details={"severity": anti_pattern.severity, "domain": anti_pattern.domain},
         )
