@@ -506,14 +506,9 @@ async def bootstrap_graph(request: Request):
         edges_created = 0
         batch_size = 20
 
-        for i, (memory_id, payload) in enumerate(memories):
-            # scroll_all with_vectors=True returns vectors in payload
-            # We need to get the vector separately
-            result = await qdrant.get(memory_id)
-            if not result:
+        for i, (memory_id, payload, embedding) in enumerate(memories):
+            if not embedding:
                 continue
-
-            embedding, _ = result
 
             # Search for similar memories
             similar = await qdrant.search(
