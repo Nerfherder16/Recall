@@ -85,12 +85,18 @@ async function main() {
   const prompt = parsed.prompt || "";
   if (shouldSkip(prompt)) process.exit(0);
 
-  // Extract project name from cwd for search affinity
+  // Extract project name from cwd for domain filtering (not query pollution)
   const cwd = parsed.cwd || "";
   const projectName = cwd.split(/[/\\]/).filter(Boolean).pop() || "";
-  const query = projectName
-    ? `[${projectName}] ${prompt.slice(0, 480)}`
-    : prompt.slice(0, 500);
+
+  // Normalize common project names to canonical domains
+  const DOMAIN_ALIASES = {
+    "recall": "development", "system-recall": "development",
+    "familyhub": "development", "sadie": "development",
+    "relay": "development",
+  };
+  const domain = DOMAIN_ALIASES[projectName.toLowerCase()] || "";
+  const query = prompt.slice(0, 500);
 
   // Query Recall browse endpoint
   const headers = { "Content-Type": "application/json" };
@@ -98,14 +104,14 @@ async function main() {
     headers["Authorization"] = `Bearer ${RECALL_API_KEY}`;
   }
 
+  const searchBody = { query, limit: MAX_RESULTS };
+  if (domain) searchBody.domain = domain;
+
   try {
     const resp = await fetch(`${RECALL_HOST}/search/browse`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        query,
-        limit: MAX_RESULTS,
-      }),
+      body: JSON.stringify(searchBody),
       signal: AbortSignal.timeout(3500),
     });
 
