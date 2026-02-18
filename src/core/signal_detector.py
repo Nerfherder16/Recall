@@ -52,50 +52,35 @@ SIGNAL_DURABILITY: dict[SignalType, str] = {
     SignalType.WARNING: "durable",
 }
 
-PROMPT_TEMPLATE = """Analyze the following conversation and extract important signals that should be remembered.
+PROMPT_TEMPLATE = """Extract signals from the conversation below. Return a JSON array.
 
-For each signal, identify:
-- signal_type: one of "error_fix", "decision", "pattern", "preference", "fact", "workflow", "contradiction", "warning"
-- content: a clear, self-contained description of what should be remembered (include enough context to be useful standalone)
-- confidence: 0.0-1.0 how confident you are this is worth remembering
-- importance: 1-10 how poignant or impactful this memory is (see scale below)
-- durability: one of "ephemeral", "durable", "permanent" (see classification below)
-- domain: topic area (e.g., "docker", "python", "infrastructure", "project-recall")
-- tags: relevant tags as a list of strings
+Signal types: error_fix, decision, pattern, preference, fact, workflow, contradiction, warning
+Durability: ephemeral (temp fixes), durable (decisions/patterns), permanent (IPs/ports/paths)
 
-Durability classification:
-- ephemeral: debug sessions, temporary workarounds, one-off fixes, session-specific context
-- durable: architecture decisions, design patterns, conventions, learned workflows
-- permanent: IP addresses, ports, URLs, file paths, hardware specs, credential locations, API keys
+Each signal: {{"signal_type": str, "content": str, "confidence": 0.0-1.0, "importance": 1-10, "durability": str, "domain": str, "tags": [str]}}
 
-Importance scale (1-10):
-1-2: Trivial, routine observations (e.g., "ran npm install")
-3-4: Useful facts, minor preferences, simple configurations
-5-6: Notable decisions, meaningful patterns, useful workflows
-7-8: Critical bug fixes, architectural decisions, production issues
-9-10: Fundamental breakthroughs, system-wide changes, critical security fixes
+Extract ALL signals you find. Return [] ONLY for casual greetings or trivial small talk.
 
-Rules:
-- Only extract signals that would be genuinely useful to recall later
-- Be specific in content — vague signals are worthless
-- error_fix: a bug and its solution (include both problem and fix)
-- decision: an architectural or design choice with reasoning
-- fact: a concrete piece of information (IP, config value, version, etc.)
-- workflow: a process or sequence of steps to accomplish something
-- preference: a user preference for tools, style, or approach
-- pattern: a recurring theme or convention
-- contradiction: information that conflicts with something previously known
-- warning: something that should NOT be done — an anti-pattern, gotcha, or dangerous approach. Content should describe what to avoid AND the better alternative if known
-- Set confidence based on how clearly the signal appears in the conversation
-- Set importance based on the impact and poignancy of the memory, not just the signal type
-- If no signals are found, return an empty array
+Example input:
+[user]: The Redis connection keeps dropping on CasaOS. I fixed it by setting tcp-keepalive 60 in redis.conf.
+[assistant]: Good find. That's a common issue with Docker bridge networking.
 
-Respond with ONLY a JSON array of signal objects. No other text.
+Example output:
+[{{"signal_type": "error_fix", "content": "Redis connections drop on CasaOS Docker. Fix: set tcp-keepalive 60 in redis.conf. Caused by Docker bridge networking.", "confidence": 0.9, "importance": 7, "durability": "durable", "domain": "redis", "tags": ["docker", "casaos", "networking"]}}]
+
+Example input:
+[user]: I prefer using bun over npm for all new projects.
+[assistant]: Makes sense — bun is significantly faster for installs and scripts.
+
+Example output:
+[{{"signal_type": "preference", "content": "User prefers bun over npm for all new projects due to faster installs and script execution.", "confidence": 0.85, "importance": 4, "durability": "durable", "domain": "tooling", "tags": ["bun", "npm", "preference"]}}]
 
 Conversation:
 {turns}
 
-JSON array of signals:"""
+JSON array:"""
+
+RETRY_NUDGE = " Look again carefully for any facts, decisions, preferences, or workflows."
 
 
 class SignalDetector:
@@ -122,9 +107,19 @@ class SignalDetector:
 
         try:
             llm = await get_llm()
-            raw = await llm.generate(prompt, format_json=True, temperature=0.2)
+            raw = await llm.generate(prompt, format_json=True, temperature=0.4)
             logger.debug("signal_detection_raw_response", raw=raw[:500])
             signals = self._parse_response(raw)
+
+            # Retry once on empty response for non-trivial conversations
+            if not signals:
+                total_chars = sum(len(t.get("content", "")) for t in turns)
+                if total_chars > 100:
+                    logger.info("signal_detection_retry", total_chars=total_chars)
+                    retry_prompt = prompt + RETRY_NUDGE
+                    raw = await llm.generate(retry_prompt, format_json=True, temperature=0.6)
+                    logger.debug("signal_detection_retry_response", raw=raw[:500])
+                    signals = self._parse_response(raw)
 
             logger.info(
                 "signals_detected",

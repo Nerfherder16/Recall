@@ -33,7 +33,7 @@ class TestbedConfig:
     time_accel_step_hours: int = 24
 
     # Signal quality suite
-    signal_wait_seconds: int = 30
+    signal_wait_seconds: int = 90
 
     # Report
     report_dir: str = "tests/simulation/reports"
@@ -82,7 +82,7 @@ Examples:
     parser.add_argument("--stress-duration", type=int, default=60)
     parser.add_argument("--time-accel-weeks", type=int, default=4)
     parser.add_argument("--time-accel-step", type=int, default=24)
-    parser.add_argument("--signal-wait", type=int, default=30)
+    parser.add_argument("--signal-wait", type=int, default=90)
 
     parser.add_argument("--report-dir", default="tests/simulation/reports")
     parser.add_argument("--compare", nargs=2, metavar="FILE", help="Compare two JSON reports")

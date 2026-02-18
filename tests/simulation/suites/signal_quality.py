@@ -19,6 +19,29 @@ from .base import BaseSuite
 class SignalQualitySuite(BaseSuite):
     name = "signals"
 
+    async def _track_session_memories(self, sid: str) -> None:
+        """Find memories auto-stored by signal detection for this session and
+        add them to the client's tracked_ids so cleanup deletes them.
+        Also cleans up any anti-patterns created by WARNING signals."""
+        results = await self.client.search_browse(
+            query="signal", limit=20, session_id=sid,
+        )
+        for r in results:
+            mem_id = r.get("id", "")
+            if mem_id and mem_id not in self.client.tracked_ids:
+                self.client.tracked_ids.append(mem_id)
+
+        # Clean anti-patterns created by signal detection (no session_id filter
+        # available, so check all and delete any created during this run)
+        anti_patterns = await self.client.list_anti_patterns()
+        for ap in anti_patterns:
+            tags = ap.get("tags", [])
+            if any("signal:" in t for t in tags):
+                try:
+                    await self.client.delete_anti_pattern(ap["id"])
+                except Exception:
+                    pass
+
     async def _poll_signals_detected(self, sid: str, timeout: float = 30.0) -> int:
         """Poll session status until signals_detected > 0 or timeout."""
         t0 = time.monotonic()
@@ -28,7 +51,7 @@ class SignalQualitySuite(BaseSuite):
                 detected = int(status.get("signals_detected", 0))
                 if detected > 0:
                     return detected
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
         # Final check
         status = await self.client.get_session_status(sid)
         return int(status.get("signals_detected", 0)) if status else 0
@@ -84,7 +107,7 @@ class SignalQualitySuite(BaseSuite):
                     for role, content in turns
                 ]
                 r = await self.client.ingest_turns(sid, turn_dicts)
-                await asyncio.sleep(3)  # Rate limit: 20/min for ingest
+                await asyncio.sleep(8)  # Let Ollama drain between conversations
 
                 if r is None:
                     self.error(f"Failed to ingest turns for: {desc}")
@@ -138,9 +161,13 @@ class SignalQualitySuite(BaseSuite):
                     f"match={match}"
                 )
 
+                # Track auto-stored memories for cleanup (server-side signal
+                # detection creates memories not tracked by the client)
+                await self._track_session_memories(sid)
+
                 # End session
                 await self.client.end_session(sid)
-                await asyncio.sleep(3)
+                await asyncio.sleep(8)
 
             # ── Aggregate metrics ──
             total_convs = len(per_conversation)

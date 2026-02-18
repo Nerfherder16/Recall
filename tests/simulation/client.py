@@ -303,12 +303,16 @@ class TimedRecallClient:
         query: str,
         limit: int = 10,
         domains: list[str] | None = None,
+        session_id: str | None = None,
     ) -> list[dict]:
-        r = await self._request("POST", "/search/browse", {
+        body: dict = {
             "query": query,
             "limit": limit,
             "domains": domains,
-        })
+        }
+        if session_id:
+            body["session_id"] = session_id
+        r = await self._request("POST", "/search/browse", body)
         if r and "results" in r:
             return r["results"]
         return []

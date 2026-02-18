@@ -6,6 +6,8 @@ Loads recent turns, runs signal detection via LLM, and
 auto-stores high-confidence signals as memories.
 """
 
+import asyncio
+
 import structlog
 
 from src.core import (
@@ -30,6 +32,9 @@ from src.core.signal_detector import (
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, get_redis_store
 
 logger = structlog.get_logger()
+
+# Serialize LLM calls — single-threaded Ollama can't handle concurrent signal detection
+_signal_semaphore = asyncio.Semaphore(1)
 
 
 async def process_signal_detection(session_id: str):
@@ -67,7 +72,8 @@ async def _run_signal_detection(session_id: str):
         return
 
     detector = SignalDetector()
-    signals = await detector.detect(turns)
+    async with _signal_semaphore:
+        signals = await detector.detect(turns)
 
     if not signals:
         logger.debug("signal_detection_no_signals", session_id=session_id)
