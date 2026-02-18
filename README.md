@@ -80,7 +80,7 @@ FastAPI API (:8200)
     |-- /session/*    session lifecycle + working memory
     |-- /ingest/*     turn ingestion + signal detection
     |-- /observe/*    file-change observer (fact extraction)
-    |-- /admin/*      export, import, reconcile, audit, sessions, ollama, users
+    |-- /admin/*      export, import, reconcile, audit, sessions, ollama, users, ml
     |-- /events/*     SSE stream for real-time dashboard
     |-- /health       public health check
     |-- /metrics      Prometheus format
@@ -91,7 +91,7 @@ FastAPI API (:8200)
 Storage Layer
     |-- Qdrant        vector store (memories + sub-embeddings/facts)
     |-- Neo4j         graph store (relationships, spreading activation)
-    |-- Redis         volatile (sessions, working memory, turns, cache)
+    |-- Redis         volatile (sessions, working memory, turns, cache, ML weights)
     |-- PostgreSQL    durable metadata (audit log, session archive, metrics)
     |
     v
@@ -122,6 +122,7 @@ Ollama (local LLM inference)
 |-----------|-------------|----------------|
 | **Spreading Activation** | Collins & Loftus (1975) — activation propagates through semantic networks | Graph traversal weighted by relationship strength: `activation *= edge_strength * decay` |
 | **Multi-Stage Pipeline** | Reconstructive memory — recall is an active process, not playback | Vector search -> graph expansion -> context filtering -> ranking -> inhibition |
+| **ML Reranker** | Experience-dependent plasticity — the brain tunes retrieval based on what worked | Logistic regression trained from feedback data learns which memories are useful; 0.7 ML + 0.3 similarity blend |
 | **Interference/Inhibition** | Competing memories suppress each other | CONTRADICTS relationships penalize lower-scored memory (0.7x); exact duplicates removed |
 | **Context-Dependent Retrieval** | Encoding specificity — recall is better when context matches | Session, file path, and task keywords boost matching memories |
 | **Retrieval-Induced Strengthening** | Testing effect — retrieving a memory makes it stronger | Every access increments importance and resets the decay clock |
@@ -141,6 +142,7 @@ Ollama (local LLM inference)
 |-----------|-------------|----------------|
 | **Anti-Patterns** | Amygdala danger memory — the brain prioritizes threats | Dedicated collection of "what NOT to do" warnings; injected into retrieval when relevant |
 | **Feedback Loop** | Reinforcement learning — reward shapes future behavior | Session-end hook compares injected memories to assistant output via cosine similarity; adjusts importance/stability |
+| **ML-Trained Reranking** | Synaptic weight tuning — connections that fire together strengthen | Logistic regression trained on 150+ feedback events; baked-in scaler weights stored in Redis; pure-math inference (no sklearn at runtime) |
 | **Pinning** | Long-term potentiation — repeatedly activated synapses become permanent | Pin endpoint marks memories as decay-immune; unpin restores normal decay |
 
 ### Storage Architecture
@@ -505,7 +507,7 @@ Token-efficient search — returns IDs and 120-char summaries instead of full co
 Chronological view of memories around an anchor point. If no `anchor_id`, returns most recent entries.
 
 #### `POST /search/query`
-Full retrieval pipeline: vector similarity -> spreading activation -> context filtering -> ranking -> inhibition.
+Full retrieval pipeline: vector similarity -> spreading activation -> context filtering -> ML reranking (or legacy formula) -> inhibition.
 
 #### `POST /search/context`
 Assemble formatted context for injection into prompts. Groups memories by type under markdown headers.
@@ -570,6 +572,8 @@ Capture a session snapshot as a memory.
 #### `GET /admin/audit` - Query PostgreSQL audit log
 #### `GET /admin/sessions` - Archived session history
 #### `GET /admin/ollama` - Ollama model status and resource usage
+#### `POST /admin/ml/retrain-ranker` - Train/retrain the ML retrieval reranker from feedback data (rate limited: 1/min)
+#### `GET /admin/ml/reranker-status` - Get reranker model status (trained_at, n_samples, cv_score, features)
 #### `POST /admin/users` - Create a user (returns one-time API key with `rc_` prefix)
 #### `GET /admin/users` - List all users (without API keys)
 #### `DELETE /admin/users/{id}` - Delete a user (memories remain)
@@ -761,7 +765,7 @@ Active development through 14 phases of iterative refinement:
 - [x] Signal detection brain (auto-memory from conversations)
 - [x] Docker Compose deployment with deploy scripts
 - [x] MCP server for Claude Code
-- [x] Integration tests (157 tests: 138 fast + 29 slow/LLM)
+- [x] Integration tests (207 integration + 73 unit tests)
 - [x] Security (auth, error sanitization, input validation, CORS)
 - [x] LLM-powered consolidation and pattern extraction
 - [x] PostgreSQL audit log & session archive
@@ -782,6 +786,7 @@ Active development through 14 phases of iterative refinement:
 - [x] Anti-pattern system (dedicated "what NOT to do" warnings, auto-injected into retrieval)
 - [x] Retrieval feedback loop (session-end hook evaluates which memories were useful, adjusts importance)
 - [x] Simulation testbed (6 suites: lifecycle, retrieval, stress, signals, time acceleration, adaptive)
+- [x] ML retrieval reranker (logistic regression trained from feedback, pure-math inference, Redis weight storage)
 - [ ] Scheduled backups
 
 ## License
