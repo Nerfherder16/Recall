@@ -7,11 +7,15 @@ chronological ordering, domain filtering, and response models.
 
 import sys
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 # Mock storage and API drivers before importing
+# Configure slowapi mock so @limiter.limit() acts as a pass-through decorator
+_slowapi_mock = MagicMock()
+_slowapi_mock.Limiter.return_value.limit.return_value = lambda f: f
+
 for mod_name in [
     "neo4j",
     "asyncpg",
@@ -21,7 +25,6 @@ for mod_name in [
     "qdrant_client.http.models",
     "redis",
     "redis.asyncio",
-    "slowapi",
     "slowapi.errors",
     "slowapi.util",
     "sse_starlette",
@@ -31,6 +34,7 @@ for mod_name in [
     "arq.connections",
 ]:
     sys.modules.setdefault(mod_name, MagicMock())
+sys.modules["slowapi"] = _slowapi_mock
 
 
 def _make_payload(
@@ -216,3 +220,135 @@ def test_rehydrate_models_exist():
     )
     assert resp.total == 1
     assert resp.narrative is None
+
+
+# ---- Task 2: LLM narrative + Redis cache ----
+
+
+@pytest.mark.asyncio
+async def test_rehydrate_narrative_calls_llm():
+    """When include_narrative=True, rehydrate calls LLM for narrative."""
+    from src.api.routes.search import RehydrateRequest, rehydrate_context
+
+    body = RehydrateRequest(
+        since="2026-01-01T00:00:00",
+        until="2026-01-31T23:59:59",
+        include_narrative=True,
+    )
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.scroll_time_range = AsyncMock(
+        return_value=[
+            ("id-1", _make_payload("Memory about Docker config", created_at="2026-01-15T12:00:00")),
+            ("id-2", _make_payload("Redis runs on port 6379", created_at="2026-01-15T13:00:00")),
+        ]
+    )
+
+    mock_redis = MagicMock()
+    mock_redis.client = MagicMock()
+    mock_redis.client.get = AsyncMock(return_value=None)  # cache miss
+    mock_redis.client.setex = AsyncMock()
+
+    mock_llm = MagicMock()
+    mock_llm.generate = AsyncMock(
+        return_value="This session covered Docker configuration and Redis setup."
+    )
+
+    mock_request = MagicMock()
+
+    with (
+        patch(
+            "src.storage.get_qdrant_store",
+            new_callable=AsyncMock,
+            return_value=mock_qdrant,
+        ),
+        patch("src.storage.get_redis_store", new_callable=AsyncMock, return_value=mock_redis),
+        patch("src.core.llm.get_llm", new_callable=AsyncMock, return_value=mock_llm),
+    ):
+        response = await rehydrate_context(request=mock_request, body=body)
+
+    assert response.narrative is not None
+    assert "Docker" in response.narrative
+    mock_llm.generate.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_rehydrate_cache_hit_skips_qdrant():
+    """Redis cache hit returns cached response without querying Qdrant."""
+    import json
+
+    from src.api.routes.search import RehydrateRequest, rehydrate_context
+
+    body = RehydrateRequest(
+        since="2026-01-01T00:00:00",
+        until="2026-01-31T23:59:59",
+    )
+
+    cached_response = {
+        "entries": [],
+        "total": 0,
+        "window_start": "2026-01-01T00:00:00",
+        "window_end": "2026-01-31T23:59:59",
+        "narrative": None,
+    }
+
+    mock_redis = MagicMock()
+    mock_redis.client = MagicMock()
+    mock_redis.client.get = AsyncMock(return_value=json.dumps(cached_response))
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.scroll_time_range = AsyncMock()
+
+    mock_request = MagicMock()
+
+    with (
+        patch(
+            "src.storage.get_qdrant_store",
+            new_callable=AsyncMock,
+            return_value=mock_qdrant,
+        ),
+        patch("src.storage.get_redis_store", new_callable=AsyncMock, return_value=mock_redis),
+    ):
+        response = await rehydrate_context(request=mock_request, body=body)
+
+    assert response.total == 0
+    mock_qdrant.scroll_time_range.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_rehydrate_no_narrative_skips_llm():
+    """When include_narrative=False, LLM is not called."""
+    from src.api.routes.search import RehydrateRequest, rehydrate_context
+
+    body = RehydrateRequest(
+        since="2026-01-01T00:00:00",
+        until="2026-01-31T23:59:59",
+        include_narrative=False,
+    )
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.scroll_time_range = AsyncMock(
+        return_value=[
+            ("id-1", _make_payload("Some memory", created_at="2026-01-15T12:00:00")),
+        ]
+    )
+
+    mock_redis = MagicMock()
+    mock_redis.client = MagicMock()
+    mock_redis.client.get = AsyncMock(return_value=None)
+    mock_redis.client.setex = AsyncMock()
+
+    mock_request = MagicMock()
+
+    with (
+        patch(
+            "src.storage.get_qdrant_store",
+            new_callable=AsyncMock,
+            return_value=mock_qdrant,
+        ),
+        patch("src.storage.get_redis_store", new_callable=AsyncMock, return_value=mock_redis),
+    ):
+        response = await rehydrate_context(request=mock_request, body=body)
+
+    assert response.narrative is None
+    assert response.total == 1

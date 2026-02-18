@@ -330,17 +330,34 @@ async def rehydrate_context(request: Request, body: RehydrateRequest):
     Optionally includes LLM-generated narrative summary and anti-patterns.
     """
     try:
-        from src.storage import get_qdrant_store
+        import datetime as dt_mod
+        import hashlib
+        import json
 
-        qdrant = await get_qdrant_store()
+        from src.storage import get_qdrant_store, get_redis_store
+
+        redis = await get_redis_store()
 
         # Default time range: last 24 hours
         if not body.since:
-            import datetime as dt_mod
-
             body.since = (datetime.utcnow() - dt_mod.timedelta(hours=24)).isoformat()
         if not body.until:
             body.until = datetime.utcnow().isoformat()
+
+        # Check Redis cache
+        cache_key = (
+            "recall:rehydrate:"
+            + hashlib.md5(
+                f"{body.since}:{body.until}:{body.domain}:{body.memory_type}"
+                f":{body.include_narrative}:{body.include_anti_patterns}".encode()
+            ).hexdigest()
+        )
+
+        cached = await redis.client.get(cache_key)
+        if cached:
+            return RehydrateResponse(**json.loads(cached))
+
+        qdrant = await get_qdrant_store()
 
         # Scroll memories in time range
         points = await qdrant.scroll_time_range(
@@ -368,14 +385,40 @@ async def rehydrate_context(request: Request, body: RehydrateRequest):
         window_start = entries[0].created_at if entries else body.since
         window_end = entries[-1].created_at if entries else body.until
 
-        logger.info("rehydrate_completed", entries=len(entries), domain=body.domain)
+        # Optional LLM narrative
+        narrative = None
+        if body.include_narrative and entries:
+            try:
+                from src.core.llm import get_llm
 
-        return RehydrateResponse(
+                llm = await get_llm()
+                summaries = "\n".join(
+                    f"- [{e.created_at}] ({e.memory_type}) {e.summary}" for e in entries
+                )
+                prompt = (
+                    "You are summarizing a developer's session memories. "
+                    "Write a 2-3 paragraph narrative briefing from these memories:\n\n"
+                    f"{summaries}\n\n"
+                    "Focus on what was accomplished, key decisions, and anything noteworthy."
+                )
+                narrative = await llm.generate(prompt, temperature=0.3)
+            except Exception as llm_err:
+                logger.warning("rehydrate_llm_failed", error=str(llm_err))
+
+        response = RehydrateResponse(
             entries=entries,
             total=len(entries),
             window_start=window_start,
             window_end=window_end,
+            narrative=narrative,
         )
+
+        # Cache for 2 minutes
+        await redis.client.setex(cache_key, 120, json.dumps(response.model_dump(), default=str))
+
+        logger.info("rehydrate_completed", entries=len(entries), domain=body.domain)
+
+        return response
 
     except HTTPException:
         raise
