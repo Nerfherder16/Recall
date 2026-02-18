@@ -822,3 +822,63 @@ async def reranker_status(request: Request):
     except Exception as e:
         logger.error("reranker_status_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ========================= Signal Classifier ML =========================
+
+
+@router.post("/ml/retrain-signal-classifier")
+@limiter.limit("1/minute")
+async def retrain_signal_classifier(request: Request):
+    """Train or retrain the signal classifier from corpus data."""
+    try:
+        from src.core.signal_classifier_trainer import train_signal_classifier
+
+        redis = await get_redis_store()
+        pg = await get_postgres_store()
+
+        result = await train_signal_classifier(redis, pg)
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="sklearn not installed — required for training",
+        )
+    except Exception as e:
+        logger.error("retrain_signal_classifier_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/ml/signal-classifier-status")
+async def signal_classifier_status(request: Request):
+    """Get current signal classifier model status."""
+    import json
+    from src.core.signal_classifier import REDIS_KEY
+
+    try:
+        redis = await get_redis_store()
+        raw = await redis.client.get(REDIS_KEY)
+
+        if not raw:
+            return {"status": "not_trained"}
+
+        data = json.loads(raw)
+        return {
+            "status": "trained",
+            "version": data.get("version"),
+            "trained_at": data.get("trained_at"),
+            "n_samples": data.get("n_samples"),
+            "vocab_size": len(data.get("vocab", {})),
+            "binary_cv_score": data.get("binary_cv_score"),
+            "type_cv_score": data.get("type_cv_score"),
+            "type_classes": data.get("type_classifier", {}).get("classes", []),
+            "class_distribution": data.get("class_distribution"),
+            "type_distribution": data.get("type_distribution"),
+        }
+
+    except Exception as e:
+        logger.error("signal_classifier_status_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

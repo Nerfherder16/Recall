@@ -71,6 +71,25 @@ async def _run_signal_detection(session_id: str):
         logger.debug("signal_detection_no_turns", session_id=session_id)
         return
 
+    # ML pre-filter: skip expensive LLM call if classifier says "no signal"
+    from src.core.signal_classifier import get_signal_classifier
+    classifier = await get_signal_classifier(redis)
+    if classifier is not None:
+        prediction = classifier.predict(turns)
+        if not prediction["is_signal"]:
+            logger.info(
+                "signal_ml_skip",
+                session_id=session_id,
+                probability=round(prediction["signal_probability"], 3),
+            )
+            return
+        logger.debug(
+            "signal_ml_pass",
+            session_id=session_id,
+            probability=round(prediction["signal_probability"], 3),
+            predicted_type=prediction.get("predicted_type"),
+        )
+
     detector = SignalDetector()
     async with _signal_semaphore:
         signals = await detector.detect(turns)
