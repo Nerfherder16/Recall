@@ -72,6 +72,10 @@ class DecayWorker:
                 stats["stable"] += 1
                 continue
 
+            # Null durability defaults to durable (safe default)
+            if durability is None:
+                durability = "durable"
+
             importance = payload.get("importance", 0.5)
             stability = payload.get("stability", 0.1)
             last_accessed_str = payload.get("last_accessed")

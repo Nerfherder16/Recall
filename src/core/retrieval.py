@@ -551,7 +551,7 @@ class RetrievalPipeline:
             user_id=payload.get("user_id"),
             username=payload.get("username"),
             pinned=payload.get("pinned") == "true",
-            durability=Durability(payload["durability"]) if payload.get("durability") else None,
+            durability=Durability(payload["durability"]) if payload.get("durability") else Durability.DURABLE,
             initial_importance=payload.get("initial_importance"),
         )
 
