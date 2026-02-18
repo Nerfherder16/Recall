@@ -20,7 +20,6 @@ const MIN_PROMPT_LENGTH = 15;
 const MAX_RESULTS = 5;
 const MIN_SIMILARITY = 0.25;
 const CACHE_DIR = join(process.env.HOME || process.env.USERPROFILE || "/tmp", ".cache", "recall");
-const INJECTED_FILE = join(CACHE_DIR, "injected.json");
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -124,11 +123,14 @@ async function main() {
 
     if (results.length === 0) process.exit(0);
 
-    // Track injected memory IDs for feedback loop
+    // Track injected memory IDs for feedback loop (session-scoped)
     try {
       if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+      // Use session_id or ppid for isolation between concurrent windows
+      const sessionKey = parsed.session_id || `ppid-${process.ppid}`;
+      const injectedFile = join(CACHE_DIR, `injected-${sessionKey}.json`);
       let injected = [];
-      try { injected = JSON.parse(readFileSync(INJECTED_FILE, "utf8")); } catch {}
+      try { injected = JSON.parse(readFileSync(injectedFile, "utf8")); } catch {}
 
       const entries = results.map((r) => ({
         memory_id: r.id,
@@ -136,7 +138,7 @@ async function main() {
       }));
       injected.push(...entries);
       if (injected.length > 500) injected = injected.slice(-500);
-      writeFileSync(INJECTED_FILE, JSON.stringify(injected));
+      writeFileSync(injectedFile, JSON.stringify(injected));
     } catch {} // Never block retrieval
 
     const context = formatContext(results);

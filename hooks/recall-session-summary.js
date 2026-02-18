@@ -9,14 +9,13 @@
  * Always exits 0 — never block stopping.
  */
 
-const { readFileSync, writeFileSync, existsSync } = require("fs");
+const { readFileSync, writeFileSync, existsSync, unlinkSync } = require("fs");
 const { join } = require("path");
 
 const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
 const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
 const MAX_TRANSCRIPT_LINES = 200;
 const CACHE_DIR = join(process.env.HOME || process.env.USERPROFILE || "/tmp", ".cache", "recall");
-const INJECTED_FILE = join(CACHE_DIR, "injected.json");
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -120,12 +119,20 @@ function extractAssistantText(transcriptPath) {
   }
 }
 
-async function submitFeedback(transcriptPath) {
-  if (!existsSync(INJECTED_FILE)) return;
+async function submitFeedback(transcriptPath, sessionId) {
+  // Try session-scoped file first, fall back to legacy global file
+  const sessionFile = sessionId
+    ? join(CACHE_DIR, `injected-${sessionId}.json`)
+    : null;
+  const legacyFile = join(CACHE_DIR, "injected.json");
+  const injectedFile = (sessionFile && existsSync(sessionFile))
+    ? sessionFile
+    : existsSync(legacyFile) ? legacyFile : null;
+  if (!injectedFile) return;
 
   let injected;
   try {
-    injected = JSON.parse(readFileSync(INJECTED_FILE, "utf8"));
+    injected = JSON.parse(readFileSync(injectedFile, "utf8"));
   } catch {
     return;
   }
@@ -157,9 +164,9 @@ async function submitFeedback(transcriptPath) {
     // Never block stopping
   }
 
-  // Clear tracking file
+  // Delete session-scoped tracking file (no cross-session contamination)
   try {
-    writeFileSync(INJECTED_FILE, "[]");
+    unlinkSync(injectedFile);
   } catch {}
 }
 
@@ -190,7 +197,7 @@ async function main() {
   }
 
   // Submit feedback for injected memories before storing summary
-  await submitFeedback(transcriptPath);
+  await submitFeedback(transcriptPath, parsed.session_id || "");
 
   const summary = buildSummary(cwd, userMessages);
   if (!summary) process.exit(0);
