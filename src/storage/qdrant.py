@@ -440,6 +440,40 @@ class QdrantStore:
 
         return all_points
 
+    async def scroll_null_durability(
+        self, batch_size: int = 100,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """
+        Scroll all non-superseded memories where durability is null.
+
+        Used by the migration endpoint to find pre-v2.2 memories
+        that need durability classification.
+        """
+        scroll_filter = Filter(
+            must=[
+                IsNullCondition(is_null=PayloadField(key="durability")),
+                IsNullCondition(is_null=PayloadField(key="superseded_by")),
+            ]
+        )
+        all_points = []
+        offset = None
+
+        while True:
+            points, next_offset = await self.client.scroll(
+                collection_name=self.collection,
+                scroll_filter=scroll_filter,
+                limit=batch_size,
+                offset=offset,
+                with_payload=True,
+            )
+            for point in points:
+                all_points.append((str(point.id), point.payload or {}))
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        return all_points
+
     async def scroll_around(
         self,
         anchor_date: str,

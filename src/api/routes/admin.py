@@ -9,6 +9,7 @@ Admin endpoints for triggering maintenance operations on-demand.
 - DELETE /admin/users/{id}  — delete user
 """
 
+import re
 from typing import Any
 
 import httpx
@@ -248,4 +249,153 @@ async def delete_user(user_id: int, request: Request):
         raise
     except Exception as e:
         logger.error("delete_user_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# DURABILITY MIGRATION
+# =============================================================
+
+# Regex patterns that indicate permanent-worthy content
+_PERMANENT_PATTERNS = [
+    re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"),  # IPv4
+    re.compile(r"\b[\w.-]+:\d{2,5}\b"),  # host:port
+    re.compile(r"https?://\S+"),  # URLs
+    re.compile(r"(?:/[\w.-]+){2,}"),  # Unix paths
+    re.compile(r"[A-Z]:\\[\w.\\-]+"),  # Windows paths
+    re.compile(r"\b(?:RTX|GTX|RX|Xeon|Ryzen|i[3579]|A100|H100)\s*\w+", re.IGNORECASE),  # GPU/CPU
+]
+
+# Signal tags → durability mapping
+_DURABLE_SIGNAL_TAGS = {"signal:fact", "signal:decision", "signal:pattern",
+                        "signal:workflow", "signal:preference", "signal:warning"}
+_EPHEMERAL_SIGNAL_TAGS = {"signal:error_fix", "signal:contradiction"}
+
+
+def classify_durability(payload: dict[str, Any]) -> tuple[str, str]:
+    """
+    Classify a memory payload into a durability tier.
+
+    Returns (tier, reason) where tier is "ephemeral"/"durable"/"permanent".
+    Priority waterfall: signal tags → regex permanent → memory type → durable fallback.
+    """
+    tags = set(payload.get("tags") or [])
+    content = payload.get("content") or ""
+    memory_type = payload.get("memory_type") or ""
+    importance = payload.get("importance") or 0.0
+
+    # Step 1: Signal tags
+    if tags & _DURABLE_SIGNAL_TAGS:
+        matched = tags & _DURABLE_SIGNAL_TAGS
+        return "durable", f"signal tag: {sorted(matched)[0]}"
+    if tags & _EPHEMERAL_SIGNAL_TAGS:
+        matched = tags & _EPHEMERAL_SIGNAL_TAGS
+        return "ephemeral", f"signal tag: {sorted(matched)[0]}"
+
+    # Step 2: Permanent regex detection (needs importance >= 0.4)
+    if importance >= 0.4:
+        regex_hits = sum(1 for p in _PERMANENT_PATTERNS if p.search(content))
+        if regex_hits >= 2:
+            return "permanent", f"{regex_hits} infrastructure patterns detected"
+        if regex_hits == 1 and memory_type == "semantic":
+            return "permanent", "infrastructure pattern + semantic type"
+
+    # Step 3: Memory type
+    if memory_type in ("procedural", "semantic"):
+        return "durable", f"memory_type={memory_type}"
+    if memory_type in ("episodic", "working"):
+        return "ephemeral", f"memory_type={memory_type}"
+
+    # Step 4: Fallback
+    return "durable", "default fallback"
+
+
+class MigrateDurabilityRequest(BaseModel):
+    dry_run: bool = True
+
+
+class MigrationSampleEntry(BaseModel):
+    id: str
+    content_preview: str
+    assigned_tier: str
+    reason: str
+
+
+class MigrateDurabilityResponse(BaseModel):
+    total_null: int
+    classified: int
+    errors: int
+    per_tier: dict[str, int]
+    sample: list[MigrationSampleEntry]
+
+
+@router.post("/migrate/durability", response_model=MigrateDurabilityResponse)
+@limiter.limit("10/minute")
+async def migrate_durability(request: Request, body: MigrateDurabilityRequest):
+    """
+    Classify and backfill durability for pre-v2.2 memories (null durability).
+
+    Naturally idempotent — only targets memories with null durability.
+    Default dry_run=true for safety.
+    """
+    try:
+        qdrant = await get_qdrant_store()
+        neo4j = await get_neo4j_store()
+        pg = await get_postgres_store()
+
+        null_memories = await qdrant.scroll_null_durability()
+        total_null = len(null_memories)
+
+        per_tier: dict[str, int] = {"ephemeral": 0, "durable": 0, "permanent": 0}
+        sample: list[MigrationSampleEntry] = []
+        errors = 0
+        classified = 0
+
+        for memory_id, payload in null_memories:
+            try:
+                tier, reason = classify_durability(payload)
+                per_tier[tier] += 1
+                classified += 1
+
+                if len(sample) < 20:
+                    content = (payload.get("content") or "")[:120]
+                    sample.append(MigrationSampleEntry(
+                        id=memory_id,
+                        content_preview=content,
+                        assigned_tier=tier,
+                        reason=reason,
+                    ))
+
+                if not body.dry_run:
+                    await qdrant.update_durability(memory_id, tier)
+                    await neo4j.update_durability(memory_id, tier)
+                    await pg.log_audit(
+                        action="durability_migration",
+                        memory_id=memory_id,
+                        actor="system",
+                        details={"tier": tier, "reason": reason},
+                    )
+            except Exception as e:
+                errors += 1
+                logger.warning("migration_classify_error", memory_id=memory_id, error=str(e))
+
+        logger.info(
+            "durability_migration_complete",
+            dry_run=body.dry_run,
+            total_null=total_null,
+            classified=classified,
+            errors=errors,
+            per_tier=per_tier,
+        )
+
+        return MigrateDurabilityResponse(
+            total_null=total_null,
+            classified=classified,
+            errors=errors,
+            per_tier=per_tier,
+            sample=sample,
+        )
+
+    except Exception as e:
+        logger.error("durability_migration_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
