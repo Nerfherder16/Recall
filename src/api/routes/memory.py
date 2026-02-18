@@ -20,6 +20,7 @@ from src.core import (
     User,
     get_embedding_service,
 )
+from src.core.domains import normalize_domain
 from src.core.embeddings import OllamaUnavailableError, content_hash
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, get_redis_store
 
@@ -112,13 +113,16 @@ async def store_memory(
         # Resolve durability
         durability = Durability(request.durability) if request.durability else None
 
+        # Normalize domain to canonical list
+        domain = normalize_domain(request.domain)
+
         # Create memory object
         memory = Memory(
             content=request.content,
             content_hash=content_hash(request.content),
             memory_type=request.memory_type,
             source=request.source,
-            domain=request.domain,
+            domain=domain,
             tags=request.tags,
             importance=request.importance,
             confidence=request.confidence,
@@ -184,6 +188,13 @@ async def store_memory(
                 "durability": request.durability,
             },
             user_id=user.id if user else None,
+        )
+
+        # Auto-link to similar memories in background
+        from src.core.auto_linker import auto_link_memory
+
+        background_tasks.add_task(
+            auto_link_memory, memory.id, embedding, request.domain
         )
 
         # Trigger sub-embedding extraction in background

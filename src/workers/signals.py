@@ -111,6 +111,8 @@ async def _run_signal_detection(session_id: str):
                 "confidence": signal.confidence,
                 "domain": signal.suggested_domain or "general",
                 "tags": signal.suggested_tags,
+                "importance": signal.suggested_importance,
+                "durability": signal.suggested_durability,
             })
             pending += 1
             metrics.increment("recall_signals_detected_total", {"outcome": "pending"})
@@ -226,6 +228,13 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
             session_id=session_id,
             details={"signal_type": signal.signal_type.value, "confidence": signal.confidence},
         )
+
+        # Auto-link to similar memories
+        try:
+            from src.core.auto_linker import auto_link_memory
+            await auto_link_memory(memory.id, embedding, memory.domain)
+        except Exception as link_err:
+            logger.debug("signal_auto_link_skipped", error=str(link_err))
 
         return memory.id
 

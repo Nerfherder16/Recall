@@ -19,7 +19,8 @@ from src.core import (
     get_settings,
 )
 from src.core.embeddings import OllamaUnavailableError, content_hash
-from src.core.signal_detector import SIGNAL_IMPORTANCE, SIGNAL_TO_MEMORY_TYPE
+from src.core.models import Durability
+from src.core.signal_detector import SIGNAL_DURABILITY, SIGNAL_IMPORTANCE, SIGNAL_TO_MEMORY_TYPE
 from src.storage import get_neo4j_store, get_qdrant_store, get_redis_store
 from src.workers.signals import process_signal_detection
 
@@ -181,16 +182,26 @@ async def approve_signal(session_id: str, request: ApproveSignalRequest):
         sig_type = SignalType.FACT
 
     memory_type = SIGNAL_TO_MEMORY_TYPE.get(sig_type, MemoryType.SEMANTIC)
-    # Prefer: explicit request > LLM-scored (1-10 → 0.0-1.0) > flat type default
+    # Prefer: explicit request > LLM-scored (already 0.0-1.0) > flat type default
     llm_importance = None
     raw_imp = signal.get("importance")
     if raw_imp is not None:
         try:
-            llm_importance = max(0.1, min(1.0, float(raw_imp) / 10.0))
+            llm_importance = max(0.1, min(1.0, float(raw_imp)))
         except (ValueError, TypeError):
             pass
     importance = request.importance or llm_importance or SIGNAL_IMPORTANCE.get(sig_type, 0.5)
     domain = request.domain or signal.get("domain", "general")
+
+    # Resolve durability: pending signal → signal-type default → ephemeral
+    durability_str = (
+        signal.get("durability")
+        or SIGNAL_DURABILITY.get(sig_type, "ephemeral")
+    )
+    try:
+        durability = Durability(durability_str)
+    except ValueError:
+        durability = Durability.EPHEMERAL
     tags = request.tags if request.tags is not None else signal.get("tags", [])
     tags = [f"signal:{signal['signal_type']}"] + tags
 
@@ -218,6 +229,8 @@ async def approve_signal(session_id: str, request: ApproveSignalRequest):
         confidence=signal.get("confidence", 0.5),
         session_id=session_id,
         metadata={"auto_detected": True, "approved": True},
+        durability=durability,
+        initial_importance=importance,
     )
 
     # Generate embedding and store

@@ -74,6 +74,9 @@ scripts/import_memory_graph.py
 # Dashboard build artifacts
 dashboard/tsconfig.tsbuildinfo
 
+# Autopilot workflow state
+.autopilot/
+
 # OS
 .DS_Store
 Thumbs.db

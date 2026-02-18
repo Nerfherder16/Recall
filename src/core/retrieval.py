@@ -145,7 +145,7 @@ class RetrievalPipeline:
             results.append(
                 RetrievalResult(
                     memory=memory,
-                    score=similarity * memory.importance,
+                    score=similarity * max(memory.importance, 0.15),
                     similarity=similarity,
                     graph_distance=0,
                     retrieval_path=[memory_id],
@@ -188,7 +188,7 @@ class RetrievalPipeline:
             results.append(
                 RetrievalResult(
                     memory=memory,
-                    score=similarity * memory.importance * 1.15,
+                    score=similarity * max(memory.importance, 0.15) * 1.15,
                     similarity=similarity,
                     graph_distance=0,
                     retrieval_path=[parent_id],
@@ -551,7 +551,7 @@ class RetrievalPipeline:
             user_id=payload.get("user_id"),
             username=payload.get("username"),
             pinned=payload.get("pinned") == "true",
-            durability=Durability(payload["durability"]) if payload.get("durability") else None,
+            durability=Durability(payload["durability"]) if payload.get("durability") else Durability.DURABLE,
             initial_importance=payload.get("initial_importance"),
         )
 

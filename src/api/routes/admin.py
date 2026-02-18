@@ -22,6 +22,7 @@ from src.core.config import get_settings
 from src.core.models import User
 
 from src.core.consolidation import MemoryConsolidator
+from src.core.domains import normalize_domain
 from src.core.embeddings import get_embedding_service
 from src.core.models import MemoryType
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store
@@ -398,4 +399,230 @@ async def migrate_durability(request: Request, body: MigrateDurabilityRequest):
 
     except Exception as e:
         logger.error("durability_migration_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# DOMAIN NORMALIZATION MIGRATION
+# =============================================================
+
+
+class NormalizeDomainsResponse(BaseModel):
+    processed: int
+    updated: int
+    domain_mapping: dict[str, str]
+
+
+@router.post("/domains/normalize", response_model=NormalizeDomainsResponse)
+@limiter.limit("5/minute")
+async def normalize_domains(request: Request):
+    """
+    One-time migration: normalize all memory domains to canonical list.
+
+    Scrolls all memories, applies normalize_domain(), updates any that changed.
+    Idempotent — safe to run multiple times.
+    """
+    try:
+        qdrant = await get_qdrant_store()
+        neo4j = await get_neo4j_store()
+
+        memories = await qdrant.scroll_all()
+
+        processed = 0
+        updated = 0
+        domain_mapping: dict[str, str] = {}
+
+        for memory_id, payload in memories:
+            processed += 1
+            current_domain = payload.get("domain", "general")
+            normalized = normalize_domain(current_domain)
+
+            if normalized != current_domain:
+                domain_mapping[current_domain] = normalized
+
+                # Update Qdrant payload
+                await qdrant.client.set_payload(
+                    collection_name=qdrant.collection,
+                    payload={"domain": normalized},
+                    points=[memory_id],
+                )
+
+                # Update Neo4j node
+                async with neo4j.driver.session() as session:
+                    await session.run(
+                        "MATCH (m:Memory {id: $id}) SET m.domain = $domain",
+                        id=memory_id, domain=normalized,
+                    )
+
+                updated += 1
+
+        logger.info(
+            "domain_normalization_complete",
+            processed=processed,
+            updated=updated,
+            unique_mappings=len(domain_mapping),
+        )
+
+        return NormalizeDomainsResponse(
+            processed=processed,
+            updated=updated,
+            domain_mapping=domain_mapping,
+        )
+
+    except Exception as e:
+        logger.error("domain_normalization_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# GRAPH BOOTSTRAP
+# =============================================================
+
+
+class BootstrapGraphResponse(BaseModel):
+    processed: int
+    edges_created: int
+
+
+@router.post("/graph/bootstrap", response_model=BootstrapGraphResponse)
+@limiter.limit("2/minute")
+async def bootstrap_graph(request: Request):
+    """
+    One-time bootstrap: create RELATED_TO edges for all existing memories.
+
+    For each memory, searches for top-3 similar (>0.5) and creates edges.
+    Processes in batches of 20 with 1s delay to avoid overwhelming Neo4j.
+    Idempotent — strengthen_relationship uses MERGE.
+    """
+    import asyncio
+
+    try:
+        qdrant = await get_qdrant_store()
+        neo4j = await get_neo4j_store()
+
+        memories = await qdrant.scroll_all(with_vectors=True)
+
+        processed = 0
+        edges_created = 0
+        batch_size = 20
+
+        for i, (memory_id, payload, embedding) in enumerate(memories):
+            if not embedding:
+                continue
+
+            # Search for similar memories
+            similar = await qdrant.search(
+                query_vector=embedding,
+                limit=4,  # Extra for self-exclusion
+            )
+
+            for candidate_id, similarity, _ in similar:
+                if candidate_id == memory_id:
+                    continue
+                if similarity < 0.5:
+                    continue
+
+                await neo4j.strengthen_relationship(
+                    source_id=memory_id,
+                    target_id=candidate_id,
+                    increment=similarity * 0.5,
+                )
+                edges_created += 1
+
+            processed += 1
+
+            # Batch delay to avoid overwhelming Neo4j
+            if (i + 1) % batch_size == 0:
+                await asyncio.sleep(1.0)
+
+        logger.info(
+            "graph_bootstrap_complete",
+            processed=processed,
+            edges_created=edges_created,
+        )
+
+        return BootstrapGraphResponse(
+            processed=processed,
+            edges_created=edges_created,
+        )
+
+    except Exception as e:
+        logger.error("graph_bootstrap_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# IMPORTANCE REHABILITATION
+# =============================================================
+
+
+class RehabilitateResponse(BaseModel):
+    processed: int
+    rehabilitated: int
+
+
+@router.post("/importance/rehabilitate", response_model=RehabilitateResponse)
+@limiter.limit("5/minute")
+async def rehabilitate_importance(request: Request):
+    """
+    Rehabilitate floor-level memories that were over-decayed.
+
+    Boosts importance for memories where:
+    - access_count >= 3 or pinned: boost to max(importance, initial_importance * 0.5, 0.3)
+    - durability is "durable" or "permanent": boost to max(importance, 0.2)
+
+    Only targets memories with importance < 0.05.
+    Idempotent — safe to run multiple times.
+    """
+    try:
+        qdrant = await get_qdrant_store()
+        neo4j = await get_neo4j_store()
+
+        memories = await qdrant.scroll_all()
+
+        processed = 0
+        rehabilitated = 0
+
+        for memory_id, payload in memories:
+            importance = payload.get("importance", 0.5)
+
+            # Only rehabilitate floor-level memories
+            if importance >= 0.05:
+                continue
+
+            processed += 1
+            new_importance = importance
+
+            access_count = payload.get("access_count", 0)
+            pinned = payload.get("pinned") == "true"
+            durability = payload.get("durability")
+            initial_importance = payload.get("initial_importance")
+
+            # High-access or pinned memories deserve rehabilitation
+            if access_count >= 3 or pinned:
+                base = (initial_importance or 0.5) * 0.5
+                new_importance = max(new_importance, base, 0.3)
+
+            # Durable/permanent memories should not be at floor level
+            if durability in ("durable", "permanent"):
+                new_importance = max(new_importance, 0.2)
+
+            if new_importance > importance:
+                await qdrant.update_importance(memory_id, new_importance)
+                await neo4j.update_importance(memory_id, new_importance)
+                rehabilitated += 1
+
+        logger.info(
+            "importance_rehabilitation_complete",
+            processed=processed,
+            rehabilitated=rehabilitated,
+        )
+
+        return RehabilitateResponse(
+            processed=processed,
+            rehabilitated=rehabilitated,
+        )
+
+    except Exception as e:
+        logger.error("importance_rehabilitation_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
