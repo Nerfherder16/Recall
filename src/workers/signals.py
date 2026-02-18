@@ -111,6 +111,8 @@ async def _run_signal_detection(session_id: str):
                 "confidence": signal.confidence,
                 "domain": signal.suggested_domain or "general",
                 "tags": signal.suggested_tags,
+                "importance": signal.suggested_importance,
+                "durability": signal.suggested_durability,
             })
             pending += 1
             metrics.increment("recall_signals_detected_total", {"outcome": "pending"})
