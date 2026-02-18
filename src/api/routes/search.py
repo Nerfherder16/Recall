@@ -382,6 +382,51 @@ async def rehydrate_context(request: Request, body: RehydrateRequest):
             for mid, payload in points
         ]
 
+        # Optional anti-pattern inclusion
+        if body.include_anti_patterns:
+            try:
+                from qdrant_client.models import (
+                    DatetimeRange,
+                    FieldCondition,
+                    Filter,
+                    MatchValue,
+                )
+
+                ap_conditions = [
+                    FieldCondition(key="created_at", range=DatetimeRange(gte=body.since)),
+                    FieldCondition(key="created_at", range=DatetimeRange(lte=body.until)),
+                ]
+                if body.domain:
+                    ap_conditions.append(
+                        FieldCondition(key="domain", match=MatchValue(value=body.domain))
+                    )
+
+                ap_points, _ = await qdrant.client.scroll(
+                    collection_name=qdrant.anti_patterns_collection,
+                    scroll_filter=Filter(must=ap_conditions),
+                    limit=body.max_entries,
+                    with_payload=True,
+                )
+                for point in ap_points:
+                    p = point.payload or {}
+                    entries.append(
+                        RehydrateEntry(
+                            id=str(point.id),
+                            summary=p.get("content", "")[:120],
+                            memory_type=p.get("memory_type", "warning"),
+                            domain=p.get("domain", "general"),
+                            created_at=p.get("created_at", ""),
+                            importance=p.get("importance", 0.5),
+                            durability=p.get("durability"),
+                            pinned=p.get("pinned") == "true",
+                            is_anti_pattern=True,
+                        )
+                    )
+                # Re-sort chronologically after merging
+                entries.sort(key=lambda e: e.created_at)
+            except Exception as ap_err:
+                logger.warning("rehydrate_anti_patterns_failed", error=str(ap_err))
+
         window_start = entries[0].created_at if entries else body.since
         window_end = entries[-1].created_at if entries else body.until
 

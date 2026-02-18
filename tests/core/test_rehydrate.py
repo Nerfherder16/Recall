@@ -352,3 +352,105 @@ async def test_rehydrate_no_narrative_skips_llm():
 
     assert response.narrative is None
     assert response.total == 1
+
+
+# ---- Task 3: anti-pattern inclusion ----
+
+
+@pytest.mark.asyncio
+async def test_rehydrate_includes_anti_patterns():
+    """When include_anti_patterns=True, anti-pattern entries appear with flag."""
+    from src.api.routes.search import RehydrateRequest, rehydrate_context
+
+    body = RehydrateRequest(
+        since="2026-01-01T00:00:00",
+        until="2026-01-31T23:59:59",
+        include_anti_patterns=True,
+    )
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.scroll_time_range = AsyncMock(
+        return_value=[
+            ("id-1", _make_payload("Normal memory", created_at="2026-01-15T12:00:00")),
+        ]
+    )
+    # Anti-pattern scroll uses the anti_patterns_collection attribute
+    mock_qdrant.anti_patterns_collection = "recall_memories_anti_patterns"
+    mock_qdrant.client = MagicMock()
+    mock_qdrant.client.scroll = AsyncMock(
+        return_value=(
+            [
+                MagicMock(
+                    id="ap-1",
+                    payload=_make_payload(
+                        "Never use sudo in containers",
+                        domain="infrastructure",
+                        memory_type="warning",
+                        created_at="2026-01-10T08:00:00",
+                    ),
+                )
+            ],
+            None,
+        )
+    )
+
+    mock_redis = MagicMock()
+    mock_redis.client = MagicMock()
+    mock_redis.client.get = AsyncMock(return_value=None)
+    mock_redis.client.setex = AsyncMock()
+
+    mock_request = MagicMock()
+
+    with (
+        patch(
+            "src.storage.get_qdrant_store",
+            new_callable=AsyncMock,
+            return_value=mock_qdrant,
+        ),
+        patch("src.storage.get_redis_store", new_callable=AsyncMock, return_value=mock_redis),
+    ):
+        response = await rehydrate_context(request=mock_request, body=body)
+
+    assert response.total == 2
+    anti_entries = [e for e in response.entries if e.is_anti_pattern]
+    assert len(anti_entries) == 1
+    assert "sudo" in anti_entries[0].summary
+
+
+@pytest.mark.asyncio
+async def test_rehydrate_excludes_anti_patterns_by_default():
+    """Default include_anti_patterns=False does not query anti-pattern collection."""
+    from src.api.routes.search import RehydrateRequest, rehydrate_context
+
+    body = RehydrateRequest(
+        since="2026-01-01T00:00:00",
+        until="2026-01-31T23:59:59",
+    )
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.scroll_time_range = AsyncMock(
+        return_value=[
+            ("id-1", _make_payload("Normal memory", created_at="2026-01-15T12:00:00")),
+        ]
+    )
+
+    mock_redis = MagicMock()
+    mock_redis.client = MagicMock()
+    mock_redis.client.get = AsyncMock(return_value=None)
+    mock_redis.client.setex = AsyncMock()
+
+    mock_request = MagicMock()
+
+    with (
+        patch(
+            "src.storage.get_qdrant_store",
+            new_callable=AsyncMock,
+            return_value=mock_qdrant,
+        ),
+        patch("src.storage.get_redis_store", new_callable=AsyncMock, return_value=mock_redis),
+    ):
+        response = await rehydrate_context(request=mock_request, body=body)
+
+    assert response.total == 1
+    anti_entries = [e for e in response.entries if e.is_anti_pattern]
+    assert len(anti_entries) == 0
