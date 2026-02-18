@@ -622,3 +622,20 @@ async def create_retrieval_pipeline():
     redis = await get_redis_store()
 
     return RetrievalPipeline(qdrant, neo4j, redis)
+
+
+_pipeline_instance: RetrievalPipeline | None = None
+
+
+async def get_retrieval_pipeline() -> RetrievalPipeline:
+    """Get or create the singleton retrieval pipeline."""
+    global _pipeline_instance
+    if _pipeline_instance is None:
+        _pipeline_instance = await create_retrieval_pipeline()
+    return _pipeline_instance
+
+
+def reset_retrieval_pipeline() -> None:
+    """Reset the singleton (for testing or reinitialization)."""
+    global _pipeline_instance
+    _pipeline_instance = None
