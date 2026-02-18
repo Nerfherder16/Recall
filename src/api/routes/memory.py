@@ -186,6 +186,13 @@ async def store_memory(
             user_id=user.id if user else None,
         )
 
+        # Auto-link to similar memories in background
+        from src.core.auto_linker import auto_link_memory
+
+        background_tasks.add_task(
+            auto_link_memory, memory.id, embedding, request.domain
+        )
+
         # Trigger sub-embedding extraction in background
         from src.workers.fact_extractor import extract_facts_for_memory
 

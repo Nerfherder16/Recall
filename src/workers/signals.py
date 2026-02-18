@@ -229,6 +229,13 @@ async def _store_signal_as_memory(session_id: str, signal) -> str | None:
             details={"signal_type": signal.signal_type.value, "confidence": signal.confidence},
         )
 
+        # Auto-link to similar memories
+        try:
+            from src.core.auto_linker import auto_link_memory
+            await auto_link_memory(memory.id, embedding, memory.domain)
+        except Exception as link_err:
+            logger.debug("signal_auto_link_skipped", error=str(link_err))
+
         return memory.id
 
     except Exception as e:

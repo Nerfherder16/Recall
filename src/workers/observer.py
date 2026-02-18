@@ -145,6 +145,13 @@ async def _run_extraction(observation: dict):
             details={"source_file": file_path, "tool": tool_name},
         )
 
+        # Auto-link to similar memories
+        try:
+            from src.core.auto_linker import auto_link_memory
+            await auto_link_memory(memory.id, embedding, domain)
+        except Exception as link_err:
+            logger.debug("observer_auto_link_skipped", error=str(link_err))
+
         # Trigger fact extraction for sub-embeddings
         try:
             from src.workers.fact_extractor import extract_facts_for_memory
