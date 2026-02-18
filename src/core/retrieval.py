@@ -86,6 +86,9 @@ class RetrievalPipeline:
 
             for result in graph_results:
                 if result.memory.id not in results:
+                    # Graph-only results (no vector match) get capped score
+                    # so they don't outrank actual semantic matches
+                    result.score = min(result.score, 0.15)
                     results[result.memory.id] = result
                 else:
                     # Boost score if found via both vector and graph
@@ -245,7 +248,7 @@ class RetrievalPipeline:
 
         # Fetch memories for activated nodes above threshold
         results = []
-        activation_threshold = 0.05
+        activation_threshold = 0.20
 
         for node_id, (act, seed_id) in activation.items():
             if act < activation_threshold:
