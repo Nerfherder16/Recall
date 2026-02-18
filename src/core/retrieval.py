@@ -47,9 +47,17 @@ class RetrievalPipeline:
         self.redis = redis_store
         self.settings = get_settings()
 
-    async def retrieve(self, query: MemoryQuery) -> list[RetrievalResult]:
+    async def retrieve(
+        self,
+        query: MemoryQuery,
+        browse_mode: bool = False,
+    ) -> list[RetrievalResult]:
         """
         Execute the full retrieval pipeline.
+
+        Args:
+            query: The memory query to execute.
+            browse_mode: If True, skip _track_access (for lightweight browsing).
 
         Returns memories ranked by relevance.
         """
@@ -123,10 +131,12 @@ class RetrievalPipeline:
         # Stage 5.5: Inhibition — suppress contradictions and near-duplicates
         ranked = await self._inhibit(ranked)
 
-        # Stage 6: Track access
-        await self._track_access(ranked[: query.limit])
+        # Stage 6: Track access (fire-and-forget, skip in browse mode)
+        final = ranked[: query.limit]
+        if not browse_mode and final:
+            asyncio.create_task(self._track_access(final))
 
-        return ranked[: query.limit]
+        return final
 
     async def _vector_search(
         self, query: MemoryQuery, embedding: list[float]
