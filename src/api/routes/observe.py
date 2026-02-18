@@ -3,7 +3,7 @@ Observation routes — auto-memory from code edits and session snapshots.
 """
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 
 from src.api.rate_limit import limiter
@@ -25,6 +25,14 @@ class FileChangeObservation(BaseModel):
     old_string: str | None = Field(None, max_length=5000)
     new_string: str | None = Field(None, max_length=5000)
     tool_name: str = "Write"
+
+
+class GitDiffRequest(BaseModel):
+    """Observation from a git commit for memory invalidation."""
+
+    commit_hash: str = Field(..., max_length=40)
+    changed_files: list[str] = Field(default_factory=list)
+    diff_text: str = Field(..., max_length=50000)
 
 
 class SessionSnapshotRequest(BaseModel):
@@ -55,6 +63,43 @@ async def observe_file_change(
     background_tasks.add_task(extract_and_store_observations, body.model_dump())
     logger.debug("observation_queued", file=body.file_path, tool=body.tool_name)
     return {"status": "queued"}
+
+
+@router.post("/git-diff")
+@limiter.limit("10/minute")
+async def observe_git_diff(
+    request: Request, body: GitDiffRequest, background_tasks: BackgroundTasks
+):
+    """
+    Observe a git commit and check for memory invalidation.
+
+    Called by the git-watch.js PostToolUse hook. Extracts concrete values
+    from the diff and searches for permanent/durable memories that may
+    be contradicted. Fire-and-forget.
+    """
+    from src.core.diff_parser import extract_values
+    from src.workers.invalidation import check_invalidations
+
+    extracted = extract_values(body.diff_text)
+
+    if extracted:
+        background_tasks.add_task(
+            check_invalidations,
+            commit_hash=body.commit_hash,
+            changed_files=body.changed_files,
+            extracted_values=extracted,
+        )
+        logger.info(
+            "git_invalidation_queued",
+            commit=body.commit_hash,
+            values=len(extracted),
+            files=len(body.changed_files),
+        )
+
+    return {
+        "status": "queued" if extracted else "skipped",
+        "extracted_values": len(extracted),
+    }
 
 
 @router.post("/session-snapshot")
