@@ -10,8 +10,6 @@ import pytest
 
 from src.core.signal_classifier import (
     CONV_FEATURE_NAMES,
-    REDIS_KEY,
-    SIGNAL_TYPES,
     SignalClassifier,
     _tokenize,
     extract_conversation_features,
@@ -237,7 +235,6 @@ class TestSignalClassifier:
     def test_type_classification_returns_best(self):
         """When signal detected, returns the highest-scoring type."""
         vocab = {"error": 0, "fix": 1, "bug": 2, "decide": 3}
-        n_features = 4 + 8  # vocab + conv features
 
         classifier = _make_classifier(
             vocab=vocab,
@@ -246,7 +243,7 @@ class TestSignalClassifier:
             type_classes=["error_fix", "decision"],
             type_weights=[
                 [5.0, 5.0, 5.0, 0.0] + [0.0] * 8,  # error_fix weights
-                [0.0, 0.0, 0.0, 5.0] + [0.0] * 8,   # decision weights
+                [0.0, 0.0, 0.0, 5.0] + [0.0] * 8,  # decision weights
             ],
             type_biases=[0.0, 0.0],
         )
@@ -268,6 +265,14 @@ class TestSignalClassifier:
 
 
 class TestGetSignalClassifier:
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        from src.core.signal_classifier import invalidate_classifier_cache
+
+        invalidate_classifier_cache()
+        yield
+        invalidate_classifier_cache()
+
     @pytest.mark.asyncio
     async def test_returns_none_when_no_model(self):
         redis_store = MagicMock()
@@ -279,25 +284,27 @@ class TestGetSignalClassifier:
 
     @pytest.mark.asyncio
     async def test_loads_model_from_redis(self):
-        model_data = json.dumps({
-            "version": 1,
-            "vocab": {"test": 0, "hello": 1},
-            "idf_weights": [1.5, 0.8],
-            "binary": {
-                "weights": [0.1] * 10,
-                "bias": -0.3,
-            },
-            "type_classifier": {
-                "classes": ["error_fix", "fact"],
-                "weights": [[0.1] * 10, [0.2] * 10],
-                "biases": [-0.1, -0.2],
-            },
-            "conv_feature_names": CONV_FEATURE_NAMES,
-            "trained_at": "2026-02-18T00:00:00",
-            "n_samples": 68,
-            "binary_cv_score": 0.85,
-            "type_cv_score": 0.72,
-        })
+        model_data = json.dumps(
+            {
+                "version": 1,
+                "vocab": {"test": 0, "hello": 1},
+                "idf_weights": [1.5, 0.8],
+                "binary": {
+                    "weights": [0.1] * 10,
+                    "bias": -0.3,
+                },
+                "type_classifier": {
+                    "classes": ["error_fix", "fact"],
+                    "weights": [[0.1] * 10, [0.2] * 10],
+                    "biases": [-0.1, -0.2],
+                },
+                "conv_feature_names": CONV_FEATURE_NAMES,
+                "trained_at": "2026-02-18T00:00:00",
+                "n_samples": 68,
+                "binary_cv_score": 0.85,
+                "type_cv_score": 0.72,
+            }
+        )
 
         redis_store = MagicMock()
         redis_store.client = AsyncMock()
@@ -337,23 +344,25 @@ class TestGetSignalClassifier:
         n_vocab = 3
         n_features = n_vocab + 8
 
-        model_data = json.dumps({
-            "version": 1,
-            "vocab": {"error": 0, "fix": 1, "bug": 2},
-            "idf_weights": [1.0, 1.0, 1.0],
-            "binary": {
-                "weights": [0.5] * n_features,
-                "bias": 0.0,
-            },
-            "type_classifier": {
-                "classes": [],
-                "weights": [],
-                "biases": [],
-            },
-            "trained_at": "2026-02-18T00:00:00",
-            "n_samples": 50,
-            "binary_cv_score": 0.80,
-        })
+        model_data = json.dumps(
+            {
+                "version": 1,
+                "vocab": {"error": 0, "fix": 1, "bug": 2},
+                "idf_weights": [1.0, 1.0, 1.0],
+                "binary": {
+                    "weights": [0.5] * n_features,
+                    "bias": 0.0,
+                },
+                "type_classifier": {
+                    "classes": [],
+                    "weights": [],
+                    "biases": [],
+                },
+                "trained_at": "2026-02-18T00:00:00",
+                "n_samples": 50,
+                "binary_cv_score": 0.80,
+            }
+        )
 
         redis_store = MagicMock()
         redis_store.client = AsyncMock()
@@ -362,9 +371,99 @@ class TestGetSignalClassifier:
         classifier = await get_signal_classifier(redis_store)
         assert classifier is not None
 
-        result = classifier.predict(_make_turns(
-            "I found a bug in the error handler",
-            "Let me fix that for you",
-        ))
+        result = classifier.predict(
+            _make_turns(
+                "I found a bug in the error handler",
+                "Let me fix that for you",
+            )
+        )
         assert isinstance(result["is_signal"], bool)
         assert 0.0 <= result["signal_probability"] <= 1.0
+
+
+class TestClassifierCache:
+    """Tests for in-process model caching in get_signal_classifier()."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        from src.core.signal_classifier import invalidate_classifier_cache
+
+        invalidate_classifier_cache()
+        yield
+        invalidate_classifier_cache()
+
+    def _model_json(self) -> str:
+        return json.dumps(
+            {
+                "version": 1,
+                "vocab": {"test": 0, "hello": 1},
+                "idf_weights": [1.5, 0.8],
+                "binary": {"weights": [0.1] * 10, "bias": -0.3},
+                "type_classifier": {"classes": [], "weights": [], "biases": []},
+                "trained_at": "2026-02-18T00:00:00",
+                "n_samples": 68,
+                "binary_cv_score": 0.85,
+            }
+        )
+
+    @pytest.mark.asyncio
+    async def test_cache_returns_same_object(self):
+        """Second call returns cached object without Redis hit."""
+        redis_store = MagicMock()
+        redis_store.client = AsyncMock()
+        redis_store.client.get = AsyncMock(return_value=self._model_json())
+
+        c1 = await get_signal_classifier(redis_store)
+        c2 = await get_signal_classifier(redis_store)
+
+        assert c1 is c2
+        assert redis_store.client.get.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_cache_expires_after_ttl(self):
+        """Cache expires and reloads from Redis after TTL."""
+        from unittest.mock import patch
+
+        redis_store = MagicMock()
+        redis_store.client = AsyncMock()
+        redis_store.client.get = AsyncMock(return_value=self._model_json())
+
+        await get_signal_classifier(redis_store)
+        assert redis_store.client.get.call_count == 1
+
+        import src.core.signal_classifier as cls_mod
+
+        with patch.object(cls_mod, "_classifier_cached_at", cls_mod._classifier_cached_at - 120):
+            await get_signal_classifier(redis_store)
+            assert redis_store.client.get.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_invalidate_forces_reload(self):
+        """invalidate_classifier_cache() forces next call to hit Redis."""
+        from src.core.signal_classifier import invalidate_classifier_cache
+
+        redis_store = MagicMock()
+        redis_store.client = AsyncMock()
+        redis_store.client.get = AsyncMock(return_value=self._model_json())
+
+        await get_signal_classifier(redis_store)
+        assert redis_store.client.get.call_count == 1
+
+        invalidate_classifier_cache()
+
+        await get_signal_classifier(redis_store)
+        assert redis_store.client.get.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_cache_returns_none_when_no_model(self):
+        """Cache correctly caches None without repeated Redis hits."""
+        redis_store = MagicMock()
+        redis_store.client = AsyncMock()
+        redis_store.client.get = AsyncMock(return_value=None)
+
+        r1 = await get_signal_classifier(redis_store)
+        r2 = await get_signal_classifier(redis_store)
+
+        assert r1 is None
+        assert r2 is None
+        assert redis_store.client.get.call_count == 1

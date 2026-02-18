@@ -861,6 +861,11 @@ async def retrain_signal_classifier(request: Request):
         pg = await get_postgres_store()
 
         result = await train_signal_classifier(redis, pg)
+
+        from src.core.signal_classifier import invalidate_classifier_cache
+
+        invalidate_classifier_cache()
+
         return result
 
     except ValueError as e:
