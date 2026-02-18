@@ -20,7 +20,6 @@ const MIN_PROMPT_LENGTH = 15;
 const MAX_RESULTS = 5;
 const MIN_SIMILARITY = 0.25;
 const CACHE_DIR = join(process.env.HOME || process.env.USERPROFILE || "/tmp", ".cache", "recall");
-const INJECTED_FILE = join(CACHE_DIR, "injected.json");
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -85,12 +84,18 @@ async function main() {
   const prompt = parsed.prompt || "";
   if (shouldSkip(prompt)) process.exit(0);
 
-  // Extract project name from cwd for search affinity
+  // Extract project name from cwd for domain filtering (not query pollution)
   const cwd = parsed.cwd || "";
   const projectName = cwd.split(/[/\\]/).filter(Boolean).pop() || "";
-  const query = projectName
-    ? `[${projectName}] ${prompt.slice(0, 480)}`
-    : prompt.slice(0, 500);
+
+  // Normalize common project names to canonical domains
+  const DOMAIN_ALIASES = {
+    "recall": "development", "system-recall": "development",
+    "familyhub": "development", "sadie": "development",
+    "relay": "development",
+  };
+  const domain = DOMAIN_ALIASES[projectName.toLowerCase()] || "";
+  const query = prompt.slice(0, 500);
 
   // Query Recall browse endpoint
   const headers = { "Content-Type": "application/json" };
@@ -98,14 +103,14 @@ async function main() {
     headers["Authorization"] = `Bearer ${RECALL_API_KEY}`;
   }
 
+  const searchBody = { query, limit: MAX_RESULTS };
+  if (domain) searchBody.domain = domain;
+
   try {
     const resp = await fetch(`${RECALL_HOST}/search/browse`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        query,
-        limit: MAX_RESULTS,
-      }),
+      body: JSON.stringify(searchBody),
       signal: AbortSignal.timeout(3500),
     });
 
@@ -118,11 +123,14 @@ async function main() {
 
     if (results.length === 0) process.exit(0);
 
-    // Track injected memory IDs for feedback loop
+    // Track injected memory IDs for feedback loop (session-scoped)
     try {
       if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+      // Use session_id or ppid for isolation between concurrent windows
+      const sessionKey = parsed.session_id || `ppid-${process.ppid}`;
+      const injectedFile = join(CACHE_DIR, `injected-${sessionKey}.json`);
       let injected = [];
-      try { injected = JSON.parse(readFileSync(INJECTED_FILE, "utf8")); } catch {}
+      try { injected = JSON.parse(readFileSync(injectedFile, "utf8")); } catch {}
 
       const entries = results.map((r) => ({
         memory_id: r.id,
@@ -130,7 +138,7 @@ async function main() {
       }));
       injected.push(...entries);
       if (injected.length > 500) injected = injected.slice(-500);
-      writeFileSync(INJECTED_FILE, JSON.stringify(injected));
+      writeFileSync(injectedFile, JSON.stringify(injected));
     } catch {} // Never block retrieval
 
     const context = formatContext(results);

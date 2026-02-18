@@ -5,7 +5,7 @@ Aggregates system health metrics from Postgres, Neo4j, Qdrant,
 and Redis into a unified dashboard view.
 """
 
-import json
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -29,12 +29,21 @@ class HealthComputer:
 
     async def compute_dashboard(self) -> dict[str, Any]:
         """Compute the full health dashboard."""
-        feedback = await self._feedback_metrics()
-        population = await self._population_balance()
-        graph = await self._graph_cohesion()
-        pins = await self._pin_ratio()
-        importance = await self._importance_distribution()
-        similarity_dist = await self._feedback_similarity()
+        (
+            feedback,
+            population,
+            graph,
+            pins,
+            importance,
+            similarity_dist,
+        ) = await asyncio.gather(
+            self._feedback_metrics(),
+            self._population_balance(),
+            self._graph_cohesion(),
+            self._pin_ratio(),
+            self._importance_distribution(),
+            self._feedback_similarity(),
+        )
 
         return {
             "generated_at": datetime.utcnow().isoformat(),
@@ -88,7 +97,8 @@ class HealthComputer:
         try:
             rels = await self.neo4j.get_relationships_for_memory(memory_id)
             co_retrieval = sum(
-                r.get("strength", 0.5) for r in rels
+                r.get("strength", 0.5)
+                for r in rels
                 if r.get("rel_type", "").upper() == "RELATED_TO"
             )
             # Normalize to 0-1 range
@@ -130,22 +140,28 @@ class HealthComputer:
         # Noisy memories (excessive negative feedback)
         noisy = await self.pg.get_noisy_memories(min_negative=3, days=7)
         for m in noisy:
-            conflicts.append({
-                "type": "noisy",
-                "severity": "warning",
-                "memory_id": m["memory_id"],
-                "description": f"Memory received {m['negative_count']} negative feedback in 7 days",
-            })
+            conflicts.append(
+                {
+                    "type": "noisy",
+                    "severity": "warning",
+                    "memory_id": m["memory_id"],
+                    "description": (
+                        f"Memory received {m['negative_count']} negative feedback in 7 days"
+                    ),
+                }
+            )
 
         # Feedback-starved memories
         starved = await self.pg.get_feedback_starved_memories(min_accesses=5)
         for m in starved:
-            conflicts.append({
-                "type": "feedback_starved",
-                "severity": "info",
-                "memory_id": m["memory_id"],
-                "description": "Memory accessed 5+ times with no feedback",
-            })
+            conflicts.append(
+                {
+                    "type": "feedback_starved",
+                    "severity": "info",
+                    "memory_id": m["memory_id"],
+                    "description": "Memory accessed 5+ times with no feedback",
+                }
+            )
 
         # Orphan hubs (high graph centrality, low importance)
         try:
@@ -156,12 +172,17 @@ class HealthComputer:
                     _, payload = result
                     imp = payload.get("importance", 0.5)
                     if imp < 0.3:
-                        conflicts.append({
-                            "type": "orphan_hub",
-                            "severity": "warning",
-                            "memory_id": mem_id,
-                            "description": f"High graph connectivity (strength={total_strength:.1f}) but low importance ({imp:.2f})",
-                        })
+                        conflicts.append(
+                            {
+                                "type": "orphan_hub",
+                                "severity": "warning",
+                                "memory_id": mem_id,
+                                "description": (
+                                    f"High graph connectivity (strength={total_strength:.1f})"
+                                    f" but low importance ({imp:.2f})"
+                                ),
+                            }
+                        )
         except Exception:
             pass
 

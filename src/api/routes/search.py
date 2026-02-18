@@ -3,16 +3,15 @@ Search and retrieval routes.
 """
 
 from datetime import datetime
-from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from src.api.rate_limit import limiter
-from src.core import MemoryQuery, MemoryType, RelationshipType
+from src.core import MemoryQuery, MemoryType
 from src.core.embeddings import OllamaUnavailableError
-from src.core.retrieval import create_retrieval_pipeline
+from src.core.retrieval import get_retrieval_pipeline
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -178,7 +177,7 @@ async def browse_memories(request: Request, body: SearchRequest):
             username=body.user,
         )
 
-        pipeline = await create_retrieval_pipeline()
+        pipeline = await get_retrieval_pipeline()
         results = await pipeline.retrieve(query)
 
         browse_results = [
@@ -317,7 +316,7 @@ async def search_memories(request: Request, body: SearchRequest):
         )
 
         # Execute retrieval
-        pipeline = await create_retrieval_pipeline()
+        pipeline = await get_retrieval_pipeline()
         results = await pipeline.retrieve(query)
 
         # Format response
@@ -412,7 +411,7 @@ async def assemble_context(request: Request, body: ContextRequest):
                 limit=10,
             )
 
-            pipeline = await create_retrieval_pipeline()
+            pipeline = await get_retrieval_pipeline()
             results = await pipeline.retrieve(query)
 
             # Group by type
@@ -446,13 +445,19 @@ async def assemble_context(request: Request, body: ContextRequest):
                 context_parts.append("## Warnings (things to avoid)\n" + "\n".join(warnings))
 
             if by_type["semantic"]:
-                context_parts.append("## Known Facts\n" + "\n".join(f"- {c}" for c in by_type["semantic"]))
+                context_parts.append(
+                    "## Known Facts\n" + "\n".join(f"- {c}" for c in by_type["semantic"])
+                )
 
             if by_type["episodic"]:
-                context_parts.append("## Previous Experiences\n" + "\n".join(f"- {c}" for c in by_type["episodic"]))
+                context_parts.append(
+                    "## Previous Experiences\n" + "\n".join(f"- {c}" for c in by_type["episodic"])
+                )
 
             if by_type["procedural"]:
-                context_parts.append("## Workflows\n" + "\n".join(f"- {c}" for c in by_type["procedural"]))
+                context_parts.append(
+                    "## Workflows\n" + "\n".join(f"- {c}" for c in by_type["procedural"])
+                )
 
         # Combine context
         full_context = "\n\n".join(context_parts) if context_parts else ""

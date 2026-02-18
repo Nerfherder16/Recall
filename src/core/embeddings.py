@@ -8,7 +8,7 @@ Qwen3-Embedding produces 1024-dimensional vectors with MTEB ~68-70.
 import hashlib
 import struct
 import time
-from typing import Any
+from collections import OrderedDict
 
 import httpx
 import numpy as np
@@ -18,6 +18,16 @@ from .config import get_settings
 from .metrics import get_metrics
 
 logger = structlog.get_logger()
+
+# --- Embedding LRU cache ---
+_embed_cache: OrderedDict[str, tuple[list[float], float]] = OrderedDict()
+_EMBED_CACHE_MAX = 200
+_EMBED_CACHE_TTL = 300  # seconds
+
+
+def clear_embed_cache() -> None:
+    """Clear the embedding LRU cache."""
+    _embed_cache.clear()
 
 
 class EmbeddingService:
@@ -44,9 +54,7 @@ class EmbeddingService:
 
         try:
             # Check if model exists
-            response = await self.client.get(
-                f"{self.settings.ollama_host}/api/tags"
-            )
+            response = await self.client.get(f"{self.settings.ollama_host}/api/tags")
             if response.status_code == 200:
                 models = response.json().get("models", [])
                 model_names = [m.get("name", "") for m in models]
@@ -85,6 +93,17 @@ class EmbeddingService:
         Returns:
             1024-dimensional embedding vector
         """
+        # Check LRU cache
+        cache_key = hashlib.md5((prefix + ":" + text).encode()).hexdigest()
+        cached = _embed_cache.get(cache_key)
+        if cached is not None:
+            vec, ts = cached
+            if time.time() - ts < _EMBED_CACHE_TTL:
+                _embed_cache.move_to_end(cache_key)
+                return vec
+            else:
+                del _embed_cache[cache_key]
+
         # Qwen3-Embedding uses instruction prefix for queries
         if prefix == "query":
             prefixed_text = (
@@ -120,7 +139,15 @@ class EmbeddingService:
                         actual=len(embedding),
                     )
 
-                metrics.increment("recall_embedding_requests_total", {"status": "success"})
+                # Store in LRU cache
+                _embed_cache[cache_key] = (embedding, time.time())
+                if len(_embed_cache) > _EMBED_CACHE_MAX:
+                    _embed_cache.popitem(last=False)
+
+                metrics.increment(
+                    "recall_embedding_requests_total",
+                    {"status": "success"},
+                )
                 return embedding
 
             logger.error("embedding_request_failed", status=response.status_code)
@@ -132,11 +159,12 @@ class EmbeddingService:
             metrics.increment("recall_embedding_requests_total", {"status": "error"})
             raise OllamaUnavailableError(f"Failed to connect to Ollama: {e}")
         finally:
-            metrics.observe("recall_embedding_latency_seconds", value=time.time() - start)
+            metrics.observe(
+                "recall_embedding_latency_seconds",
+                value=time.time() - start,
+            )
 
-    async def embed_batch(
-        self, texts: list[str], prefix: str = "passage"
-    ) -> list[list[float]]:
+    async def embed_batch(self, texts: list[str], prefix: str = "passage") -> list[list[float]]:
         """
         Generate embeddings for multiple texts using native batch API.
 

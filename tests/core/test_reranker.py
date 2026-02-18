@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.core.models import Durability, Memory, MemoryType, MemorySource, RetrievalResult
+from src.core.models import Durability, Memory, MemorySource, MemoryType, RetrievalResult
 from src.core.reranker import (
     FEATURE_NAMES,
     RerankerModel,
@@ -39,7 +39,9 @@ def _make_memory(**overrides) -> Memory:
     return Memory(**defaults)
 
 
-def _make_result(memory: Memory, similarity: float = 0.7, graph_distance: int = 0) -> RetrievalResult:
+def _make_result(
+    memory: Memory, similarity: float = 0.7, graph_distance: int = 0
+) -> RetrievalResult:
     return RetrievalResult(
         memory=memory,
         score=similarity,
@@ -52,7 +54,9 @@ class TestExtractFeatures:
     def test_length(self):
         """extract_features returns exactly 11 features."""
         memory = _make_memory()
-        features = extract_features(memory, similarity=0.8, has_graph_path=False, retrieval_path_len=0)
+        features = extract_features(
+            memory, similarity=0.8, has_graph_path=False, retrieval_path_len=0
+        )
         assert len(features) == 11
         assert len(features) == len(FEATURE_NAMES)
 
@@ -66,7 +70,9 @@ class TestExtractFeatures:
             pinned=True,
             durability=Durability.PERMANENT,
         )
-        features = extract_features(memory, similarity=0.85, has_graph_path=True, retrieval_path_len=2)
+        features = extract_features(
+            memory, similarity=0.85, has_graph_path=True, retrieval_path_len=2
+        )
 
         # importance (0-1)
         assert 0.0 <= features[0] <= 1.0
@@ -98,7 +104,9 @@ class TestExtractFeatures:
             created_at=datetime.utcnow() - timedelta(days=400),
             last_accessed=datetime.utcnow() - timedelta(days=60),
         )
-        features = extract_features(memory, similarity=0.5, has_graph_path=False, retrieval_path_len=0)
+        features = extract_features(
+            memory, similarity=0.5, has_graph_path=False, retrieval_path_len=0
+        )
         assert features[4] == 720.0  # hours_since_last_access capped
         assert features[5] == 8760.0  # hours_since_creation capped
 
@@ -194,6 +202,14 @@ class TestRerankerModel:
 
 
 class TestGetReranker:
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        from src.core.reranker import invalidate_reranker_cache
+
+        invalidate_reranker_cache()
+        yield
+        invalidate_reranker_cache()
+
     @pytest.mark.asyncio
     async def test_returns_none_when_no_model(self):
         """get_reranker returns None when Redis key doesn't exist."""
@@ -208,14 +224,17 @@ class TestGetReranker:
     async def test_loads_model_from_redis(self):
         """get_reranker deserializes weights from Redis JSON."""
         import json
-        model_data = json.dumps({
-            "features": FEATURE_NAMES,
-            "weights": [0.1] * 11,
-            "bias": -0.5,
-            "trained_at": "2026-02-18T00:00:00",
-            "n_samples": 100,
-            "cv_score": 0.82,
-        })
+
+        model_data = json.dumps(
+            {
+                "features": FEATURE_NAMES,
+                "weights": [0.1] * 11,
+                "bias": -0.5,
+                "trained_at": "2026-02-18T00:00:00",
+                "n_samples": 100,
+                "cv_score": 0.82,
+            }
+        )
 
         redis_store = MagicMock()
         redis_store.client = AsyncMock()
@@ -238,6 +257,132 @@ class TestGetReranker:
         assert result is None
 
 
+class TestRerankerCache:
+    """Tests for in-process model caching in get_reranker()."""
+
+    @pytest.mark.asyncio
+    async def test_cache_returns_same_object(self):
+        """Second call to get_reranker returns cached object (no Redis hit)."""
+        import json
+
+        from src.core.reranker import invalidate_reranker_cache
+
+        invalidate_reranker_cache()  # Start fresh
+
+        model_data = json.dumps(
+            {
+                "features": FEATURE_NAMES,
+                "weights": [0.1] * 11,
+                "bias": -0.5,
+                "trained_at": "2026-02-18T00:00:00",
+                "n_samples": 100,
+                "cv_score": 0.82,
+            }
+        )
+
+        redis_store = MagicMock()
+        redis_store.client = AsyncMock()
+        redis_store.client.get = AsyncMock(return_value=model_data)
+
+        model1 = await get_reranker(redis_store)
+        model2 = await get_reranker(redis_store)
+
+        assert model1 is model2  # Same object
+        # Redis should only be called once
+        assert redis_store.client.get.call_count == 1
+
+        invalidate_reranker_cache()  # Cleanup
+
+    @pytest.mark.asyncio
+    async def test_cache_expires_after_ttl(self):
+        """Cache expires and reloads from Redis after TTL."""
+        import json
+        from unittest.mock import patch
+
+        from src.core.reranker import invalidate_reranker_cache
+
+        invalidate_reranker_cache()
+
+        model_data = json.dumps(
+            {
+                "features": FEATURE_NAMES,
+                "weights": [0.1] * 11,
+                "bias": -0.5,
+            }
+        )
+
+        redis_store = MagicMock()
+        redis_store.client = AsyncMock()
+        redis_store.client.get = AsyncMock(return_value=model_data)
+
+        # First call loads from Redis
+        await get_reranker(redis_store)
+        assert redis_store.client.get.call_count == 1
+
+        # Simulate TTL expiry by patching time.monotonic
+        import src.core.reranker as reranker_mod
+
+        with patch.object(
+            reranker_mod, "_reranker_cached_at", reranker_mod._reranker_cached_at - 120
+        ):
+            await get_reranker(redis_store)
+            assert redis_store.client.get.call_count == 2
+
+        invalidate_reranker_cache()
+
+    @pytest.mark.asyncio
+    async def test_invalidate_forces_reload(self):
+        """invalidate_reranker_cache() forces next call to hit Redis."""
+        import json
+
+        from src.core.reranker import invalidate_reranker_cache
+
+        invalidate_reranker_cache()
+
+        model_data = json.dumps(
+            {
+                "features": FEATURE_NAMES,
+                "weights": [0.1] * 11,
+                "bias": -0.5,
+            }
+        )
+
+        redis_store = MagicMock()
+        redis_store.client = AsyncMock()
+        redis_store.client.get = AsyncMock(return_value=model_data)
+
+        await get_reranker(redis_store)
+        assert redis_store.client.get.call_count == 1
+
+        invalidate_reranker_cache()
+
+        await get_reranker(redis_store)
+        assert redis_store.client.get.call_count == 2
+
+        invalidate_reranker_cache()
+
+    @pytest.mark.asyncio
+    async def test_cache_returns_none_when_no_model(self):
+        """Cache correctly caches None (no model) without repeated Redis hits."""
+        from src.core.reranker import invalidate_reranker_cache
+
+        invalidate_reranker_cache()
+
+        redis_store = MagicMock()
+        redis_store.client = AsyncMock()
+        redis_store.client.get = AsyncMock(return_value=None)
+
+        result1 = await get_reranker(redis_store)
+        result2 = await get_reranker(redis_store)
+
+        assert result1 is None
+        assert result2 is None
+        # Should still only hit Redis once (None is a valid cached value)
+        assert redis_store.client.get.call_count == 1
+
+        invalidate_reranker_cache()
+
+
 class TestFallbackBehavior:
     def test_legacy_formula_when_no_reranker(self):
         """Verify _rank_results uses legacy formula when reranker is None.
@@ -246,6 +391,7 @@ class TestFallbackBehavior:
         'if reranker is not None' guard.
         """
         from pathlib import Path
+
         source = Path("src/core/retrieval.py").read_text()
         assert "def _rank_results(" in source
         assert "reranker=None" in source

@@ -8,10 +8,10 @@ for the complete chain of fixes across all subsystems.
 import re
 from pathlib import Path
 
-
 # =============================================================
 # Subsystem 1: Domain normalization
 # =============================================================
+
 
 def test_pipeline_domain_normalization_chain():
     """Full domain normalization chain: domains.py → signal_detector → observer → memory store."""
@@ -43,13 +43,15 @@ def test_pipeline_domain_normalization_chain():
 # Subsystem 2: Signal pipeline
 # =============================================================
 
+
 def test_pipeline_signal_chain():
     """Signal pipeline: pending dict → approve → durability + importance."""
     # 1. Pending dict includes importance + durability
     signals_source = Path("src/workers/signals.py").read_text()
     pending_match = re.search(
-        r'add_pending_signal\(session_id,\s*\{(.*?)\}\)',
-        signals_source, re.DOTALL,
+        r"add_pending_signal\(\s*session_id,\s*\{(.*?)\}",
+        signals_source,
+        re.DOTALL,
     )
     assert pending_match
     pending_dict = pending_match.group(1)
@@ -60,7 +62,8 @@ def test_pipeline_signal_chain():
     ingest_source = Path("src/api/routes/ingest.py").read_text()
     approve_match = re.search(
         r'memory = Memory\((.*?)"approved": True\}.*?\)',
-        ingest_source, re.DOTALL,
+        ingest_source,
+        re.DOTALL,
     )
     assert approve_match
     constructor = approve_match.group(0)
@@ -74,6 +77,7 @@ def test_pipeline_signal_chain():
 # =============================================================
 # Subsystem 3: Graph relationships
 # =============================================================
+
 
 def test_pipeline_graph_chain():
     """Graph: auto-linker → store paths → bootstrap endpoint."""
@@ -101,6 +105,7 @@ def test_pipeline_graph_chain():
 # Subsystem 4: Decay/scoring balance
 # =============================================================
 
+
 def test_pipeline_decay_scoring_chain():
     """Decay/scoring: importance floor → null durability → rehabilitation."""
     # 1. Scoring uses importance floor
@@ -123,6 +128,7 @@ def test_pipeline_decay_scoring_chain():
 # Full chain: all 12 tasks verified
 # =============================================================
 
+
 def test_all_v23_fixes_present():
     """Every v2.3 fix is present — comprehensive gate test."""
     files = {
@@ -135,12 +141,14 @@ def test_all_v23_fixes_present():
         "src/core/retrieval.py": ["max(memory.importance, 0.15)", "Durability.DURABLE"],
         "src/workers/decay.py": ["durability is None"],
         "src/core/auto_linker.py": ["auto_link_memory", "strengthen_relationship"],
-        "src/api/routes/admin.py": ["domains/normalize", "graph/bootstrap", "importance/rehabilitate"],
+        "src/api/routes/admin.py": [
+            "domains/normalize",
+            "graph/bootstrap",
+            "importance/rehabilitate",
+        ],
     }
 
     for filepath, expected_strings in files.items():
         source = Path(filepath).read_text()
         for s in expected_strings:
-            assert s in source, (
-                f"Missing '{s}' in {filepath}"
-            )
+            assert s in source, f"Missing '{s}' in {filepath}"

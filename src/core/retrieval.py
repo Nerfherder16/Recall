@@ -9,6 +9,7 @@ Multi-stage retrieval:
 5. Ranking and selection
 """
 
+import asyncio
 import math
 from datetime import datetime
 from typing import Any
@@ -46,9 +47,17 @@ class RetrievalPipeline:
         self.redis = redis_store
         self.settings = get_settings()
 
-    async def retrieve(self, query: MemoryQuery) -> list[RetrievalResult]:
+    async def retrieve(
+        self,
+        query: MemoryQuery,
+        browse_mode: bool = False,
+    ) -> list[RetrievalResult]:
         """
         Execute the full retrieval pipeline.
+
+        Args:
+            query: The memory query to execute.
+            browse_mode: If True, skip _track_access (for lightweight browsing).
 
         Returns memories ranked by relevance.
         """
@@ -115,16 +124,19 @@ class RetrievalPipeline:
 
         # Stage 5: Final ranking (ML reranker or legacy formula)
         from .reranker import get_reranker
+
         reranker = await get_reranker(self.redis)
         ranked = self._rank_results(list(results.values()), query, reranker)
 
         # Stage 5.5: Inhibition — suppress contradictions and near-duplicates
         ranked = await self._inhibit(ranked)
 
-        # Stage 6: Track access
-        await self._track_access(ranked[:query.limit])
+        # Stage 6: Track access (fire-and-forget, skip in browse mode)
+        final = ranked[: query.limit]
+        if not browse_mode and final:
+            asyncio.create_task(self._track_access(final))
 
-        return ranked[:query.limit]
+        return final
 
     async def _vector_search(
         self, query: MemoryQuery, embedding: list[float]
@@ -160,7 +172,9 @@ class RetrievalPipeline:
         return results
 
     async def _fact_search(
-        self, query: MemoryQuery, embedding: list[float],
+        self,
+        query: MemoryQuery,
+        embedding: list[float],
         existing_results: dict[str, RetrievalResult],
     ) -> list[RetrievalResult]:
         """Search facts sub-embeddings for precise matches, return parent memories."""
@@ -219,17 +233,25 @@ class RetrievalPipeline:
         # Activation map: memory_id -> (best_activation, seed_id)
         activation: dict[str, tuple[float, str]] = {}
 
-        for seed_id in seed_ids:
-            related = await self.neo4j.find_related(
-                memory_id=seed_id,
-                relationship_types=relationship_types,
-                max_depth=max_depth,
-                limit=10,
-            )
+        if not seed_ids:
+            return []
 
+        # Fire all Neo4j queries concurrently
+        all_related = await asyncio.gather(
+            *(
+                self.neo4j.find_related(
+                    memory_id=seed_id,
+                    relationship_types=relationship_types,
+                    max_depth=max_depth,
+                    limit=10,
+                )
+                for seed_id in seed_ids
+            )
+        )
+
+        for seed_id, related in zip(seed_ids, all_related):
             for record in related:
                 node_id = record["id"]
-                distance = record.get("distance", 1)
                 strengths = record.get("rel_strengths", [])
 
                 # Propagate activation through edge strengths
@@ -273,7 +295,8 @@ class RetrievalPipeline:
         return results
 
     async def _document_sibling_boost(
-        self, results: dict[str, RetrievalResult],
+        self,
+        results: dict[str, RetrievalResult],
     ) -> list[RetrievalResult]:
         """
         Stage 3.5: Document-sibling boost.
@@ -294,7 +317,9 @@ class RetrievalPipeline:
 
             try:
                 sibling_ids = await doc_store.find_document_siblings(
-                    memory_id, doc_id, limit=5,
+                    memory_id,
+                    doc_id,
+                    limit=5,
                 )
             except Exception:
                 continue
@@ -358,7 +383,10 @@ class RetrievalPipeline:
         return filtered
 
     def _rank_results(
-        self, results: list[RetrievalResult], query: MemoryQuery, reranker=None,
+        self,
+        results: list[RetrievalResult],
+        query: MemoryQuery,
+        reranker=None,
     ) -> list[RetrievalResult]:
         """Stage 5: Final ranking. Uses ML reranker if available, else legacy formula."""
         if reranker is not None:
@@ -438,7 +466,9 @@ class RetrievalPipeline:
         return result
 
     async def _check_anti_patterns(
-        self, query: MemoryQuery, embedding: list[float],
+        self,
+        query: MemoryQuery,
+        embedding: list[float],
     ) -> list[RetrievalResult]:
         """Stage 4.5: Check anti-patterns collection for relevant warnings."""
         results = []
@@ -551,16 +581,24 @@ class RetrievalPipeline:
             stability=payload.get("stability", 0.1),
             confidence=payload.get("confidence", 0.8),
             access_count=payload.get("access_count", 0),
-            created_at=datetime.fromisoformat(payload["created_at"]) if payload.get("created_at") else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(payload["updated_at"]) if payload.get("updated_at") else datetime.utcnow(),
-            last_accessed=datetime.fromisoformat(payload["last_accessed"]) if payload.get("last_accessed") else datetime.utcnow(),
+            created_at=datetime.fromisoformat(payload["created_at"])
+            if payload.get("created_at")
+            else datetime.utcnow(),
+            updated_at=datetime.fromisoformat(payload["updated_at"])
+            if payload.get("updated_at")
+            else datetime.utcnow(),
+            last_accessed=datetime.fromisoformat(payload["last_accessed"])
+            if payload.get("last_accessed")
+            else datetime.utcnow(),
             session_id=payload.get("session_id"),
             superseded_by=payload.get("superseded_by"),
             parent_ids=payload.get("parent_ids", []),
             user_id=payload.get("user_id"),
             username=payload.get("username"),
             pinned=payload.get("pinned") == "true",
-            durability=Durability(payload["durability"]) if payload.get("durability") else Durability.DURABLE,
+            durability=Durability(payload["durability"])
+            if payload.get("durability")
+            else Durability.DURABLE,
             initial_importance=payload.get("initial_importance"),
         )
 
@@ -584,3 +622,20 @@ async def create_retrieval_pipeline():
     redis = await get_redis_store()
 
     return RetrievalPipeline(qdrant, neo4j, redis)
+
+
+_pipeline_instance: RetrievalPipeline | None = None
+
+
+async def get_retrieval_pipeline() -> RetrievalPipeline:
+    """Get or create the singleton retrieval pipeline."""
+    global _pipeline_instance
+    if _pipeline_instance is None:
+        _pipeline_instance = await create_retrieval_pipeline()
+    return _pipeline_instance
+
+
+def reset_retrieval_pipeline() -> None:
+    """Reset the singleton (for testing or reinitialization)."""
+    global _pipeline_instance
+    _pipeline_instance = None

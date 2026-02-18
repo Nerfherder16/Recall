@@ -23,8 +23,14 @@ logger = structlog.get_logger()
 REDIS_KEY = "recall:ml:signal_classifier_weights"
 
 SIGNAL_TYPES = [
-    "error_fix", "decision", "pattern", "preference",
-    "fact", "workflow", "contradiction", "warning",
+    "error_fix",
+    "decision",
+    "pattern",
+    "preference",
+    "fact",
+    "workflow",
+    "contradiction",
+    "warning",
 ]
 
 CONV_FEATURE_NAMES = [
@@ -39,22 +45,24 @@ CONV_FEATURE_NAMES = [
 ]
 
 _CODE_PATTERNS = re.compile(
-    r'`|def\s|function\s|import\s|class\s|const\s|let\s|var\s|=>\s|'
-    r'\bif\s*\(|\bfor\s*\(|\breturn\s|\.py\b|\.js\b|\.ts\b'
+    r"`|def\s|function\s|import\s|class\s|const\s|let\s|var\s|=>\s|"
+    r"\bif\s*\(|\bfor\s*\(|\breturn\s|\.py\b|\.js\b|\.ts\b"
 )
 _ERROR_KEYWORDS = re.compile(
-    r'\b(error|fix|bug|crash|fail|broke|exception|traceback|stack\s*trace|'
-    r'not\s+working|issue|problem|debug)\b', re.IGNORECASE
+    r"\b(error|fix|bug|crash|fail|broke|exception|traceback|stack\s*trace|"
+    r"not\s+working|issue|problem|debug)\b",
+    re.IGNORECASE,
 )
 _DECISION_KEYWORDS = re.compile(
-    r'\b(decide|decision|let\'?s\s+go\s+with|recommend|choose|prefer|'
-    r'approach|strategy|option|trade-?off|we\s+should)\b', re.IGNORECASE
+    r"\b(decide|decision|let\'?s\s+go\s+with|recommend|choose|prefer|"
+    r"approach|strategy|option|trade-?off|we\s+should)\b",
+    re.IGNORECASE,
 )
 
 
 def _tokenize(text: str) -> list[str]:
     """Simple whitespace/punctuation tokenizer."""
-    return [t for t in re.split(r'\W+', text.lower()) if len(t) > 1]
+    return [t for t in re.split(r"\W+", text.lower()) if len(t) > 1]
 
 
 def tfidf_transform(
@@ -110,9 +118,7 @@ def extract_conversation_features(turns: list[dict[str, str]]) -> list[float]:
     question_density = questions / turn_count
 
     # Code density: fraction of turns with code-like patterns
-    code_turns = sum(
-        1 for t in turns if _CODE_PATTERNS.search(t.get("content", ""))
-    )
+    code_turns = sum(1 for t in turns if _CODE_PATTERNS.search(t.get("content", "")))
     code_density = code_turns / turn_count
 
     # User turn ratio
@@ -178,9 +184,7 @@ class SignalClassifier:
         features = tfidf_vec + conv_features
 
         # Binary classification
-        dot = sum(
-            w * f for w, f in zip(self.binary_weights, features)
-        ) + self.binary_bias
+        dot = sum(w * f for w, f in zip(self.binary_weights, features)) + self.binary_bias
         signal_prob = sigmoid(dot)
         is_signal = signal_prob > 0.5
 
@@ -191,9 +195,9 @@ class SignalClassifier:
         if is_signal and self.type_classes:
             best_score = -float("inf")
             for i, cls in enumerate(self.type_classes):
-                score = sum(
-                    w * f for w, f in zip(self.type_weights[i], features)
-                ) + self.type_biases[i]
+                score = (
+                    sum(w * f for w, f in zip(self.type_weights[i], features)) + self.type_biases[i]
+                )
                 prob = sigmoid(score)
                 type_probs[cls] = round(prob, 4)
                 if score > best_score:
@@ -208,11 +212,36 @@ class SignalClassifier:
         }
 
 
+import time as _time  # noqa: E402 — needed for cache TTL
+
+_CACHE_TTL = 60  # seconds
+_cached_classifier: SignalClassifier | None = None
+_classifier_cached_at: float = 0.0
+_classifier_cache_populated: bool = False
+
+
+def invalidate_classifier_cache() -> None:
+    """Clear the in-process classifier cache, forcing next call to hit Redis."""
+    global _cached_classifier, _classifier_cached_at, _classifier_cache_populated
+    _cached_classifier = None
+    _classifier_cached_at = 0.0
+    _classifier_cache_populated = False
+
+
 async def get_signal_classifier(redis_store) -> SignalClassifier | None:
-    """Load signal classifier from Redis. Returns None if not trained."""
+    """Load signal classifier from Redis with 60s in-process cache."""
+    global _cached_classifier, _classifier_cached_at, _classifier_cache_populated
+
+    now = _time.monotonic()
+    if _classifier_cache_populated and (now - _classifier_cached_at) < _CACHE_TTL:
+        return _cached_classifier
+
     try:
         raw = await redis_store.client.get(REDIS_KEY)
         if not raw:
+            _cached_classifier = None
+            _classifier_cached_at = _time.monotonic()
+            _classifier_cache_populated = True
             return None
 
         data = json.loads(raw)
@@ -220,12 +249,15 @@ async def get_signal_classifier(redis_store) -> SignalClassifier | None:
         # Validate required keys
         if not all(k in data for k in ("vocab", "idf_weights", "binary")):
             logger.warning("signal_classifier_missing_keys")
+            _cached_classifier = None
+            _classifier_cached_at = _time.monotonic()
+            _classifier_cache_populated = True
             return None
 
         binary = data["binary"]
         type_cls = data.get("type_classifier", {})
 
-        return SignalClassifier(
+        model = SignalClassifier(
             vocab=data["vocab"],
             idf_weights=data["idf_weights"],
             binary_weights=binary["weights"],
@@ -241,6 +273,10 @@ async def get_signal_classifier(redis_store) -> SignalClassifier | None:
                 "version": data.get("version"),
             },
         )
+        _cached_classifier = model
+        _classifier_cached_at = _time.monotonic()
+        _classifier_cache_populated = True
+        return model
     except Exception as e:
         logger.warning("signal_classifier_load_failed", error=str(e))
         return None
