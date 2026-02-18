@@ -205,3 +205,101 @@ async def test_check_invalidations_writes_audit():
 
     assert result["flagged_count"] == 2
     assert mock_postgres.log_audit.call_count == 2
+
+
+# ---- Task 7: admin endpoints + resolve ----
+
+
+@pytest.mark.asyncio
+async def test_list_stale_returns_flagged():
+    """GET /admin/stale returns memories with invalidation_flag set."""
+    from src.api.routes.admin import list_stale_memories
+
+    mock_qdrant = MagicMock()
+    flagged_point = MagicMock()
+    flagged_point.id = "mem-flagged"
+    flagged_point.payload = {
+        "content": "Ollama on 192.168.50.62",
+        "domain": "infrastructure",
+        "invalidation_flag": {
+            "reason": "Values ['192.168.50.62'] found in commit abc1234",
+            "commit_hash": "abc1234def5678",
+            "flagged_at": "2026-02-18T20:00:00",
+        },
+    }
+    mock_qdrant.client = MagicMock()
+    mock_qdrant.client.scroll = AsyncMock(return_value=([flagged_point], None))
+    mock_qdrant.collection = "recall_memories"
+
+    mock_request = MagicMock()
+
+    with patch(
+        "src.storage.get_qdrant_store",
+        new_callable=AsyncMock,
+        return_value=mock_qdrant,
+    ):
+        result = await list_stale_memories(request=mock_request)
+
+    assert len(result["stale_memories"]) == 1
+    assert result["stale_memories"][0]["id"] == "mem-flagged"
+    assert result["stale_memories"][0]["invalidation_flag"]["commit_hash"] == "abc1234def5678"
+
+
+@pytest.mark.asyncio
+async def test_list_stale_empty():
+    """GET /admin/stale returns empty when no flagged memories."""
+    from src.api.routes.admin import list_stale_memories
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.client = MagicMock()
+    mock_qdrant.client.scroll = AsyncMock(return_value=([], None))
+    mock_qdrant.collection = "recall_memories"
+
+    mock_request = MagicMock()
+
+    with patch(
+        "src.storage.get_qdrant_store",
+        new_callable=AsyncMock,
+        return_value=mock_qdrant,
+    ):
+        result = await list_stale_memories(request=mock_request)
+
+    assert result["stale_memories"] == []
+    assert result["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_resolve_stale_clears_flag():
+    """POST /admin/stale/{id}/resolve clears the invalidation_flag."""
+    from src.api.routes.admin import resolve_stale_memory
+
+    mock_qdrant = MagicMock()
+    mock_qdrant.client = MagicMock()
+    mock_qdrant.client.set_payload = AsyncMock()
+    mock_qdrant.collection = "recall_memories"
+
+    mock_postgres = MagicMock()
+    mock_postgres.log_audit = AsyncMock()
+
+    mock_request = MagicMock()
+
+    with (
+        patch(
+            "src.storage.get_qdrant_store",
+            new_callable=AsyncMock,
+            return_value=mock_qdrant,
+        ),
+        patch(
+            "src.storage.get_postgres_store",
+            new_callable=AsyncMock,
+            return_value=mock_postgres,
+        ),
+    ):
+        result = await resolve_stale_memory(request=mock_request, memory_id="mem-flagged")
+
+    assert result["status"] == "resolved"
+    # Verify set_payload called with null invalidation_flag
+    mock_qdrant.client.set_payload.assert_called_once()
+    call_kwargs = mock_qdrant.client.set_payload.call_args
+    payload = call_kwargs.kwargs.get("payload") or call_kwargs[1].get("payload")
+    assert payload["invalidation_flag"] is None
