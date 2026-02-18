@@ -1,0 +1,344 @@
+[
+  {
+    "id": "cls-01",
+    "turns": [
+      {"role": "user", "content": "The API keeps returning 500 errors on the /memory endpoint"},
+      {"role": "assistant", "content": "Let me check the logs. It looks like Qdrant is timing out."},
+      {"role": "user", "content": "Increasing the timeout from 5s to 30s fixed it"},
+      {"role": "assistant", "content": "The collection had grown too large for the default timeout."}
+    ],
+    "expected_signal": true,
+    "expected_type": "error_fix"
+  },
+  {
+    "id": "cls-02",
+    "turns": [
+      {"role": "user", "content": "For the embedding model, should we use text-embedding-ada-002 or a local model?"},
+      {"role": "assistant", "content": "Local keeps everything self-hosted and eliminates API costs."},
+      {"role": "user", "content": "Let's use qwen3-embedding:0.6b via Ollama"},
+      {"role": "assistant", "content": "Good choice — small, fast, and runs alongside the main model."}
+    ],
+    "expected_signal": true,
+    "expected_type": "decision"
+  },
+  {
+    "id": "cls-03",
+    "turns": [
+      {"role": "user", "content": "To test changes, SCP the file then restart the container"},
+      {"role": "assistant", "content": "Since src is volume-mounted, a restart is enough — no rebuild needed."},
+      {"role": "user", "content": "The command is: docker compose restart api worker"},
+      {"role": "assistant", "content": "I'll add that to the deployment notes."}
+    ],
+    "expected_signal": true,
+    "expected_type": "workflow"
+  },
+  {
+    "id": "cls-04",
+    "turns": [
+      {"role": "user", "content": "The API runs on port 8200, not the default 8000"},
+      {"role": "assistant", "content": "Noted. That's mapped in the docker-compose port binding."},
+      {"role": "user", "content": "Redis is on default 6379, Neo4j on 7687, Qdrant on 6333"},
+      {"role": "assistant", "content": "All default ports for the storage services, only the API is non-standard."}
+    ],
+    "expected_signal": true,
+    "expected_type": "fact"
+  },
+  {
+    "id": "cls-05",
+    "turns": [
+      {"role": "user", "content": "I like concise commit messages that focus on the why, not the what"},
+      {"role": "assistant", "content": "That's a good practice — the diff shows the what."},
+      {"role": "user", "content": "Keep them to 1-2 sentences max"},
+      {"role": "assistant", "content": "I'll follow that format for all future commits."}
+    ],
+    "expected_signal": true,
+    "expected_type": "preference"
+  },
+  {
+    "id": "cls-06",
+    "turns": [
+      {"role": "user", "content": "We keep forgetting to handle None values from optional fields"},
+      {"role": "assistant", "content": "current_task from /admin/sessions is a common one — it returns null."},
+      {"role": "user", "content": "Always use (field or default) pattern, not .get(field, default)"},
+      {"role": "assistant", "content": "Because .get returns the None from the JSON, bypassing the default."}
+    ],
+    "expected_signal": true,
+    "expected_type": "pattern"
+  },
+  {
+    "id": "cls-07",
+    "turns": [
+      {"role": "user", "content": "Never use bare except clauses — always catch specific exceptions"},
+      {"role": "assistant", "content": "Bare except catches SystemExit and KeyboardInterrupt which breaks debugging."},
+      {"role": "user", "content": "And always log the exception details, never silently swallow"},
+      {"role": "assistant", "content": "I'll use logger.error with exc_info=True for all error handlers."}
+    ],
+    "expected_signal": true,
+    "expected_type": "warning"
+  },
+  {
+    "id": "cls-08",
+    "turns": [
+      {"role": "user", "content": "Hello Claude"},
+      {"role": "assistant", "content": "Hi there! What are we building today?"}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "cls-09",
+    "turns": [
+      {"role": "user", "content": "Read the file at src/core/retrieval.py"},
+      {"role": "assistant", "content": "Here's the content of retrieval.py..."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "cls-10",
+    "turns": [
+      {"role": "user", "content": "The JSONL export is not JSON — it's newline-delimited"},
+      {"role": "assistant", "content": "So r.json() fails. You need to parse line by line."},
+      {"role": "user", "content": "Split on newlines and json.loads each line separately"},
+      {"role": "assistant", "content": "I'll update the import code to handle JSONL format correctly."}
+    ],
+    "expected_signal": true,
+    "expected_type": "error_fix"
+  },
+  {
+    "id": "cls-11",
+    "turns": [
+      {"role": "user", "content": "Let's use Redis for caching with a 2-minute TTL for rehydrate responses"},
+      {"role": "assistant", "content": "That prevents repeated LLM calls for the same time window query."},
+      {"role": "user", "content": "Key format: recall:rehydrate:{md5_hash} where hash is of the request params"},
+      {"role": "assistant", "content": "I'll use hashlib.md5 on the JSON-serialized request body."}
+    ],
+    "expected_signal": true,
+    "expected_type": "decision"
+  },
+  {
+    "id": "cls-12",
+    "turns": [
+      {"role": "user", "content": "npm test"},
+      {"role": "assistant", "content": "All 3 MCP server tests pass."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "cls-13",
+    "turns": [
+      {"role": "user", "content": "When adding a new Qdrant payload field, you need to create an index for it"},
+      {"role": "assistant", "content": "Otherwise filter queries on that field will be slow or fail."},
+      {"role": "user", "content": "For keyword fields use PayloadSchemaType.KEYWORD, for floats use FLOAT"},
+      {"role": "assistant", "content": "And booleans need to be stored as keyword 'true'/'false' strings."}
+    ],
+    "expected_signal": true,
+    "expected_type": "pattern"
+  },
+  {
+    "id": "cls-14",
+    "turns": [
+      {"role": "user", "content": "Never expose internal error details in API responses"},
+      {"role": "assistant", "content": "That leaks implementation details attackers can exploit."},
+      {"role": "user", "content": "Return generic messages to clients, log the full stack trace server-side"},
+      {"role": "assistant", "content": "I'll use a middleware that catches exceptions and returns sanitized messages."}
+    ],
+    "expected_signal": true,
+    "expected_type": "warning"
+  },
+  {
+    "id": "cls-15",
+    "turns": [
+      {"role": "user", "content": "I prefer self-hosted solutions over cloud services"},
+      {"role": "assistant", "content": "That gives you full control over your data and infrastructure."},
+      {"role": "user", "content": "Especially for AI and memory systems — no data leaves the network"},
+      {"role": "assistant", "content": "Everything runs on your homelab, fully air-gapped from cloud providers."}
+    ],
+    "expected_signal": true,
+    "expected_type": "preference"
+  },
+  {
+    "id": "cls-16",
+    "turns": [
+      {"role": "user", "content": "Can you explain what the decay worker does?"},
+      {"role": "assistant", "content": "It reduces importance of memories over time based on their durability."},
+      {"role": "user", "content": "OK that makes sense, thanks"},
+      {"role": "assistant", "content": "Permanent memories are immune, durable decay at 0.15x rate, ephemeral at normal rate."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "cls-17",
+    "turns": [
+      {"role": "user", "content": "After running git diff, extract IPs, ports, URLs, env vars, and version strings"},
+      {"role": "assistant", "content": "I'll use regex patterns for each type of concrete value."},
+      {"role": "user", "content": "Only from added/removed lines — ignore context lines"},
+      {"role": "assistant", "content": "Filter for lines starting with + or - (excluding the diff headers)."}
+    ],
+    "expected_signal": true,
+    "expected_type": "workflow"
+  },
+  {
+    "id": "cls-18",
+    "turns": [
+      {"role": "user", "content": "The GPU server has an RTX 3090 with 24GB VRAM"},
+      {"role": "assistant", "content": "That's at 192.168.50.62 running Ollama."},
+      {"role": "user", "content": "It can handle 14B parameter models comfortably"},
+      {"role": "assistant", "content": "With room for the embedding model to run concurrently."}
+    ],
+    "expected_signal": true,
+    "expected_type": "fact"
+  },
+  {
+    "id": "cls-19",
+    "turns": [
+      {"role": "user", "content": "Show me the git log"},
+      {"role": "assistant", "content": "Here are the recent commits..."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "cls-20",
+    "turns": [
+      {"role": "user", "content": "The StaticFiles mount for /dashboard returns 307 redirect to /dashboard/"},
+      {"role": "assistant", "content": "That's standard behavior — it adds the trailing slash."},
+      {"role": "user", "content": "Tests must use follow_redirects=True or hit the trailing-slash URL directly"},
+      {"role": "assistant", "content": "Otherwise the test gets a redirect response instead of the HTML."}
+    ],
+    "expected_signal": true,
+    "expected_type": "error_fix"
+  },
+  {
+    "id": "cls-21",
+    "turns": [
+      {"role": "user", "content": "How are you?"},
+      {"role": "assistant", "content": "I'm doing well, ready to help! What are we working on?"},
+      {"role": "user", "content": "Nothing specific, just wanted to say hi"},
+      {"role": "assistant", "content": "Nice to hear from you! I'll be here when you're ready to code."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "cls-22",
+    "turns": [
+      {"role": "user", "content": "Node.js hooks must use CommonJS require(), not ESM import"},
+      {"role": "assistant", "content": "Without type: module in package.json, ESM imports will warn."},
+      {"role": "user", "content": "The hooks don't have their own package.json so they inherit the parent"},
+      {"role": "assistant", "content": "Which uses CommonJS by default. All hooks should use require()."}
+    ],
+    "expected_signal": true,
+    "expected_type": "pattern"
+  },
+  {
+    "id": "cls-23",
+    "turns": [
+      {"role": "user", "content": "For rate limiting on the rehydrate endpoint, use 10 per minute"},
+      {"role": "assistant", "content": "That's more generous than the retrain endpoint which is 1/min."},
+      {"role": "user", "content": "The retrain is expensive, rehydrate is just a query plus optional LLM"},
+      {"role": "assistant", "content": "Makes sense. I'll use @limiter.limit('10/minute') on the rehydrate route."}
+    ],
+    "expected_signal": true,
+    "expected_type": "decision"
+  },
+  {
+    "id": "cls-24",
+    "turns": [
+      {"role": "user", "content": "Never use dangerouslySetInnerHTML in the React dashboard"},
+      {"role": "assistant", "content": "That's a direct XSS vector — React's auto-escaping is much safer."},
+      {"role": "user", "content": "If we need to render HTML, sanitize it server-side first"},
+      {"role": "assistant", "content": "I'll keep all rendering through React's JSX templating."}
+    ],
+    "expected_signal": true,
+    "expected_type": "warning"
+  },
+  {
+    "id": "cls-25",
+    "turns": [
+      {"role": "user", "content": "Delete the temporary test file"},
+      {"role": "assistant", "content": "Removed the file. Anything else?"},
+      {"role": "user", "content": "No that's it"},
+      {"role": "assistant", "content": "OK, let me know if you need anything."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "cls-26",
+    "turns": [
+      {"role": "user", "content": "I noticed that SSE connections never reconnect after the server restarts"},
+      {"role": "assistant", "content": "The EventSource closes but the React component doesn't re-open it."},
+      {"role": "user", "content": "Fixed by using a mountedRef + recursive connect() function"},
+      {"role": "assistant", "content": "Now when onerror fires, it waits 3 seconds and reconnects if still mounted."}
+    ],
+    "expected_signal": true,
+    "expected_type": "error_fix"
+  },
+  {
+    "id": "cls-27",
+    "turns": [
+      {"role": "user", "content": "The memory importance range is 0.0 to 1.0, with a floor of 0.15 in retrieval"},
+      {"role": "assistant", "content": "The floor prevents memories from becoming completely invisible to search."},
+      {"role": "user", "content": "Without it, decayed memories would score near zero and never resurface"},
+      {"role": "assistant", "content": "The formula is max(memory.importance, 0.15) in the retrieval scoring."}
+    ],
+    "expected_signal": true,
+    "expected_type": "fact"
+  },
+  {
+    "id": "cls-28",
+    "turns": [
+      {"role": "user", "content": "I always want verbose test output — use pytest -v flag"},
+      {"role": "assistant", "content": "That shows individual test names and results instead of just dots."},
+      {"role": "user", "content": "And --tb=short for shorter tracebacks on failures"},
+      {"role": "assistant", "content": "I'll use pytest -v --tb=short as the default test command."}
+    ],
+    "expected_signal": true,
+    "expected_type": "preference"
+  },
+  {
+    "id": "cls-29",
+    "turns": [
+      {"role": "user", "content": "To run the full test suite: pytest tests/integration/ -v"},
+      {"role": "assistant", "content": "That covers 207 integration tests — 164 fast and 43 slow LLM tests."},
+      {"role": "user", "content": "Unit tests are separate: pytest tests/core/ tests/workers/ -v"},
+      {"role": "assistant", "content": "Currently 73 unit tests, all passing with mocked dependencies."}
+    ],
+    "expected_signal": true,
+    "expected_type": "workflow"
+  },
+  {
+    "id": "cls-30",
+    "turns": [
+      {"role": "user", "content": "What's the difference between durable and permanent memories?"},
+      {"role": "assistant", "content": "Permanent are immune to decay, durable decay at 15% normal rate."},
+      {"role": "user", "content": "Got it, thanks for explaining"},
+      {"role": "assistant", "content": "No problem. Ephemeral memories decay at the full normal rate."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "cls-31",
+    "turns": [
+      {"role": "user", "content": "The search endpoint is /search/query, NOT /search/full"},
+      {"role": "assistant", "content": "We hit that mismatch once in the v2.1 tests."},
+      {"role": "user", "content": "The browse endpoint is /search/browse and timeline is /search/timeline"},
+      {"role": "assistant", "content": "I'll make sure to use the correct paths in all client code."}
+    ],
+    "expected_signal": true,
+    "expected_type": "pattern"
+  },
+  {
+    "id": "cls-32",
+    "turns": [
+      {"role": "user", "content": "Check if the container is running"},
+      {"role": "assistant", "content": "Running docker ps to check container status."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  }
+]

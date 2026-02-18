@@ -222,6 +222,29 @@ export interface IngestResponse {
   child_ids: string[];
 }
 
+// v2.7: Stale memory types
+
+export interface InvalidationFlag {
+  reason: string;
+  commit_hash: string;
+  changed_files?: string[];
+  matched_values?: string[];
+  flagged_at: string;
+}
+
+export interface StaleMemory {
+  id: string;
+  content: string;
+  domain: string;
+  durability: string | null;
+  invalidation_flag: InvalidationFlag;
+}
+
+export interface StaleMemoriesResponse {
+  stale_memories: StaleMemory[];
+  total: number;
+}
+
 // Phase 10 additions
 
 export interface MemoryPreview {

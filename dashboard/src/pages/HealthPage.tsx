@@ -1,15 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  Heart,
-  ChartBar,
-  Warning,
-  ArrowClockwise,
-} from "@phosphor-icons/react";
+import { ArrowClockwise } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type { HealthDashboard, Conflict } from "../api/types";
 import PageHeader from "../components/PageHeader";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useToastContext } from "../context/ToastContext";
+import { Button } from "../components/common/Button";
 import { FeedbackCard } from "../components/health/FeedbackCard";
 import { PopulationCard } from "../components/health/PopulationCard";
 import { GraphCohesionCard } from "../components/health/GraphCohesionCard";
@@ -17,6 +13,7 @@ import { PinRatioCard } from "../components/health/PinRatioCard";
 import { ImportanceChart } from "../components/health/ImportanceChart";
 import { FeedbackHistogram } from "../components/health/FeedbackHistogram";
 import { ConflictsTable } from "../components/health/ConflictsTable";
+import { StaleAuditSection } from "../components/StaleAuditSection";
 
 export default function HealthPage() {
   const { addToast } = useToastContext();
@@ -54,18 +51,15 @@ export default function HealthPage() {
         title="System Health"
         subtitle="Memory system metrics, force analysis, and conflict detection"
       >
-        <button
-          className="rounded-lg bg-base-200 px-3 py-1.5 text-sm text-base-content/60 hover:text-base-content hover:bg-base-300 transition-colors flex items-center gap-1.5"
-          onClick={fetchData}
-        >
+        <Button variant="secondary" size="sm" onClick={fetchData}>
           <ArrowClockwise size={14} /> Refresh
-        </button>
+        </Button>
       </PageHeader>
 
       {dashboard && (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <FeedbackCard feedback={dashboard.feedback} />
             <PopulationCard population={dashboard.population} />
             <GraphCohesionCard graph={dashboard.graph} />
@@ -73,12 +67,17 @@ export default function HealthPage() {
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
             <ImportanceChart bands={dashboard.importance_distribution} />
             <FeedbackHistogram buckets={dashboard.feedback_similarity} />
           </div>
         </>
       )}
+
+      {/* Stale Memories */}
+      <div className="mb-8">
+        <StaleAuditSection />
+      </div>
 
       {/* Conflicts */}
       <ConflictsTable conflicts={conflicts} />
