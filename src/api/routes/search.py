@@ -125,6 +125,42 @@ class TimelineResponse(BaseModel):
     anchor_id: str | None
 
 
+class RehydrateRequest(BaseModel):
+    """Request for temporal context reconstruction."""
+
+    since: str | None = None
+    until: str | None = None
+    domain: str | None = None
+    memory_type: str | None = None
+    max_entries: int = Field(default=50, ge=1, le=200)
+    include_narrative: bool = False
+    include_anti_patterns: bool = False
+
+
+class RehydrateEntry(BaseModel):
+    """A single entry in the rehydrated context."""
+
+    id: str
+    summary: str
+    memory_type: str
+    domain: str
+    created_at: str
+    importance: float
+    durability: str | None = None
+    pinned: bool = False
+    is_anti_pattern: bool = False
+
+
+class RehydrateResponse(BaseModel):
+    """Response from temporal context reconstruction."""
+
+    entries: list[RehydrateEntry]
+    total: int
+    window_start: str
+    window_end: str
+    narrative: str | None = None
+
+
 class ContextRequest(BaseModel):
     """Request for context assembly."""
 
@@ -281,6 +317,70 @@ async def timeline_view(request: Request, body: TimelineRequest):
         raise
     except Exception as e:
         logger.error("timeline_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/rehydrate", response_model=RehydrateResponse)
+@limiter.limit("10/minute")
+async def rehydrate_context(request: Request, body: RehydrateRequest):
+    """
+    Temporal context reconstruction.
+
+    Assembles a chronological briefing from memories in a time window.
+    Optionally includes LLM-generated narrative summary and anti-patterns.
+    """
+    try:
+        from src.storage import get_qdrant_store
+
+        qdrant = await get_qdrant_store()
+
+        # Default time range: last 24 hours
+        if not body.since:
+            import datetime as dt_mod
+
+            body.since = (datetime.utcnow() - dt_mod.timedelta(hours=24)).isoformat()
+        if not body.until:
+            body.until = datetime.utcnow().isoformat()
+
+        # Scroll memories in time range
+        points = await qdrant.scroll_time_range(
+            since=body.since,
+            until=body.until,
+            domain=body.domain,
+            memory_type=body.memory_type,
+            limit=body.max_entries,
+        )
+
+        entries = [
+            RehydrateEntry(
+                id=mid,
+                summary=payload.get("content", "")[:120],
+                memory_type=payload.get("memory_type", "semantic"),
+                domain=payload.get("domain", "general"),
+                created_at=payload.get("created_at", ""),
+                importance=payload.get("importance", 0.5),
+                durability=payload.get("durability"),
+                pinned=payload.get("pinned") == "true",
+            )
+            for mid, payload in points
+        ]
+
+        window_start = entries[0].created_at if entries else body.since
+        window_end = entries[-1].created_at if entries else body.until
+
+        logger.info("rehydrate_completed", entries=len(entries), domain=body.domain)
+
+        return RehydrateResponse(
+            entries=entries,
+            total=len(entries),
+            window_start=window_start,
+            window_end=window_end,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("rehydrate_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

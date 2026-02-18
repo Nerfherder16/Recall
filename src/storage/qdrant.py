@@ -209,14 +209,10 @@ class QdrantStore:
             )
 
         if since:
-            conditions.append(
-                FieldCondition(key="created_at", range=DatetimeRange(gte=since))
-            )
+            conditions.append(FieldCondition(key="created_at", range=DatetimeRange(gte=since)))
 
         if until:
-            conditions.append(
-                FieldCondition(key="created_at", range=DatetimeRange(lte=until))
-            )
+            conditions.append(FieldCondition(key="created_at", range=DatetimeRange(lte=until)))
 
         search_filter = Filter(must=conditions) if conditions else None
 
@@ -228,10 +224,7 @@ class QdrantStore:
             with_payload=True,
         )
 
-        return [
-            (str(r.id), r.score, r.payload)
-            for r in results.points
-        ]
+        return [(str(r.id), r.score, r.payload) for r in results.points]
 
     async def get(self, memory_id: str) -> tuple[list[float], dict[str, Any]] | None:
         """Get a memory by ID, returning (embedding, payload)."""
@@ -350,7 +343,8 @@ class QdrantStore:
         return bands
 
     async def scroll_by_document_id(
-        self, doc_id: str,
+        self,
+        doc_id: str,
     ) -> list[tuple[str, dict[str, Any]]]:
         """Scroll all memories belonging to a document."""
         all_points = []
@@ -441,7 +435,8 @@ class QdrantStore:
         return all_points
 
     async def scroll_null_durability(
-        self, batch_size: int = 100,
+        self,
+        batch_size: int = 100,
     ) -> list[tuple[str, dict[str, Any]]]:
         """
         Scroll all non-superseded memories where durability is null.
@@ -489,16 +484,12 @@ class QdrantStore:
         """
         base_conditions = []
         if domain:
-            base_conditions.append(
-                FieldCondition(key="domain", match=MatchValue(value=domain))
-            )
+            base_conditions.append(FieldCondition(key="domain", match=MatchValue(value=domain)))
         if memory_type:
             base_conditions.append(
                 FieldCondition(key="memory_type", match=MatchValue(value=memory_type))
             )
-        base_conditions.append(
-            IsNullCondition(is_null=PayloadField(key="superseded_by"))
-        )
+        base_conditions.append(IsNullCondition(is_null=PayloadField(key="superseded_by")))
 
         results = []
 
@@ -559,6 +550,56 @@ class QdrantStore:
         results.sort(key=lambda x: x[1].get("created_at", ""))
         return results
 
+    async def scroll_time_range(
+        self,
+        since: str,
+        until: str,
+        domain: str | None = None,
+        memory_type: str | None = None,
+        limit: int = 50,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """
+        Scroll memories within a time range, sorted chronologically.
+
+        Used by the rehydrate endpoint for temporal context reconstruction.
+        Returns (memory_id, payload) tuples sorted by created_at ascending.
+        """
+        conditions = [
+            FieldCondition(key="created_at", range=DatetimeRange(gte=since)),
+            FieldCondition(key="created_at", range=DatetimeRange(lte=until)),
+            IsNullCondition(is_null=PayloadField(key="superseded_by")),
+        ]
+
+        if domain:
+            conditions.append(FieldCondition(key="domain", match=MatchValue(value=domain)))
+        if memory_type:
+            conditions.append(
+                FieldCondition(key="memory_type", match=MatchValue(value=memory_type))
+            )
+
+        scroll_filter = Filter(must=conditions)
+        all_points = []
+        offset = None
+
+        while len(all_points) < limit:
+            batch_size = min(100, limit - len(all_points))
+            points, next_offset = await self.client.scroll(
+                collection_name=self.collection,
+                scroll_filter=scroll_filter,
+                limit=batch_size,
+                offset=offset,
+                with_payload=True,
+            )
+            for point in points:
+                all_points.append((str(point.id), point.payload or {}))
+            if next_offset is None or not points:
+                break
+            offset = next_offset
+
+        # Sort chronologically
+        all_points.sort(key=lambda x: x[1].get("created_at", ""))
+        return all_points[:limit]
+
     # --- Facts collection methods (sub-embeddings) ---
 
     async def ensure_facts_collection(self):
@@ -592,8 +633,12 @@ class QdrantStore:
             logger.info("created_facts_collection", name=self.facts_collection)
 
     async def store_fact(
-        self, parent_id: str, fact_content: str, fact_index: int,
-        embedding: list[float], domain: str = "general",
+        self,
+        parent_id: str,
+        fact_content: str,
+        fact_index: int,
+        embedding: list[float],
+        domain: str = "general",
     ) -> str:
         """Store a single fact sub-embedding linked to a parent memory."""
         from src.core.models import generate_id
@@ -617,15 +662,15 @@ class QdrantStore:
         return fact_id
 
     async def search_facts(
-        self, query_vector: list[float], limit: int = 10,
+        self,
+        query_vector: list[float],
+        limit: int = 10,
         domain: str | None = None,
     ) -> list[tuple[str, float, dict[str, Any]]]:
         """Search the facts collection for matching sub-embeddings."""
         conditions = []
         if domain:
-            conditions.append(
-                FieldCondition(key="domain", match=MatchValue(value=domain))
-            )
+            conditions.append(FieldCondition(key="domain", match=MatchValue(value=domain)))
         search_filter = Filter(must=conditions) if conditions else None
 
         results = await self.client.query_points(
@@ -635,10 +680,7 @@ class QdrantStore:
             query_filter=search_filter,
             with_payload=True,
         )
-        return [
-            (str(r.id), r.score, r.payload)
-            for r in results.points
-        ]
+        return [(str(r.id), r.score, r.payload) for r in results.points]
 
     async def delete_facts_for_memory(self, parent_id: str):
         """Delete all facts linked to a parent memory."""
@@ -718,14 +760,15 @@ class QdrantStore:
         return anti_pattern.id
 
     async def search_anti_patterns(
-        self, query_vector: list[float], limit: int = 5, domain: str | None = None,
+        self,
+        query_vector: list[float],
+        limit: int = 5,
+        domain: str | None = None,
     ) -> list[tuple[str, float, dict[str, Any]]]:
         """Search anti-patterns by embedding similarity."""
         conditions = []
         if domain:
-            conditions.append(
-                FieldCondition(key="domain", match=MatchValue(value=domain))
-            )
+            conditions.append(FieldCondition(key="domain", match=MatchValue(value=domain)))
         search_filter = Filter(must=conditions) if conditions else None
 
         results = await self.client.query_points(
@@ -758,14 +801,13 @@ class QdrantStore:
         )
 
     async def scroll_anti_patterns(
-        self, domain: str | None = None,
+        self,
+        domain: str | None = None,
     ) -> list[tuple[str, dict[str, Any]]]:
         """Scroll all anti-patterns."""
         conditions = []
         if domain:
-            conditions.append(
-                FieldCondition(key="domain", match=MatchValue(value=domain))
-            )
+            conditions.append(FieldCondition(key="domain", match=MatchValue(value=domain)))
         scroll_filter = Filter(must=conditions) if conditions else None
         all_points = []
         offset = None
