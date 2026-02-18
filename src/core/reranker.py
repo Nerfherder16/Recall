@@ -97,7 +97,10 @@ class RerankerModel:
             path_len = result.graph_distance
 
             features = extract_features(
-                result.memory, result.similarity, has_graph, path_len,
+                result.memory,
+                result.similarity,
+                has_graph,
+                path_len,
             )
             ml_score = self.predict(features)
 
@@ -108,15 +111,40 @@ class RerankerModel:
         return results
 
 
+import time as _time  # noqa: E402 — needed for cache TTL
+
+_CACHE_TTL = 60  # seconds
+_cached_reranker: RerankerModel | None = None
+_reranker_cached_at: float = 0.0
+_reranker_cache_populated: bool = False
+
+
+def invalidate_reranker_cache() -> None:
+    """Clear the in-process reranker cache, forcing next call to hit Redis."""
+    global _cached_reranker, _reranker_cached_at, _reranker_cache_populated
+    _cached_reranker = None
+    _reranker_cached_at = 0.0
+    _reranker_cache_populated = False
+
+
 async def get_reranker(redis_store) -> RerankerModel | None:
-    """Load reranker from Redis. Returns None if not trained."""
+    """Load reranker from Redis with 60s in-process cache."""
+    global _cached_reranker, _reranker_cached_at, _reranker_cache_populated
+
+    now = _time.monotonic()
+    if _reranker_cache_populated and (now - _reranker_cached_at) < _CACHE_TTL:
+        return _cached_reranker
+
     try:
         raw = await redis_store.client.get(REDIS_KEY)
         if not raw:
+            _cached_reranker = None
+            _reranker_cached_at = _time.monotonic()
+            _reranker_cache_populated = True
             return None
 
         data = json.loads(raw)
-        return RerankerModel(
+        model = RerankerModel(
             weights=data["weights"],
             bias=data["bias"],
             metadata={
@@ -126,6 +154,10 @@ async def get_reranker(redis_store) -> RerankerModel | None:
                 "features": data.get("features", FEATURE_NAMES),
             },
         )
+        _cached_reranker = model
+        _reranker_cached_at = _time.monotonic()
+        _reranker_cache_populated = True
+        return model
     except Exception as e:
         logger.warning("reranker_load_failed", error=str(e))
         return None

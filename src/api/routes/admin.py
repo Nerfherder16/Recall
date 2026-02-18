@@ -14,13 +14,11 @@ from typing import Any
 
 import httpx
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from src.api.rate_limit import limiter
 from src.core.config import get_settings
-from src.core.models import User
-
 from src.core.consolidation import MemoryConsolidator
 from src.core.domains import normalize_domain
 from src.core.embeddings import get_embedding_service
@@ -90,13 +88,15 @@ async def trigger_consolidation(request: Request, body: ConsolidateRequest):
         memories_merged = 0
         for r in results:
             memories_merged += len(r.source_memories)
-            formatted.append({
-                "merged_id": r.merged_memory.id,
-                "source_ids": r.source_memories,
-                "content_preview": r.merged_memory.content[:100],
-                "relationships_created": r.relationships_created,
-                "memories_superseded": r.memories_superseded,
-            })
+            formatted.append(
+                {
+                    "merged_id": r.merged_memory.id,
+                    "source_ids": r.source_memories,
+                    "content_preview": r.merged_memory.content[:100],
+                    "relationships_created": r.relationships_created,
+                    "memories_superseded": r.memories_superseded,
+                }
+            )
 
         return ConsolidateResponse(
             clusters_merged=len(results),
@@ -137,7 +137,9 @@ async def ollama_info(request: Request):
     async with httpx.AsyncClient(timeout=5.0) as client:
         try:
             r = await client.get(f"{host}/api/version")
-            result["version"] = r.json().get("version", "unknown") if r.status_code == 200 else "error"
+            result["version"] = (
+                r.json().get("version", "unknown") if r.status_code == 200 else "error"
+            )
         except Exception:
             result["version"] = "unreachable"
 
@@ -219,7 +221,9 @@ async def create_user(body: CreateUserRequest, request: Request):
     except Exception as e:
         err = str(e).lower()
         if "unique" in err or "duplicate" in err:
-            raise HTTPException(status_code=409, detail=f"Username '{body.username}' already exists")
+            raise HTTPException(
+                status_code=409, detail=f"Username '{body.username}' already exists"
+            )
         logger.error("create_user_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -268,8 +272,14 @@ _PERMANENT_PATTERNS = [
 ]
 
 # Signal tags → durability mapping
-_DURABLE_SIGNAL_TAGS = {"signal:fact", "signal:decision", "signal:pattern",
-                        "signal:workflow", "signal:preference", "signal:warning"}
+_DURABLE_SIGNAL_TAGS = {
+    "signal:fact",
+    "signal:decision",
+    "signal:pattern",
+    "signal:workflow",
+    "signal:preference",
+    "signal:warning",
+}
 _EPHEMERAL_SIGNAL_TAGS = {"signal:error_fix", "signal:contradiction"}
 
 
@@ -360,12 +370,14 @@ async def migrate_durability(request: Request, body: MigrateDurabilityRequest):
 
                 if len(sample) < 20:
                     content = (payload.get("content") or "")[:120]
-                    sample.append(MigrationSampleEntry(
-                        id=memory_id,
-                        content_preview=content,
-                        assigned_tier=tier,
-                        reason=reason,
-                    ))
+                    sample.append(
+                        MigrationSampleEntry(
+                            id=memory_id,
+                            content_preview=content,
+                            assigned_tier=tier,
+                            reason=reason,
+                        )
+                    )
 
                 if not body.dry_run:
                     await qdrant.update_durability(memory_id, tier)
@@ -451,7 +463,8 @@ async def normalize_domains(request: Request):
                 async with neo4j.driver.session() as session:
                     await session.run(
                         "MATCH (m:Memory {id: $id}) SET m.domain = $domain",
-                        id=memory_id, domain=normalized,
+                        id=memory_id,
+                        domain=normalized,
                     )
 
                 updated += 1
@@ -499,9 +512,10 @@ async def reclassify_domains(request: Request):
     import asyncio
     import json
 
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
     from src.core.domains import CANONICAL_DOMAINS
     from src.core.llm import get_llm
-    from qdrant_client.models import FieldCondition, MatchValue, Filter
 
     canonical_list = ", ".join(d for d in CANONICAL_DOMAINS if d != "general")
     prompt_template = (
@@ -524,12 +538,14 @@ async def reclassify_domains(request: Request):
         while True:
             points, next_offset = await qdrant.client.scroll(
                 collection_name=qdrant.collection,
-                scroll_filter=Filter(must=[
-                    FieldCondition(
-                        key="domain",
-                        match=MatchValue(value="general"),
-                    ),
-                ]),
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="domain",
+                            match=MatchValue(value="general"),
+                        ),
+                    ]
+                ),
                 limit=100,
                 offset=offset,
                 with_payload=True,
@@ -578,7 +594,8 @@ async def reclassify_domains(request: Request):
                 async with neo4j.driver.session() as session:
                     await session.run(
                         "MATCH (m:Memory {id: $id}) SET m.domain = $domain",
-                        id=memory_id, domain=new_domain,
+                        id=memory_id,
+                        domain=new_domain,
                     )
 
                 reclassified += 1
@@ -782,6 +799,11 @@ async def retrain_ranker(request: Request):
         redis = await get_redis_store()
 
         result = await train_reranker(pg, qdrant, redis)
+
+        from src.core.reranker import invalidate_reranker_cache
+
+        invalidate_reranker_cache()
+
         return result
 
     except ValueError as e:
@@ -800,6 +822,7 @@ async def retrain_ranker(request: Request):
 async def reranker_status(request: Request):
     """Get current reranker model status."""
     import json
+
     from src.core.reranker import REDIS_KEY
 
     try:
@@ -856,6 +879,7 @@ async def retrain_signal_classifier(request: Request):
 async def signal_classifier_status(request: Request):
     """Get current signal classifier model status."""
     import json
+
     from src.core.signal_classifier import REDIS_KEY
 
     try:
