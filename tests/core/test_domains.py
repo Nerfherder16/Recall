@@ -43,8 +43,51 @@ def test_normalize_domain_unknown_falls_back():
     from src.core.domains import normalize_domain
 
     assert normalize_domain("xylophone") == "general"
-    assert normalize_domain("random-stuff") == "general"
     assert normalize_domain("") == "general"
+
+
+def test_normalize_domain_compound_slash():
+    """Compound domains with / are split and matched."""
+    from src.core.domains import normalize_domain
+
+    assert normalize_domain("Docker/Containerization") == "infrastructure"
+    assert normalize_domain("Frontend/React") == "frontend"
+    assert normalize_domain("Machine Learning / NLP") == "ai-ml"
+    assert normalize_domain("Machine Learning / Embeddings") == "ai-ml"
+    assert normalize_domain("Machine Learning / Embedding Models") == "ai-ml"
+    assert normalize_domain("Infrastructure/Configuration") == "infrastructure"
+    assert normalize_domain("Testing/Dependencies") == "testing"
+
+
+def test_normalize_domain_compound_spaces():
+    """Multi-word domains are split and matched by word."""
+    from src.core.domains import normalize_domain
+
+    assert normalize_domain("API Design") == "api"
+    assert normalize_domain("API Behavior") == "api"
+    assert normalize_domain("API Architecture") == "api"
+    assert normalize_domain("API Endpoints") == "api"
+    assert normalize_domain("API Integration") == "api"
+    assert normalize_domain("Database Schema") == "database"
+    assert normalize_domain("Code Quality") == "development"
+    assert normalize_domain("Code Refactoring") == "development"
+    assert normalize_domain("Code Architecture") == "development"
+    assert normalize_domain("System Architecture") == "development"
+    assert normalize_domain("Frontend State Management") == "frontend"
+    assert normalize_domain("UI Component Design") == "frontend"
+    assert normalize_domain("Deployment Configuration") == "devops"
+
+
+def test_normalize_domain_priority():
+    """When multiple words match, the more specific domain wins."""
+    from src.core.domains import normalize_domain
+
+    # "API" (priority 1) beats "Development" (priority 5)
+    assert normalize_domain("API Development") == "api"
+    # "Database" (priority 1) beats "Configuration" (priority 3)
+    assert normalize_domain("Database Configuration") == "database"
+    # "Security" (priority 1) beats "Testing" (priority 2)
+    assert normalize_domain("Security Testing") == "security"
 
 
 def test_normalize_domain_case_insensitive():

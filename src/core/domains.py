@@ -2,9 +2,15 @@
 Canonical domain list and normalization.
 
 All memories should use one of CANONICAL_DOMAINS.
-Freeform domain strings are normalized via DOMAIN_ALIASES
-or fall back to "general".
+Freeform domain strings are normalized via multi-level matching:
+  1. Exact match on canonical names
+  2. Exact match on alias dict
+  3. Segment match — split on / and try each segment
+  4. Word match — split into words and match against keyword signals
+  5. Fall back to "general"
 """
+
+import re
 
 CANONICAL_DOMAINS: list[str] = [
     "general",
@@ -24,7 +30,7 @@ CANONICAL_DOMAINS: list[str] = [
     "sessions",
 ]
 
-# Map freeform domain names to canonical domains
+# Map freeform domain names to canonical domains (exact match after lowering)
 DOMAIN_ALIASES: dict[str, str] = {
     # infrastructure
     "redis": "infrastructure",
@@ -37,6 +43,8 @@ DOMAIN_ALIASES: dict[str, str] = {
     "vm": "infrastructure",
     "container": "infrastructure",
     "containers": "infrastructure",
+    "containerization": "infrastructure",
+    "server": "infrastructure",
     # database
     "neo4j": "database",
     "qdrant": "database",
@@ -46,21 +54,22 @@ DOMAIN_ALIASES: dict[str, str] = {
     "sqlite": "database",
     "mongodb": "database",
     "db": "database",
+    "database schema": "database",
+    "schema": "database",
     # frontend
     "react": "frontend",
     "dashboard": "frontend",
     "tailwind": "frontend",
     "css": "frontend",
     "ui": "frontend",
+    "ux": "frontend",
     "ui/ux": "frontend",
-    "ui/ux design": "frontend",
-    "frontend ui": "frontend",
-    "frontend ui/ux": "frontend",
-    "frontend development": "frontend",
-    "frontend/react": "frontend",
     "vite": "frontend",
     "daisyui": "frontend",
     "html": "frontend",
+    "component": "frontend",
+    "components": "frontend",
+    "interaction": "frontend",
     # development
     "python": "development",
     "typescript": "development",
@@ -70,26 +79,33 @@ DOMAIN_ALIASES: dict[str, str] = {
     "node.js": "development",
     "coding": "development",
     "programming": "development",
-    "software development": "development",
     "backend": "development",
-    "backend development": "development",
+    "code": "development",
+    "refactoring": "development",
+    "architecture": "development",
+    "dependencies": "development",
+    "recall": "development",
+    "memory system": "development",
     # api
     "fastapi": "api",
     "rest": "api",
-    "rest api": "api",
-    "api development": "api",
     "endpoints": "api",
     "http": "api",
+    "api": "api",
     # ai-ml
     "ollama": "ai-ml",
     "llm": "ai-ml",
     "embeddings": "ai-ml",
+    "embedding": "ai-ml",
     "ai": "ai-ml",
     "ml": "ai-ml",
     "machine learning": "ai-ml",
     "artificial intelligence": "ai-ml",
     "qwen": "ai-ml",
     "qwen3": "ai-ml",
+    "neural": "ai-ml",
+    "nlp": "ai-ml",
+    "model": "ai-ml",
     # tooling
     "npm": "tooling",
     "bun": "tooling",
@@ -97,7 +113,6 @@ DOMAIN_ALIASES: dict[str, str] = {
     "ruff": "tooling",
     "mypy": "tooling",
     "tools": "tooling",
-    "dev tools": "tooling",
     # devops
     "git": "devops",
     "ci-cd": "devops",
@@ -106,6 +121,8 @@ DOMAIN_ALIASES: dict[str, str] = {
     "deploy": "devops",
     "ssh": "devops",
     "scp": "devops",
+    "version control": "devops",
+    "build system": "devops",
     # networking
     "nginx": "networking",
     "dns": "networking",
@@ -120,15 +137,13 @@ DOMAIN_ALIASES: dict[str, str] = {
     "authentication": "security",
     "authorization": "security",
     "encryption": "security",
-    "api keys": "security",
     # testing
     "pytest": "testing",
     "vitest": "testing",
     "jest": "testing",
     "tests": "testing",
     "test": "testing",
-    "unit testing": "testing",
-    "integration testing": "testing",
+    "verification": "testing",
     # configuration
     "config": "configuration",
     "settings": "configuration",
@@ -137,28 +152,71 @@ DOMAIN_ALIASES: dict[str, str] = {
     # documentation
     "docs": "documentation",
     "readme": "documentation",
-    "markdown": "documentation",
     # sessions
     "session": "sessions",
     "session-summary": "sessions",
-    # recall-specific
-    "recall": "development",
-    "memory": "development",
-    "memory system": "development",
 }
 
 _CANONICAL_SET = set(CANONICAL_DOMAINS)
+
+# Priority: lower = wins ties when multiple words match different domains
+_DOMAIN_PRIORITY: dict[str, int] = {
+    "api": 1,
+    "database": 1,
+    "security": 1,
+    "ai-ml": 1,
+    "testing": 2,
+    "infrastructure": 2,
+    "frontend": 2,
+    "networking": 2,
+    "devops": 3,
+    "tooling": 3,
+    "configuration": 3,
+    "documentation": 4,
+    "sessions": 4,
+    "development": 5,  # Most generic — loses to everything
+    "general": 99,
+}
+
+_SPLIT_RE = re.compile(r"[/\-_,&]+|\s+")
 
 
 def normalize_domain(raw: str) -> str:
     """Normalize a freeform domain string to a canonical domain.
 
-    Checks aliases first, then falls back to "general" for unknown domains.
-    Canonical domain names pass through unchanged.
+    Multi-level matching:
+      1. Exact match on canonical set
+      2. Exact match on alias dict
+      3. Split on /, -, _, spaces — try each segment as alias
+      4. Try individual words as alias keys
+      5. Fall back to "general"
+
+    When multiple segments match different domains, the highest-priority
+    (most specific) domain wins.
     """
     cleaned = raw.strip().lower()
     if not cleaned:
         return "general"
+
+    # 1. Already canonical
     if cleaned in _CANONICAL_SET:
         return cleaned
-    return DOMAIN_ALIASES.get(cleaned, "general")
+
+    # 2. Exact alias match
+    if cleaned in DOMAIN_ALIASES:
+        return DOMAIN_ALIASES[cleaned]
+
+    # 3. Segment matching — split on / - _ spaces, try each segment
+    segments = [s.strip() for s in _SPLIT_RE.split(cleaned) if s.strip()]
+    candidates: list[str] = []
+
+    for seg in segments:
+        if seg in _CANONICAL_SET:
+            candidates.append(seg)
+        elif seg in DOMAIN_ALIASES:
+            candidates.append(DOMAIN_ALIASES[seg])
+
+    if candidates:
+        return min(candidates, key=lambda d: _DOMAIN_PRIORITY.get(d, 50))
+
+    return "general"
