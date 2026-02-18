@@ -20,6 +20,7 @@ from src.core import (
     User,
     get_embedding_service,
 )
+from src.core.domains import normalize_domain
 from src.core.embeddings import OllamaUnavailableError, content_hash
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, get_redis_store
 
@@ -112,13 +113,16 @@ async def store_memory(
         # Resolve durability
         durability = Durability(request.durability) if request.durability else None
 
+        # Normalize domain to canonical list
+        domain = normalize_domain(request.domain)
+
         # Create memory object
         memory = Memory(
             content=request.content,
             content_hash=content_hash(request.content),
             memory_type=request.memory_type,
             source=request.source,
-            domain=request.domain,
+            domain=domain,
             tags=request.tags,
             importance=request.importance,
             confidence=request.confidence,
