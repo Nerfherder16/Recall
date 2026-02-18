@@ -145,7 +145,7 @@ class RetrievalPipeline:
             results.append(
                 RetrievalResult(
                     memory=memory,
-                    score=similarity * memory.importance,
+                    score=similarity * max(memory.importance, 0.15),
                     similarity=similarity,
                     graph_distance=0,
                     retrieval_path=[memory_id],
@@ -188,7 +188,7 @@ class RetrievalPipeline:
             results.append(
                 RetrievalResult(
                     memory=memory,
-                    score=similarity * memory.importance * 1.15,
+                    score=similarity * max(memory.importance, 0.15) * 1.15,
                     similarity=similarity,
                     graph_distance=0,
                     retrieval_path=[parent_id],
