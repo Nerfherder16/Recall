@@ -475,6 +475,143 @@ async def normalize_domains(request: Request):
 
 
 # =============================================================
+# DOMAIN RECLASSIFICATION (LLM-based)
+# =============================================================
+
+
+class ReclassifyDomainsResponse(BaseModel):
+    scanned: int
+    reclassified: int
+    domain_changes: dict[str, int]
+    errors: int
+
+
+@router.post("/domains/reclassify", response_model=ReclassifyDomainsResponse)
+@limiter.limit("2/minute")
+async def reclassify_domains(request: Request):
+    """
+    LLM-based reclassification of memories stuck in the 'general' domain.
+
+    Sends each general-domain memory's content to the LLM to classify
+    into a canonical domain. Processes sequentially with delays to avoid
+    overwhelming Ollama.
+    """
+    import asyncio
+    import json
+
+    from src.core.domains import CANONICAL_DOMAINS
+    from src.core.llm import get_llm
+    from qdrant_client.models import FieldCondition, MatchValue, Filter
+
+    canonical_list = ", ".join(d for d in CANONICAL_DOMAINS if d != "general")
+    prompt_template = (
+        "Classify this memory into exactly one domain.\n"
+        "Domains: {domains}\n\n"
+        "Memory content:\n{content}\n\n"
+        'Respond with JSON: {{"domain": "chosen_domain"}}\n'
+        "If unsure, use the most specific domain that applies. "
+        "Only use 'general' if absolutely nothing else fits."
+    )
+
+    try:
+        qdrant = await get_qdrant_store()
+        neo4j = await get_neo4j_store()
+        llm = await get_llm()
+
+        # Scroll only "general" domain memories
+        all_points = []
+        offset = None
+        while True:
+            points, next_offset = await qdrant.client.scroll(
+                collection_name=qdrant.collection,
+                scroll_filter=Filter(must=[
+                    FieldCondition(
+                        key="domain",
+                        match=MatchValue(value="general"),
+                    ),
+                ]),
+                limit=100,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+            for point in points:
+                all_points.append((str(point.id), point.payload or {}))
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        scanned = len(all_points)
+        reclassified = 0
+        errors = 0
+        domain_changes: dict[str, int] = {}
+
+        for i, (memory_id, payload) in enumerate(all_points):
+            content = payload.get("content", "")
+            if not content or len(content) < 10:
+                continue
+
+            # Truncate long content to avoid blowing context
+            truncated = content[:500]
+
+            prompt = prompt_template.format(
+                domains=canonical_list,
+                content=truncated,
+            )
+
+            try:
+                raw = await llm.generate(prompt, temperature=0.1, format_json=True)
+                parsed = json.loads(raw)
+                new_domain = parsed.get("domain", "general").strip().lower()
+
+                if new_domain == "general" or new_domain not in set(CANONICAL_DOMAINS):
+                    continue
+
+                # Update Qdrant
+                await qdrant.client.set_payload(
+                    collection_name=qdrant.collection,
+                    payload={"domain": new_domain},
+                    points=[memory_id],
+                )
+
+                # Update Neo4j
+                async with neo4j.driver.session() as session:
+                    await session.run(
+                        "MATCH (m:Memory {id: $id}) SET m.domain = $domain",
+                        id=memory_id, domain=new_domain,
+                    )
+
+                reclassified += 1
+                domain_changes[new_domain] = domain_changes.get(new_domain, 0) + 1
+
+            except Exception as e:
+                logger.debug("reclassify_error", memory_id=memory_id, error=str(e))
+                errors += 1
+
+            # Rate limit: 1 LLM call per second
+            if (i + 1) % 5 == 0:
+                await asyncio.sleep(2)
+
+        logger.info(
+            "domain_reclassification_complete",
+            scanned=scanned,
+            reclassified=reclassified,
+            errors=errors,
+        )
+
+        return ReclassifyDomainsResponse(
+            scanned=scanned,
+            reclassified=reclassified,
+            domain_changes=domain_changes,
+            errors=errors,
+        )
+
+    except Exception as e:
+        logger.error("domain_reclassification_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
 # GRAPH BOOTSTRAP
 # =============================================================
 
