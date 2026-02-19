@@ -72,7 +72,10 @@ export default function GraphPage() {
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const graphRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [dimensions, setDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -93,15 +96,28 @@ export default function GraphPage() {
     fetchData();
   }, [fetchData]);
 
+  // Measure container and keep dimensions in sync
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const obs = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setDimensions({ width, height });
-    });
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      setDimensions({ width: rect.width, height: rect.height });
+    };
+    // Initial measurement
+    measure();
+    const obs = new ResizeObserver(measure);
     obs.observe(el);
     return () => obs.disconnect();
+  }, []);
+
+  // Prevent scroll events on graph container from scrolling the page
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => e.preventDefault();
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
   }, []);
 
   const toggleType = useCallback((type: NodeType) => {
@@ -212,10 +228,8 @@ export default function GraphPage() {
     [selectedNode, connectedIds],
   );
 
-  if (loading) return <LoadingSpinner />;
-
   return (
-    <div>
+    <div className="flex flex-col h-[calc(100vh-48px)] lg:h-[calc(100vh-64px)]">
       <PageHeader
         title="Architecture Graph"
         subtitle={`${data?.metadata.node_count ?? 0} modules, ${data?.metadata.link_count ?? 0} connections`}
@@ -226,7 +240,7 @@ export default function GraphPage() {
       </PageHeader>
 
       {/* Filter pills */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-3 shrink-0">
         <FunnelSimple size={16} className="text-zinc-400" />
         {(Object.entries(NODE_LABELS) as [NodeType, string][]).map(
           ([type, label]) => (
@@ -256,90 +270,60 @@ export default function GraphPage() {
         )}
       </div>
 
-      <div className="flex gap-4">
-        {/* Graph canvas */}
-        <div
-          ref={containerRef}
-          className="flex-1 rounded-xl border border-zinc-200 dark:border-white/[0.06] bg-zinc-100 dark:bg-zinc-900/60 overflow-hidden relative"
-          style={{ height: "calc(100vh - 240px)", minHeight: 400 }}
-        >
-          {filteredData && (
-            <ForceGraph2D
-              ref={graphRef}
-              graphData={filteredData}
-              width={dimensions.width}
-              height={dimensions.height}
-              backgroundColor="transparent"
-              nodeCanvasObject={paintNode}
-              linkCanvasObject={paintLink}
-              onNodeClick={handleNodeClick}
-              onNodeHover={handleNodeHover}
-              nodeId="id"
-              cooldownTicks={120}
-              d3AlphaDecay={0.02}
-              d3VelocityDecay={0.3}
-              enableNodeDrag={true}
-              enableZoomInteraction={true}
-              enablePanInteraction={true}
-            />
-          )}
-
-          {/* Hover tooltip */}
-          {hoveredNode && !selectedNode && (
-            <div className="absolute top-3 left-3 pointer-events-none rounded-lg bg-zinc-900/90 backdrop-blur-md border border-white/10 px-3 py-2 max-w-xs shadow-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: NODE_COLORS[hoveredNode.type] }}
-                />
-                <span className="text-sm font-medium text-zinc-100">
-                  {hoveredNode.label}
-                </span>
-                <span className="text-[10px] uppercase tracking-wider text-zinc-500">
-                  {hoveredNode.type}
-                </span>
-              </div>
-              <p className="text-xs text-zinc-400">{hoveredNode.description}</p>
-            </div>
-          )}
-
-          {/* Legend */}
-          <div className="absolute bottom-3 right-3 rounded-lg bg-zinc-900/80 backdrop-blur-md border border-white/10 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">
-              Link Types
-            </div>
-            <div className="flex flex-col gap-1">
-              {(
-                ["calls", "imports", "data_flow", "triggers"] as LinkType[]
-              ).map((type) => (
-                <div key={type} className="flex items-center gap-2">
-                  <span
-                    className="w-4 h-0.5 inline-block"
-                    style={{
-                      backgroundColor:
-                        type === "calls"
-                          ? "#8b5cf6"
-                          : type === "triggers"
-                            ? "#fb923c"
-                            : type === "data_flow"
-                              ? "#22d3ee"
-                              : "#a1a1aa",
-                      borderBottom:
-                        type === "data_flow" ? "1px dashed" : undefined,
-                    }}
-                  />
-                  <span className="text-[10px] text-zinc-400">
-                    {type.replace("_", " ")}
-                  </span>
-                </div>
-              ))}
-            </div>
+      {/* Graph canvas — fills all remaining space */}
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 rounded-xl border border-zinc-200 dark:border-white/[0.06] bg-zinc-100 dark:bg-zinc-900/60 overflow-hidden relative"
+      >
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center z-20">
+            <LoadingSpinner />
           </div>
-        </div>
+        )}
+        {filteredData && dimensions && (
+          <ForceGraph2D
+            ref={graphRef}
+            graphData={filteredData}
+            width={dimensions.width}
+            height={dimensions.height}
+            backgroundColor="transparent"
+            nodeCanvasObject={paintNode}
+            linkCanvasObject={paintLink}
+            onNodeClick={handleNodeClick}
+            onNodeHover={handleNodeHover}
+            onBackgroundClick={() => setSelectedNode(null)}
+            nodeId="id"
+            cooldownTicks={120}
+            d3AlphaDecay={0.02}
+            d3VelocityDecay={0.3}
+            enableNodeDrag={true}
+            enableZoomInteraction={true}
+            enablePanInteraction={true}
+          />
+        )}
 
-        {/* Detail panel */}
+        {/* Hover tooltip */}
+        {hoveredNode && !selectedNode && (
+          <div className="absolute top-3 left-3 pointer-events-none rounded-lg bg-zinc-900/90 backdrop-blur-md border border-white/10 px-3 py-2 max-w-xs shadow-xl z-10">
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: NODE_COLORS[hoveredNode.type] }}
+              />
+              <span className="text-sm font-medium text-zinc-100">
+                {hoveredNode.label}
+              </span>
+              <span className="text-[10px] uppercase tracking-wider text-zinc-500">
+                {hoveredNode.type}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400">{hoveredNode.description}</p>
+          </div>
+        )}
+
+        {/* Detail panel — overlay inside graph container */}
         {selectedNode && data && (
-          <div className="w-72 shrink-0 rounded-xl border border-zinc-200 dark:border-white/[0.06] bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl p-4 self-start">
+          <div className="absolute top-3 right-3 w-72 rounded-xl border border-white/[0.08] bg-zinc-900/90 backdrop-blur-2xl p-4 shadow-2xl z-10 max-h-[calc(100%-24px)] overflow-y-auto">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span
@@ -348,13 +332,13 @@ export default function GraphPage() {
                     backgroundColor: NODE_COLORS[selectedNode.type],
                   }}
                 />
-                <span className="font-medium text-zinc-900 dark:text-zinc-100 text-sm">
+                <span className="font-medium text-zinc-100 text-sm">
                   {selectedNode.label}
                 </span>
               </div>
               <button
                 onClick={() => setSelectedNode(null)}
-                className="rounded-md p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400"
+                className="rounded-md p-1 hover:bg-zinc-800 transition-colors text-zinc-400"
               >
                 <X size={14} />
               </button>
@@ -370,20 +354,20 @@ export default function GraphPage() {
               {selectedNode.type}
             </span>
 
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+            <p className="text-xs text-zinc-400 mb-4">
               {selectedNode.description}
             </p>
 
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-500 font-medium mb-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium mb-1.5">
               {selectedNode.id}
             </p>
 
             {/* Connections */}
-            <div className="border-t border-zinc-200 dark:border-white/[0.06] pt-3 mt-2">
+            <div className="border-t border-white/[0.06] pt-3 mt-2">
               <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium mb-2">
                 Connections
               </p>
-              <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+              <div className="flex flex-col gap-1.5">
                 {data.links
                   .filter((l) => {
                     const src = nodeId(l.source);
@@ -400,7 +384,7 @@ export default function GraphPage() {
                     return (
                       <div
                         key={i}
-                        className="flex items-center gap-1.5 text-xs cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 rounded px-1.5 py-0.5 transition-colors"
+                        className="flex items-center gap-1.5 text-xs cursor-pointer hover:bg-white/5 rounded px-1.5 py-0.5 transition-colors"
                         onClick={() => {
                           if (other) setSelectedNode(other);
                         }}
@@ -427,6 +411,39 @@ export default function GraphPage() {
             </div>
           </div>
         )}
+
+        {/* Legend */}
+        <div className="absolute bottom-3 right-3 rounded-lg bg-zinc-900/80 backdrop-blur-md border border-white/10 px-3 py-2 z-10">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">
+            Link Types
+          </div>
+          <div className="flex flex-col gap-1">
+            {(["calls", "imports", "data_flow", "triggers"] as LinkType[]).map(
+              (type) => (
+                <div key={type} className="flex items-center gap-2">
+                  <span
+                    className="w-4 h-0.5 inline-block"
+                    style={{
+                      backgroundColor:
+                        type === "calls"
+                          ? "#8b5cf6"
+                          : type === "triggers"
+                            ? "#fb923c"
+                            : type === "data_flow"
+                              ? "#22d3ee"
+                              : "#a1a1aa",
+                      borderBottom:
+                        type === "data_flow" ? "1px dashed" : undefined,
+                    }}
+                  />
+                  <span className="text-[10px] text-zinc-400">
+                    {type.replace("_", " ")}
+                  </span>
+                </div>
+              ),
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

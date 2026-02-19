@@ -23,7 +23,18 @@ from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store, g
 
 from .auth import require_auth
 from .rate_limit import limiter
-from .routes import admin, documents, events, health_dashboard, ingest, memory, observe, ops, search, session
+from .routes import (
+    admin,
+    documents,
+    events,
+    health_dashboard,
+    ingest,
+    memory,
+    observe,
+    ops,
+    search,
+    session,
+)
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -75,13 +86,13 @@ async def lifespan(app: FastAPI):
             await postgres.close()
 
         # Reset singleton globals so hot-reload creates fresh connections
-        import src.storage.qdrant as _qdrant_mod
-        import src.storage.neo4j_store as _neo4j_mod
-        import src.storage.redis_store as _redis_mod
-        import src.storage.postgres_store as _postgres_mod
         import src.core.embeddings as _embed_mod
         import src.core.llm as _llm_mod
         import src.core.metrics as _metrics_mod
+        import src.storage.neo4j_store as _neo4j_mod
+        import src.storage.postgres_store as _postgres_mod
+        import src.storage.qdrant as _qdrant_mod
+        import src.storage.redis_store as _redis_mod
 
         _qdrant_mod._store = None
         _neo4j_mod._store = None
@@ -108,11 +119,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware — configurable via RECALL_ALLOWED_ORIGINS
-_origins = [
-    o.strip()
-    for o in settings.allowed_origins.split(",")
-    if o.strip()
-]
+_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
@@ -145,43 +152,63 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers — all require auth except /health
 app.include_router(
-    memory.router, prefix="/memory", tags=["memory"],
+    memory.router,
+    prefix="/memory",
+    tags=["memory"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    search.router, prefix="/search", tags=["search"],
+    search.router,
+    prefix="/search",
+    tags=["search"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    session.router, prefix="/session", tags=["session"],
+    session.router,
+    prefix="/session",
+    tags=["session"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    admin.router, prefix="/admin", tags=["admin"],
+    admin.router,
+    prefix="/admin",
+    tags=["admin"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    ingest.router, prefix="/ingest", tags=["ingest"],
+    ingest.router,
+    prefix="/ingest",
+    tags=["ingest"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    ops.router, prefix="/admin", tags=["ops"],
+    ops.router,
+    prefix="/admin",
+    tags=["ops"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    observe.router, prefix="/observe", tags=["observe"],
+    observe.router,
+    prefix="/observe",
+    tags=["observe"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    events.router, prefix="/events", tags=["events"],
+    events.router,
+    prefix="/events",
+    tags=["events"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    health_dashboard.router, prefix="/admin", tags=["health"],
+    health_dashboard.router,
+    prefix="/admin",
+    tags=["health"],
     dependencies=[Depends(require_auth)],
 )
 app.include_router(
-    documents.router, prefix="/document", tags=["documents"],
+    documents.router,
+    prefix="/document",
+    tags=["documents"],
     dependencies=[Depends(require_auth)],
 )
 
@@ -297,11 +324,15 @@ async def get_domain_stats():
 
         domains = []
         for domain, data in sorted(domain_data.items(), key=lambda x: x[1]["count"], reverse=True):
-            domains.append({
-                "domain": domain,
-                "count": data["count"],
-                "avg_importance": round(data["total_importance"] / data["count"], 4) if data["count"] > 0 else 0,
-            })
+            domains.append(
+                {
+                    "domain": domain,
+                    "count": data["count"],
+                    "avg_importance": round(data["total_importance"] / data["count"], 4)
+                    if data["count"] > 0
+                    else 0,
+                }
+            )
 
         return {"domains": domains}
 
@@ -341,14 +372,28 @@ async def dashboard_legacy():
 # Serve React SPA dashboard if built, otherwise fall back to legacy
 _dashboard_dir = Path(__file__).parent / "static" / "dashboard"
 if _dashboard_dir.exists():
-    from fastapi.staticfiles import StaticFiles
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+    from starlette.responses import Response as StarletteResponse
+    from starlette.staticfiles import StaticFiles
+
+    class _SPAStaticFiles(StaticFiles):
+        """StaticFiles that falls back to index.html for SPA client-side routing."""
+
+        async def get_response(self, path: str, scope: dict) -> StarletteResponse:
+            try:
+                return await super().get_response(path, scope)
+            except StarletteHTTPException as ex:
+                if ex.status_code == 404:
+                    return await super().get_response("index.html", scope)
+                raise
 
     app.mount(
         "/dashboard",
-        StaticFiles(directory=str(_dashboard_dir), html=True),
+        _SPAStaticFiles(directory=str(_dashboard_dir), html=True),
         name="dashboard",
     )
 else:
+
     @app.get("/dashboard", dependencies=[Depends(require_auth)])
     async def dashboard():
         """Serve the ops dashboard (legacy HTML fallback)."""
