@@ -2,8 +2,6 @@
 Session management routes.
 """
 
-from datetime import datetime
-
 import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
@@ -127,8 +125,9 @@ async def end_session(request: EndSessionRequest, background_tasks: BackgroundTa
         # Trigger consolidation as a BackgroundTask (replaces dead event stream)
         consolidation_queued = False
         if request.trigger_consolidation and len(working_memory) >= 2:
+            session_domain = (session_data or {}).get("domain")
             background_tasks.add_task(
-                _run_session_end_consolidation, request.session_id
+                _run_session_end_consolidation, request.session_id, session_domain
             )
             consolidation_queued = True
 
@@ -138,10 +137,12 @@ async def end_session(request: EndSessionRequest, background_tasks: BackgroundTa
         if updated_session:
             turns_count = len(await redis.get_recent_turns(request.session_id, count=9999))
             pg = await get_postgres_store()
-            await pg.archive_session({
-                **updated_session,
-                "turns_count": turns_count,
-            })
+            await pg.archive_session(
+                {
+                    **updated_session,
+                    "turns_count": turns_count,
+                }
+            )
 
         logger.info(
             "session_ended",
@@ -164,17 +165,18 @@ async def end_session(request: EndSessionRequest, background_tasks: BackgroundTa
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-async def _run_session_end_consolidation(session_id: str):
+async def _run_session_end_consolidation(session_id: str, domain: str | None = None):
     """Background task: consolidate memories from an ended session."""
     try:
         from src.core.consolidation import create_consolidator
 
         consolidator = await create_consolidator()
-        results = await consolidator.consolidate()
+        results = await consolidator.consolidate(domain=domain)
 
         logger.info(
             "session_end_consolidation_complete",
             session_id=session_id,
+            domain=domain,
             clusters_merged=len(results),
         )
     except Exception as e:
@@ -239,12 +241,14 @@ async def get_working_memory(session_id: str):
             result = await qdrant.get(memory_id)
             if result:
                 _, payload = result
-                memories.append({
-                    "id": memory_id,
-                    "content": payload.get("content", ""),
-                    "type": payload.get("memory_type", "semantic"),
-                    "importance": payload.get("importance", 0.5),
-                })
+                memories.append(
+                    {
+                        "id": memory_id,
+                        "content": payload.get("content", ""),
+                        "type": payload.get("memory_type", "semantic"),
+                        "importance": payload.get("importance", 0.5),
+                    }
+                )
 
         return {
             "session_id": session_id,

@@ -93,8 +93,8 @@ class RerankerModel:
     def score_results(self, results: list[RetrievalResult]) -> list[RetrievalResult]:
         """Re-score results using ML prediction blended with similarity."""
         for result in results:
-            has_graph = result.graph_distance > 0
-            path_len = result.graph_distance
+            has_graph = len(result.retrieval_path) > 1
+            path_len = len(result.retrieval_path)
 
             features = extract_features(
                 result.memory,

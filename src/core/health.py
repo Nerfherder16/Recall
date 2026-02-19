@@ -80,8 +80,10 @@ class HealthComputer:
         else:
             decay_pressure = -(effective_decay * importance)
 
-        # Retrieval lift
-        retrieval_lift = 0.02 * access_count
+        # Retrieval lift (diminishing returns — log scale matches other forces)
+        import math
+
+        retrieval_lift = 0.02 * math.log1p(access_count)
 
         # Feedback signal (net importance delta from feedback)
         feedback_entries = await self.pg.get_feedback_for_memory(memory_id)

@@ -548,11 +548,16 @@ class RetrievalPipeline:
             if memory.metadata.get("is_anti_pattern"):
                 continue
 
+            # Reinforce importance only if not accessed in the last hour
+            # Prevents runaway importance inflation from frequent retrieval
+            hours_since = (now - memory.last_accessed).total_seconds() / 3600
+            if hours_since >= 1.0:
+                memory.importance = min(1.0, memory.importance + 0.02)
+                await self.qdrant.update_importance(memory.id, memory.importance)
+                await self.neo4j.update_importance(memory.id, memory.importance)
+
             memory.access_count += 1
             memory.last_accessed = now
-
-            # Reinforce importance slightly
-            memory.importance = min(1.0, memory.importance + 0.02)
 
             # Update access count and timestamps in Qdrant
             await self.qdrant.update_access(
@@ -560,10 +565,6 @@ class RetrievalPipeline:
                 memory.access_count,
                 now.isoformat(),
             )
-
-            # Persist the importance boost to both stores
-            await self.qdrant.update_importance(memory.id, memory.importance)
-            await self.neo4j.update_importance(memory.id, memory.importance)
 
     def _payload_to_memory(self, memory_id: str, payload: dict[str, Any]) -> Memory:
         """Convert Qdrant payload to Memory object."""

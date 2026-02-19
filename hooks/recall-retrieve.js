@@ -230,7 +230,7 @@ async function main() {
   try {
     // Build concurrent requests
     const searchBody = { query, limit: MAX_RESULTS };
-    if (domain) searchBody.domain = domain;
+    if (domain) searchBody.domains = [domain];
 
     const browsePromise = fetch(`${RECALL_HOST}/search/browse`, {
       method: "POST",
@@ -245,7 +245,7 @@ async function main() {
       rehydratePromise = fetch(`${RECALL_HOST}/search/rehydrate`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ domain, limit: 10 }),
+        body: JSON.stringify({ domain, max_entries: 10 }),
         signal: AbortSignal.timeout(3500),
       }).catch(() => null);
     }

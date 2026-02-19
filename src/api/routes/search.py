@@ -215,7 +215,7 @@ async def browse_memories(request: Request, body: SearchRequest):
         )
 
         pipeline = await get_retrieval_pipeline()
-        results = await pipeline.retrieve(query)
+        results = await pipeline.retrieve(query, browse_mode=True)
 
         browse_results = [
             BrowseResult(

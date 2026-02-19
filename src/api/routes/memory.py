@@ -2,7 +2,6 @@
 Memory CRUD routes.
 """
 
-from datetime import datetime
 from typing import Any
 
 import structlog
@@ -178,7 +177,8 @@ async def store_memory(
         # Audit log (fire-and-forget)
         pg = await get_postgres_store()
         await pg.log_audit(
-            "create", memory.id,
+            "create",
+            memory.id,
             actor=user.username if user else "user",
             session_id=request.session_id,
             details={
@@ -193,16 +193,12 @@ async def store_memory(
         # Auto-link to similar memories in background
         from src.core.auto_linker import auto_link_memory
 
-        background_tasks.add_task(
-            auto_link_memory, memory.id, embedding, request.domain
-        )
+        background_tasks.add_task(auto_link_memory, memory.id, embedding, domain)
 
         # Trigger sub-embedding extraction in background
         from src.workers.fact_extractor import extract_facts_for_memory
 
-        background_tasks.add_task(
-            extract_facts_for_memory, memory.id, request.content, request.domain
-        )
+        background_tasks.add_task(extract_facts_for_memory, memory.id, request.content, domain)
 
         return StoreMemoryResponse(
             id=memory.id,
@@ -278,7 +274,8 @@ async def create_anti_pattern(
 
         pg = await get_postgres_store()
         await pg.log_audit(
-            "create_anti_pattern", anti_pattern.id,
+            "create_anti_pattern",
+            anti_pattern.id,
             actor=user.username if user else "user",
             user_id=user.id if user else None,
             details={"severity": request.severity, "domain": request.domain},
@@ -379,7 +376,8 @@ async def delete_anti_pattern(anti_pattern_id: str, user: User | None = Depends(
 
         pg = await get_postgres_store()
         await pg.log_audit(
-            "delete_anti_pattern", anti_pattern_id,
+            "delete_anti_pattern",
+            anti_pattern_id,
             actor=user.username if user else "user",
             user_id=user.id if user else None,
         )
@@ -479,7 +477,8 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
 
             # Audit log — enriched with memory features for ML training
             await pg.log_audit(
-                "feedback", memory_id,
+                "feedback",
+                memory_id,
                 actor=user.username if user else "system",
                 user_id=user.id if user else None,
                 details={
@@ -504,6 +503,7 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
         relationships_strengthened = 0
         if len(useful_memory_ids) >= 2:
             from itertools import combinations
+
             for id_a, id_b in combinations(useful_memory_ids, 2):
                 try:
                     await neo4j.strengthen_relationship(id_a, id_b)
@@ -565,7 +565,8 @@ async def update_durability(
 
         pg = await get_postgres_store()
         await pg.log_audit(
-            "update_durability", memory_id,
+            "update_durability",
+            memory_id,
             actor=user.username if user else "user",
             user_id=user.id if user else None,
             details={"durability": request.durability},
@@ -679,7 +680,8 @@ async def delete_memory(memory_id: str, user: User | None = Depends(require_auth
         # Audit log (fire-and-forget)
         pg = await get_postgres_store()
         await pg.log_audit(
-            "delete", memory_id,
+            "delete",
+            memory_id,
             actor=user.username if user else "user",
             user_id=user.id if user else None,
         )
@@ -709,7 +711,8 @@ async def pin_memory(memory_id: str, user: User | None = Depends(require_auth)):
 
         pg = await get_postgres_store()
         await pg.log_audit(
-            "pin", memory_id,
+            "pin",
+            memory_id,
             actor=user.username if user else "user",
             user_id=user.id if user else None,
         )
@@ -741,7 +744,8 @@ async def unpin_memory(memory_id: str, user: User | None = Depends(require_auth)
 
         pg = await get_postgres_store()
         await pg.log_audit(
-            "unpin", memory_id,
+            "unpin",
+            memory_id,
             actor=user.username if user else "user",
             user_id=user.id if user else None,
         )
@@ -859,7 +863,9 @@ class BatchDeleteResponse(BaseModel):
 
 
 @router.post("/batch/store", response_model=BatchStoreResponse)
-async def batch_store_memories(request: BatchStoreRequest, user: User | None = Depends(require_auth)):
+async def batch_store_memories(
+    request: BatchStoreRequest, user: User | None = Depends(require_auth)
+):
     """
     Store multiple memories in one request.
 
@@ -879,12 +885,15 @@ async def batch_store_memories(request: BatchStoreRequest, user: User | None = D
 
         for item in request.memories:
             try:
+                item_domain = normalize_domain(item.domain)
+                item_durability = Durability(item.durability) if item.durability else None
+
                 memory = Memory(
                     content=item.content,
                     content_hash=content_hash(item.content),
                     memory_type=item.memory_type,
                     source=item.source,
-                    domain=item.domain,
+                    domain=item_domain,
                     tags=item.tags,
                     importance=item.importance,
                     confidence=item.confidence,
@@ -892,17 +901,21 @@ async def batch_store_memories(request: BatchStoreRequest, user: User | None = D
                     metadata=item.metadata,
                     user_id=user.id if user else None,
                     username=user.username if user else None,
+                    durability=item_durability,
+                    initial_importance=item.importance,
                 )
 
                 # Dedup check
                 existing_id = await qdrant.find_by_content_hash(memory.content_hash)
                 if existing_id:
-                    results.append(BatchStoreResult(
-                        id=existing_id,
-                        content_hash=memory.content_hash,
-                        created=False,
-                        message="Duplicate",
-                    ))
+                    results.append(
+                        BatchStoreResult(
+                            id=existing_id,
+                            content_hash=memory.content_hash,
+                            created=False,
+                            message="Duplicate",
+                        )
+                    )
                     duplicates += 1
                     continue
 
@@ -916,14 +929,18 @@ async def batch_store_memories(request: BatchStoreRequest, user: User | None = D
                 try:
                     await neo4j.create_memory_node(memory)
                 except Exception as neo4j_err:
-                    logger.error("batch_neo4j_failed_compensating", id=memory.id, error=str(neo4j_err))
+                    logger.error(
+                        "batch_neo4j_failed_compensating", id=memory.id, error=str(neo4j_err)
+                    )
                     await qdrant.delete(memory.id)
-                    results.append(BatchStoreResult(
-                        id=memory.id,
-                        content_hash=memory.content_hash,
-                        created=False,
-                        message=f"Neo4j error",
-                    ))
+                    results.append(
+                        BatchStoreResult(
+                            id=memory.id,
+                            content_hash=memory.content_hash,
+                            created=False,
+                            message="Neo4j error",
+                        )
+                    )
                     errors += 1
                     continue
 
@@ -934,31 +951,40 @@ async def batch_store_memories(request: BatchStoreRequest, user: User | None = D
 
                 # Audit (fire-and-forget)
                 await pg.log_audit(
-                    "create", memory.id,
+                    "create",
+                    memory.id,
                     actor=user.username if user else "user",
                     session_id=item.session_id,
-                    details={"type": memory.memory_type.value, "domain": memory.domain, "batch": True},
+                    details={
+                        "type": memory.memory_type.value,
+                        "domain": memory.domain,
+                        "batch": True,
+                    },
                     user_id=user.id if user else None,
                 )
 
-                results.append(BatchStoreResult(
-                    id=memory.id,
-                    content_hash=memory.content_hash,
-                    created=True,
-                    message="Stored",
-                ))
+                results.append(
+                    BatchStoreResult(
+                        id=memory.id,
+                        content_hash=memory.content_hash,
+                        created=True,
+                        message="Stored",
+                    )
+                )
                 created += 1
 
             except OllamaUnavailableError:
                 raise  # Propagate to outer handler for 503
             except Exception as e:
                 logger.error("batch_store_item_error", error=str(e))
-                results.append(BatchStoreResult(
-                    id="",
-                    content_hash="",
-                    created=False,
-                    message="Error",
-                ))
+                results.append(
+                    BatchStoreResult(
+                        id="",
+                        content_hash="",
+                        created=False,
+                        message="Error",
+                    )
+                )
                 errors += 1
 
         return BatchStoreResponse(
@@ -976,7 +1002,9 @@ async def batch_store_memories(request: BatchStoreRequest, user: User | None = D
 
 
 @router.post("/batch/delete", response_model=BatchDeleteResponse)
-async def batch_delete_memories(request: BatchDeleteRequest, user: User | None = Depends(require_auth)):
+async def batch_delete_memories(
+    request: BatchDeleteRequest, user: User | None = Depends(require_auth)
+):
     """
     Delete multiple memories in one request.
 
@@ -1003,7 +1031,8 @@ async def batch_delete_memories(request: BatchDeleteRequest, user: User | None =
                 await neo4j.delete_memory(memory_id)
 
                 await pg.log_audit(
-                    "delete", memory_id,
+                    "delete",
+                    memory_id,
                     actor=user.username if user else "user",
                     details={"batch": True},
                     user_id=user.id if user else None,
@@ -1027,5 +1056,3 @@ async def batch_delete_memories(request: BatchDeleteRequest, user: User | None =
     except Exception as e:
         logger.error("batch_delete_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
-
-

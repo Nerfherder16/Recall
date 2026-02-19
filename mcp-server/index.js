@@ -174,12 +174,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               enum: ["semantic", "episodic", "procedural"],
               description: "Optional type filter",
             },
-            min_similarity: {
-              type: "number",
-              minimum: 0,
-              maximum: 1,
-              description: "Minimum similarity threshold (default 0.5)",
-            },
           },
           required: ["query"],
         },
@@ -485,8 +479,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
         if (args.domain) body.domains = [args.domain];
         if (args.memory_type) body.memory_types = [args.memory_type];
-        if (args.min_similarity !== undefined)
-          body.min_similarity = args.min_similarity;
 
         const result = await recallAPI("/search/query", "POST", body);
 
