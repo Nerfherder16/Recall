@@ -5,6 +5,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Most recent first.
 
 ---
 
+## v2.9 — Installer Fix (2026-02-19)
+
+### Fixed
+- **`install.js` hook clobber**: `settings.hooks = buildHooksConfig()` replaced the entire hooks object, wiping non-Recall hooks (autopilot, UI, etc.). Now uses tag-based smart merge — only touches `_tag: "__recall__"` entries.
+- **`install.js` uninstall clobber**: `delete settings.hooks` nuked ALL hooks. Now only removes `__recall__`-tagged entries, preserving other hook systems.
+- **Env vars never written**: `RECALL_HOST`, `RECALL_API_KEY`, `OLLAMA_HOST` were printed as instructions but never written to `settings.json`'s `env` block. Now merged into `settings.env` automatically.
+- **Non-Recall hooks in installer**: Removed `lint-check.js`, `context-monitor.js`, `stop-guard.js` from the Recall installer — these are autopilot hooks, not Recall-specific.
+
+### Added
+- **`--key` and `--ollama` CLI flags**: `node install.js --host URL --key KEY --ollama URL` for fully non-interactive install.
+- **Legacy hook migration**: `isRecallHook()` detects both tagged (`_tag: "__recall__"`) and untagged legacy hooks (by command path matching), ensuring clean upgrade from older installs.
+- **`_tag: "__recall__"`** on all Recall hook entries and statusline for safe identification.
+
+---
+
 ## v2.8 — "Tip Top Shape" (2026-02-19)
 
 Hardening pass — no new features, just making everything that exists work correctly.
