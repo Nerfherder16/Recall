@@ -530,12 +530,11 @@ class PostgresStore:
             for r in rows
         }
 
-    async def get_feedback_starved_memories(self, **_kwargs) -> list[dict[str, Any]]:
-        """Find memories created but never given feedback.
+    async def get_feedback_starved_memories(self) -> list[dict[str, Any]]:
+        """Find memory IDs created but never given feedback.
 
-        Uses 'create' audit entries (not 'access' — no access audit exists).
-        Returns memory_ids that have been created but have zero feedback entries.
-        Note: min_accesses cannot be enforced (access_count lives in Qdrant, not audit_log).
+        Returns memory_ids with zero feedback entries. Caller should
+        cross-reference with Qdrant access_count to filter by actual usage.
         """
         rows = await self.pool.fetch(
             """

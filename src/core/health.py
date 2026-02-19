@@ -176,19 +176,23 @@ class HealthComputer:
                 }
             )
 
-        # Feedback-starved memories
-        starved = await self.pg.get_feedback_starved_memories(min_accesses=5)
+        # Feedback-starved memories (cross-reference with Qdrant access_count)
+        starved = await self.pg.get_feedback_starved_memories()
         for m in starved:
-            if m["memory_id"] not in active_ids:
+            mid = m["memory_id"]
+            if mid not in active_ids:
                 continue
-            conflicts.append(
-                {
-                    "type": "feedback_starved",
-                    "severity": "info",
-                    "memory_id": m["memory_id"],
-                    "description": "Memory accessed 5+ times with no feedback",
-                }
-            )
+            payload = active_payloads.get(mid, {})
+            access_count = payload.get("access_count", 0)
+            if access_count >= 5:
+                conflicts.append(
+                    {
+                        "type": "feedback_starved",
+                        "severity": "info",
+                        "memory_id": mid,
+                        "description": f"Memory accessed {access_count} times with no feedback",
+                    }
+                )
 
         # Orphan hubs (high graph centrality, low importance)
         try:

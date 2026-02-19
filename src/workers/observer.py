@@ -35,7 +35,15 @@ Skip: variable names, obvious code, temporary debug changes, formatting-only cha
 Domain must be one of: general, infrastructure, development, testing, security, api,
 database, frontend, devops, networking, ai-ml, tooling, configuration, documentation, sessions
 
-Return JSON array: [{{"fact": "...", "domain": "...", "tags": ["..."]}}]
+Return JSON array: [{{"fact": "...", "domain": "...", "tags": ["..."], "importance": 1-10}}]
+
+Importance scale:
+1-2: Trivial — formatting change, variable rename, icon path swap
+3-4: Minor — import added, small config tweak, test helper
+5-6: Moderate — new endpoint, dependency added, feature flag, bug fix
+7-8: Significant — architectural decision, security change, system integration
+9-10: Critical — breaking change, data model change, deployment config
+
 Return [] if nothing worth remembering."""
 
 
@@ -61,6 +69,24 @@ async def _run_extraction(observation: dict):
     """Inner implementation of observation extraction."""
     file_path = observation.get("file_path", "")
     tool_name = observation.get("tool_name", "Write")
+
+    # Skip test/smoke-test content that pollutes memory store
+    content_lower = (observation.get("content") or "").lower()
+    old_lower = (observation.get("old_string") or "").lower()
+    new_lower = (observation.get("new_string") or "").lower()
+    combined = content_lower + old_lower + new_lower
+    if any(
+        pattern in combined
+        for pattern in [
+            "test document",
+            "smoke test",
+            "test metadata",
+            "test fixture",
+            "mock data for testing",
+        ]
+    ):
+        logger.debug("observer_skip_test_content", file=file_path)
+        return
 
     # Build change description
     if tool_name == "Edit" and observation.get("old_string") and observation.get("new_string"):
@@ -103,6 +129,17 @@ async def _run_extraction(observation: dict):
         domain = normalize_domain(fact_data.get("domain", "general"))
         tags = fact_data.get("tags", [])
 
+        # Parse LLM-assigned importance (1-10 → 0.1-1.0)
+        raw_imp = fact_data.get("importance")
+        if raw_imp is not None:
+            try:
+                imp_val = max(1.0, min(10.0, float(raw_imp)))
+                importance = imp_val / 10.0
+            except (ValueError, TypeError):
+                importance = 0.4
+        else:
+            importance = 0.4
+
         chash = content_hash(fact_text)
 
         qdrant = await get_qdrant_store()
@@ -117,11 +154,11 @@ async def _run_extraction(observation: dict):
             source=MemorySource.SYSTEM,
             domain=domain,
             tags=["observer"] + tags,
-            importance=0.4,
+            importance=importance,
             confidence=0.6,
             metadata={"observer": True, "source_file": file_path},
             durability=Durability.DURABLE,
-            initial_importance=0.4,
+            initial_importance=importance,
         )
 
         try:

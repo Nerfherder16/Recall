@@ -19,7 +19,7 @@ const SKIP_EXTENSIONS = new Set([
   ".pyc", ".pyo", ".whl", ".zip", ".tar", ".gz", ".exe", ".dll",
   ".so", ".dylib", ".pdf", ".mp3", ".mp4", ".wav", ".avi",
 ]);
-const SKIP_DIRS = ["node_modules", ".git", "__pycache__", "dist", "build", ".next", ".venv"];
+const SKIP_DIRS = ["node_modules", ".git", "__pycache__", "dist", "build", ".next", ".venv", "__tests__", ".autopilot"];
 
 function shouldSkipFile(filePath) {
   if (!filePath) return true;
@@ -29,6 +29,9 @@ function shouldSkipFile(filePath) {
   if (SKIP_EXTENSIONS.has(ext)) return true;
   // Check compound extensions like .min.js
   if (lower.endsWith(".min.js") || lower.endsWith(".min.css")) return true;
+  // Skip test files by path pattern
+  if (/\/(tests?|__tests__|spec|__mocks__)\//.test(lower)) return true;
+  if (/\.(test|spec)\.(js|ts|jsx|tsx|py)$/.test(lower)) return true;
   return false;
 }
 

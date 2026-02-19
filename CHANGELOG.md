@@ -5,6 +5,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Most recent first.
 
 ---
 
+## v2.9 — "Observer Intelligence" (2026-02-19)
+
+Observer memories get LLM-assigned importance, test payloads are filtered out,
+decay respects graph connectivity, and the feedback loop actually works.
+
+### Fixed
+- **Periodic feedback always marked "not useful"**: `submitPeriodicFeedback` sent fake UUID text as `assistant_text`, which always failed the 0.35 cosine similarity check. Added `force_useful` flag to `FeedbackRequest` — re-retrieval feedback now correctly boosts memories (+0.10 importance, +0.05 stability).
+- **Feedback-starved query ignored access_count**: `get_feedback_starved_memories()` returned ANY memory without feedback regardless of access count. Now cross-references with Qdrant `access_count` — only flags memories accessed 5+ times.
+- **Orphan hub conflicts from flat decay floor**: Well-connected hub memories (edge strength 6-12) decayed to 0.05 floor despite being central to the graph. Graph-aware floor now preserves hubs at 0.30 minimum.
+
+### Changed
+- **Observer importance tiers**: LLM prompt now requests importance 1-10. Observer memories range from 0.1 (trivial formatting change) to 1.0 (critical architecture decision) instead of flat 0.4 for everything.
+- **Graph-aware decay floor**: Memories with total RELATED_TO edge strength >= 6.0 get 0.30 floor, >= 3.0 get 0.15, otherwise 0.05. One bulk Neo4j query per decay run (no N+1).
+- **`get_feedback_starved_memories()` signature**: Removed misleading `**_kwargs` — caller filters by access_count instead.
+
+### Added
+- **Test payload filtering** (hook + worker): `observe-edit.js` skips `__tests__/`, `.autopilot/`, and `*.test.*` files. Observer worker skips content containing "test document", "smoke test", "test fixture", etc.
+- **`force_useful` field on `POST /memory/feedback`**: Bypasses cosine similarity check for explicit re-retrieval signals.
+- **`get_bulk_edge_strengths()`** on Neo4jStore: Batch query returning total RELATED_TO strength per memory ID.
+
+### Files Changed
+- `src/workers/observer.py` — importance tiers + test content filter
+- `hooks/observe-edit.js` — test dir/file skip patterns
+- `src/workers/decay.py` — graph-aware floor
+- `src/storage/neo4j_store.py` — `get_bulk_edge_strengths()`
+- `src/api/routes/memory.py` — `force_useful` on FeedbackRequest
+- `hooks/recall-retrieve.js` — `force_useful: true` for re-retrieval
+- `src/storage/postgres_store.py` — cleaned up signature
+- `src/core/health.py` — access_count filter for feedback-starved
+
+---
+
 ## v2.9 — Installer Fix (2026-02-19)
 
 ### Fixed

@@ -74,6 +74,14 @@ class DecayWorker:
         archive_threshold = 0.05
         base_decay_rate = self.settings.importance_decay_rate
 
+        # Load graph connectivity for all memory IDs (one Neo4j call)
+        all_ids = [mid for mid, _ in results]
+        try:
+            graph_strengths = await self.neo4j.get_bulk_edge_strengths(all_ids)
+        except Exception as e:
+            logger.debug("decay_graph_strengths_unavailable", error=str(e))
+            graph_strengths = {}
+
         for memory_id, payload in results:
             stats["processed"] += 1
 
@@ -132,8 +140,15 @@ class DecayWorker:
             # Apply decay
             new_importance = importance * ((1 - effective_decay) ** hours_since)
 
-            # Clamp to minimum — floor at 0.05 so memories never become invisible
-            new_importance = max(0.05, new_importance)
+            # Graph-aware floor: well-connected memories get a higher minimum
+            total_strength = graph_strengths.get(memory_id, 0)
+            if total_strength >= 6.0:
+                floor = 0.3  # Hub memory — preserve
+            elif total_strength >= 3.0:
+                floor = 0.15  # Moderately connected
+            else:
+                floor = 0.05  # Default floor
+            new_importance = max(floor, new_importance)
 
             if abs(new_importance - importance) > 0.001:
                 await self.qdrant.update_importance(
@@ -212,12 +227,13 @@ async def apply_decay_to_memory(
     access_count: int = 0,
     durability: str | None = None,
     feedback_stats: dict[str, int] | None = None,
+    graph_strength: float = 0.0,
 ) -> float:
     """
     Apply decay to a single memory and return new importance.
 
     Mirrors the full DecayWorker.run() formula including v2.8
-    access/feedback/durability modifiers.
+    access/feedback/durability modifiers and v2.9 graph-aware floor.
     """
     settings = get_settings()
     base_decay_rate = settings.importance_decay_rate
@@ -244,7 +260,15 @@ async def apply_decay_to_memory(
 
     # Apply exponential decay
     new_importance = current_importance * ((1 - effective_decay) ** hours_since_access)
-    new_importance = max(0.05, new_importance)
+
+    # Graph-aware floor (v2.9)
+    if graph_strength >= 6.0:
+        floor = 0.3
+    elif graph_strength >= 3.0:
+        floor = 0.15
+    else:
+        floor = 0.05
+    new_importance = max(floor, new_importance)
 
     if abs(new_importance - current_importance) > 0.001:
         await qdrant_store.update_importance(

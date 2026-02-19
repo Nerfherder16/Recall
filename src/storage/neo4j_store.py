@@ -397,6 +397,23 @@ class Neo4jStore:
                 )
             return (0.0, 0)
 
+    async def get_bulk_edge_strengths(self, memory_ids: list[str]) -> dict[str, float]:
+        """Return total RELATED_TO edge strength for each memory ID."""
+        if not memory_ids:
+            return {}
+        async with self.driver.session() as session:
+            result = await session.run(
+                """
+                UNWIND $ids AS mid
+                OPTIONAL MATCH (m:Memory {id: mid})-[r:RELATED_TO]-()
+                WITH mid, coalesce(sum(coalesce(r.strength, 0.5)), 0) AS total_strength
+                RETURN mid AS id, total_strength
+                """,
+                ids=memory_ids,
+            )
+            records = await result.data()
+            return {r["id"]: r["total_strength"] for r in records}
+
     async def get_high_gravity_memories(self, min_strength: float = 2.0) -> list[dict[str, Any]]:
         """Find memories with high total RELATED_TO strength but low importance."""
         async with self.driver.session() as session:

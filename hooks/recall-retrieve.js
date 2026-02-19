@@ -298,9 +298,8 @@ async function submitPeriodicFeedback(injectedFile, currentResultIds, headers) {
         headers,
         body: JSON.stringify({
           injected_ids: uniqueIds,
-          // Use the memory IDs themselves as context — the feedback endpoint
-          // will boost these since they appear in the "assistant text"
           assistant_text: `Re-retrieved memories still relevant: ${uniqueIds.join(", ")}`,
+          force_useful: true,
         }),
         signal: AbortSignal.timeout(3000),
       });

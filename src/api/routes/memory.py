@@ -434,6 +434,7 @@ class FeedbackRequest(BaseModel):
 
     injected_ids: list[str] = Field(..., min_length=1, max_length=200)
     assistant_text: str = Field(..., min_length=50, max_length=15000)
+    force_useful: bool = Field(default=False)
 
 
 class FeedbackResponse(BaseModel):
@@ -483,7 +484,7 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
             old_importance = payload.get("importance", 0.5)
             old_stability = payload.get("stability", 0.1)
 
-            if similarity > 0.35:
+            if request.force_useful or similarity > 0.35:
                 # Useful — strong boost to reinforce valuable memories
                 new_importance = min(1.0, old_importance + 0.10)
                 new_stability = min(1.0, old_stability + 0.05)
