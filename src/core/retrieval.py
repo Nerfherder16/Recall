@@ -122,6 +122,15 @@ class RetrievalPipeline:
                 if result.memory.id not in results:
                     results[result.memory.id] = result
 
+        # Stage 4.9: Tag post-filter — graph/sibling/anti-pattern stages
+        # may have added results that don't match required tags
+        if query.tags:
+            results = {
+                mid: r
+                for mid, r in results.items()
+                if all(tag in (r.memory.tags or []) for tag in query.tags)
+            }
+
         # Stage 5: Final ranking (ML reranker or legacy formula)
         from .reranker import get_reranker
 
@@ -149,6 +158,7 @@ class RetrievalPipeline:
             limit=query.limit * 2,  # Get extra for filtering
             memory_types=query.memory_types,
             domains=query.domains,
+            tags=query.tags,
             min_importance=query.min_importance,
             include_superseded=query.include_superseded,
             session_id=query.session_id if query.session_id else None,

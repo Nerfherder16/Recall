@@ -197,10 +197,15 @@ async def browse_memories(request: Request, body: SearchRequest):
     Use GET /memory/{id} to fetch full details for specific results.
     """
     try:
+        from src.core.domains import normalize_domain
+
+        # Normalize domains to match how they're stored
+        normalized_domains = [normalize_domain(d) for d in body.domains] if body.domains else None
+
         query = MemoryQuery(
             text=body.query,
             memory_types=body.memory_types,
-            domains=body.domains,
+            domains=normalized_domains,
             tags=body.tags,
             min_importance=body.min_importance,
             expand_relationships=body.expand_relationships,
@@ -492,11 +497,15 @@ async def search_memories(request: Request, body: SearchRequest):
     4. Ranking
     """
     try:
-        # Build query
+        from src.core.domains import normalize_domain
+
+        # Normalize domains to match how they're stored
+        normalized_domains = [normalize_domain(d) for d in body.domains] if body.domains else None
+
         query = MemoryQuery(
             text=body.query,
             memory_types=body.memory_types,
-            domains=body.domains,
+            domains=normalized_domains,
             tags=body.tags,
             min_importance=body.min_importance,
             expand_relationships=body.expand_relationships,
@@ -598,12 +607,15 @@ async def assemble_context(request: Request, body: ContextRequest):
 
         # Retrieve relevant memories
         if body.query or body.current_task:
+            from src.core.domains import normalize_domain
+
+            ctx_domains = [normalize_domain(body.domain)] if body.domain else None
             query = MemoryQuery(
                 text=body.query or body.current_task,
                 session_id=body.session_id,
                 current_file=body.current_file,
                 current_task=body.current_task,
-                domains=[body.domain] if body.domain else None,
+                domains=ctx_domains,
                 limit=10,
             )
 

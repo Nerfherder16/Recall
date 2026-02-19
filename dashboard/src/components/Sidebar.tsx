@@ -15,6 +15,7 @@ import {
   Warning,
   Heartbeat,
   FilePdf,
+  TreeStructure,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import { cn } from "../lib/utils";
@@ -29,6 +30,7 @@ const links: { to: string; label: string; icon: Icon }[] = [
   { to: "/dashboard/users", label: "Users", icon: Users },
   { to: "/dashboard/health", label: "Health", icon: Heartbeat },
   { to: "/dashboard/documents", label: "Documents", icon: FilePdf },
+  { to: "/dashboard/graph", label: "Graph", icon: TreeStructure },
   { to: "/dashboard/settings", label: "Settings", icon: GearSix },
 ];
 

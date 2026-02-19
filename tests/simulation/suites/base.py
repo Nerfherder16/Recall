@@ -2,7 +2,6 @@
 BaseSuite — Abstract base class for all test suites.
 """
 
-import time
 from abc import ABC, abstractmethod
 
 from tests.simulation.client import TimedRecallClient
@@ -19,6 +18,7 @@ class BaseSuite(ABC):
         self.client = client
         self.config = config
         self.domain = client.suite_domain(self.name)
+        self.run_tag = client.run_tag()
         self._observations: list[str] = []
         self._errors: list[str] = []
         self._metrics: dict = {}
@@ -54,8 +54,13 @@ class BaseSuite(ABC):
             errors=self._errors,
         )
 
-    async def _store(self, content: str, importance: float = 0.5,
-                     memory_type: str = "semantic", tags: list[str] | None = None) -> str | None:
+    async def _store(
+        self,
+        content: str,
+        importance: float = 0.5,
+        memory_type: str = "semantic",
+        tags: list[str] | None = None,
+    ) -> str | None:
         """Helper to store a memory in this suite's domain."""
         r = await self.client.store_memory(
             content=content,

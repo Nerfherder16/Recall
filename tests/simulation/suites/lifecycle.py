@@ -35,8 +35,10 @@ class LifecycleSuite(BaseSuite):
                     await asyncio.sleep(0.5)
 
             total_stored = sum(len(v) for v in stored.values())
-            self.observe(f"Stored {total_stored} memories: "
-                         f"{len(stored['high'])} high, {len(stored['mid'])} mid, {len(stored['low'])} low")
+            self.observe(
+                f"Stored {total_stored} memories: "
+                f"{len(stored['high'])} high, {len(stored['mid'])} mid, {len(stored['low'])} low"
+            )
 
             if total_stored < 10:
                 self.error("Too few memories stored, aborting lifecycle tests")
@@ -45,7 +47,9 @@ class LifecycleSuite(BaseSuite):
             # Store consolidation candidates
             consol_ids = []
             for content in CONSOLIDATION_CANDIDATES:
-                mid = await self._store(content=content, importance=0.5, tags=["consolidation-test"])
+                mid = await self._store(
+                    content=content, importance=0.5, tags=["consolidation-test"]
+                )
                 if mid:
                     consol_ids.append(mid)
                 await asyncio.sleep(0.5)
@@ -64,7 +68,7 @@ class LifecycleSuite(BaseSuite):
                 await asyncio.sleep(6)  # Rate limit: 10/min for admin
 
                 if r is None:
-                    self.error(f"Decay step {step+1} failed")
+                    self.error(f"Decay step {step + 1} failed")
                     continue
 
                 # Sample importances
@@ -85,7 +89,10 @@ class LifecycleSuite(BaseSuite):
                     "decay_decayed": r.get("decayed", 0),
                 }
                 decay_curve.append(point)
-                self.observe(f"  Day {step+1}: high={point['avg_high']:.3f} mid={point['avg_mid']:.3f} low={point['avg_low']:.3f}")
+                self.observe(
+                    f"  Day {step + 1}: high={point['avg_high']:.3f} "
+                    f"mid={point['avg_mid']:.3f} low={point['avg_low']:.3f}"
+                )
 
             self.metric("decay_curve", decay_curve)
 
@@ -94,17 +101,21 @@ class LifecycleSuite(BaseSuite):
                 first_high = decay_curve[0]["avg_high"]
                 last_high = decay_curve[-1]["avg_high"]
                 first_low = decay_curve[0]["avg_low"]
-                last_low = decay_curve[-1]["avg_low"]
 
                 if last_high >= first_high and first_high > 0:
-                    self.error(f"High-importance did not decay: {first_high:.3f} -> {last_high:.3f}")
+                    self.error(
+                        f"High-importance did not decay: {first_high:.3f} -> {last_high:.3f}"
+                    )
                     passed = False
                 else:
                     self.observe(f"Decay confirmed: high {first_high:.3f} -> {last_high:.3f}")
 
                 # High should remain above where low started
                 if last_high < first_low and first_low > 0.05:
-                    self.observe(f"Warning: high decayed below initial low ({last_high:.3f} < {first_low:.3f})")
+                    self.observe(
+                        f"Warning: high decayed below initial low "
+                        f"({last_high:.3f} < {first_low:.3f})"
+                    )
 
             # ── Scenario B: Reinforcement Loop ──
             self.observe("Running reinforcement test...")
@@ -120,7 +131,7 @@ class LifecycleSuite(BaseSuite):
                     await self.client.search_query(
                         mem["content"][:50],
                         limit=5,
-                        domains=[self.domain],
+                        tags=[self.run_tag],
                     )
                 await asyncio.sleep(2)
 
@@ -148,16 +159,25 @@ class LifecycleSuite(BaseSuite):
             avg_control = _avg(control_importances)
             delta = avg_reinforced - avg_control
 
-            self.metric("reinforcement", {
-                "accessed_final": round(avg_reinforced, 4),
-                "unaccessed_final": round(avg_control, 4),
-                "delta": round(delta, 4),
-            })
+            self.metric(
+                "reinforcement",
+                {
+                    "accessed_final": round(avg_reinforced, 4),
+                    "unaccessed_final": round(avg_control, 4),
+                    "delta": round(delta, 4),
+                },
+            )
 
             if delta > 0:
-                self.observe(f"Reinforcement works: accessed={avg_reinforced:.3f} > unaccessed={avg_control:.3f} (delta={delta:.3f})")
+                self.observe(
+                    f"Reinforcement works: accessed={avg_reinforced:.3f} "
+                    f"> unaccessed={avg_control:.3f} (delta={delta:.3f})"
+                )
             else:
-                self.observe(f"Reinforcement inconclusive: accessed={avg_reinforced:.3f} vs unaccessed={avg_control:.3f}")
+                self.observe(
+                    f"Reinforcement inconclusive: accessed={avg_reinforced:.3f} "
+                    f"vs unaccessed={avg_control:.3f}"
+                )
                 # Not a hard failure — delta can be small
 
             # ── Scenario C: Consolidation ──
@@ -169,15 +189,20 @@ class LifecycleSuite(BaseSuite):
                 clusters = r.get("clusters_merged", 0)
                 merged = r.get("memories_merged", 0)
                 results = r.get("results", [])
-                self.metric("consolidation", {
-                    "clusters_found": clusters,
-                    "memories_merged": merged,
-                    "merged_previews": [res.get("content_preview", "") for res in results[:3]],
-                })
+                self.metric(
+                    "consolidation",
+                    {
+                        "clusters_found": clusters,
+                        "memories_merged": merged,
+                        "merged_previews": [res.get("content_preview", "") for res in results[:3]],
+                    },
+                )
                 self.observe(f"Consolidation: {clusters} clusters, {merged} memories merged")
 
                 if clusters == 0:
-                    self.observe("Warning: no clusters merged (consolidation may need more similar content)")
+                    self.observe(
+                        "Warning: no clusters merged (consolidation may need more similar content)"
+                    )
             else:
                 self.error("Consolidation request failed")
                 passed = False

@@ -50,7 +50,9 @@ class AdaptiveSuite(BaseSuite):
                 self.error("Pin request failed")
                 passed = False
             else:
-                self.observe(f"Pinned memory {pinned_id[:8]}... → pinned={pin_result.get('pinned')}")
+                self.observe(
+                    f"Pinned memory {pinned_id[:8]}... → pinned={pin_result.get('pinned')}"
+                )
 
             # Verify pin via GET
             mem = await self.client.get_memory(pinned_id)
@@ -64,13 +66,15 @@ class AdaptiveSuite(BaseSuite):
             pinned_before = mem.get("importance", 0) if mem else 0
             control_mem = await self.client.get_memory(control_id)
             control_before = control_mem.get("importance", 0) if control_mem else 0
-            self.observe(f"Before decay — pinned: {pinned_before:.3f}, control: {control_before:.3f}")
+            self.observe(
+                f"Before decay — pinned: {pinned_before:.3f}, control: {control_before:.3f}"
+            )
 
             # Run decay (3 steps x 48h = 144h simulated)
             for step in range(3):
                 r = await self.client.decay(simulate_hours=48)
                 if r is None:
-                    self.error(f"Decay step {step+1} failed")
+                    self.error(f"Decay step {step + 1} failed")
                 await asyncio.sleep(6)  # Rate limit
 
             # Check importances after decay
@@ -85,26 +89,36 @@ class AdaptiveSuite(BaseSuite):
             # Pinned should be unchanged (or very close)
             pinned_drift = abs(pinned_after - pinned_before)
             if pinned_drift > 0.05:
-                self.error(f"Pinned memory decayed: {pinned_before:.3f} → {pinned_after:.3f} (drift={pinned_drift:.3f})")
+                self.error(
+                    f"Pinned memory decayed: {pinned_before:.3f} → "
+                    f"{pinned_after:.3f} (drift={pinned_drift:.3f})"
+                )
                 passed = False
             else:
                 self.observe(f"Pinned memory held stable (drift={pinned_drift:.3f})")
 
             # Control should have decayed
             if control_after < control_before:
-                self.observe(f"Control decayed normally: {control_before:.3f} → {control_after:.3f}")
+                self.observe(
+                    f"Control decayed normally: {control_before:.3f} → {control_after:.3f}"
+                )
             else:
-                self.observe(f"Warning: control didn't decay ({control_before:.3f} → {control_after:.3f})")
+                self.observe(
+                    f"Warning: control didn't decay ({control_before:.3f} → {control_after:.3f})"
+                )
 
-            self.metric("pinning", {
-                "pinned_before": round(pinned_before, 4),
-                "pinned_after": round(pinned_after, 4),
-                "pinned_drift": round(pinned_drift, 4),
-                "control_before": round(control_before, 4),
-                "control_after": round(control_after, 4),
-                "pinned_survived": pinned_drift <= 0.05,
-                "control_decayed": control_after < control_before,
-            })
+            self.metric(
+                "pinning",
+                {
+                    "pinned_before": round(pinned_before, 4),
+                    "pinned_after": round(pinned_after, 4),
+                    "pinned_drift": round(pinned_drift, 4),
+                    "control_before": round(control_before, 4),
+                    "control_after": round(control_after, 4),
+                    "pinned_survived": pinned_drift <= 0.05,
+                    "control_decayed": control_after < control_before,
+                },
+            )
 
             # Test unpin
             unpin_result = await self.client.unpin_memory(pinned_id)
@@ -169,12 +183,15 @@ class AdaptiveSuite(BaseSuite):
             our_ap_ids = [ap["id"] for ap in [ap1, ap2, ap3] if ap and ap.get("id")]
             found_in_list = sum(1 for ap in all_aps if ap.get("id") in our_ap_ids)
 
-            self.metric("anti_patterns_crud", {
-                "created": created_count,
-                "total_listed": len(all_aps),
-                "domain_filtered": len(domain_aps),
-                "found_in_list": found_in_list,
-            })
+            self.metric(
+                "anti_patterns_crud",
+                {
+                    "created": created_count,
+                    "total_listed": len(all_aps),
+                    "domain_filtered": len(domain_aps),
+                    "found_in_list": found_in_list,
+                },
+            )
 
             # Test retrieval integration — search for content matching an anti-pattern
             if ap1 and ap1.get("id"):
@@ -182,7 +199,7 @@ class AdaptiveSuite(BaseSuite):
                 browse_results = await self.client.search_browse(
                     "pickle deserialize untrusted data security risk",
                     limit=10,
-                    domains=[self.domain],
+                    tags=[self.run_tag],
                 )
                 await asyncio.sleep(2)
 
@@ -192,11 +209,17 @@ class AdaptiveSuite(BaseSuite):
                     or r.get("metadata", {}).get("is_anti_pattern")
                     for r in browse_results
                 )
-                self.observe(f"Anti-pattern in browse results: {warning_found} ({len(browse_results)} results)")
-                self.metric("anti_pattern_retrieval", {
-                    "browse_results": len(browse_results),
-                    "warning_injected": warning_found,
-                })
+                self.observe(
+                    f"Anti-pattern in browse results: "
+                    f"{warning_found} ({len(browse_results)} results)"
+                )
+                self.metric(
+                    "anti_pattern_retrieval",
+                    {
+                        "browse_results": len(browse_results),
+                        "warning_injected": warning_found,
+                    },
+                )
 
             # Delete one anti-pattern
             if ap3 and ap3.get("id"):
@@ -219,12 +242,17 @@ class AdaptiveSuite(BaseSuite):
 
             # Store memories for feedback testing
             fb_useful = await self._store(
-                content="FastAPI uses Pydantic models for automatic request validation and serialization",
+                content=(
+                    "FastAPI uses Pydantic models for automatic "
+                    "request validation and serialization"
+                ),
                 importance=0.5,
                 tags=["feedback-test"],
             )
             fb_notuseful = await self._store(
-                content="Recipe for chocolate cake: mix flour, sugar, cocoa powder, eggs, and butter",
+                content=(
+                    "Recipe for chocolate cake: mix flour, sugar, cocoa powder, eggs, and butter"
+                ),
                 importance=0.5,
                 tags=["feedback-test"],
             )
@@ -247,8 +275,11 @@ class AdaptiveSuite(BaseSuite):
             await asyncio.sleep(1)
 
             if useful_result:
-                self.observe(f"Useful feedback: processed={useful_result.get('processed')}, "
-                             f"useful={useful_result.get('useful')}, not_useful={useful_result.get('not_useful')}")
+                self.observe(
+                    f"Useful feedback: processed={useful_result.get('processed')}, "
+                    f"useful={useful_result.get('useful')}, "
+                    f"not_useful={useful_result.get('not_useful')}"
+                )
             else:
                 self.error("Useful feedback request failed")
                 passed = False
@@ -266,8 +297,11 @@ class AdaptiveSuite(BaseSuite):
             await asyncio.sleep(1)
 
             if notuseful_result:
-                self.observe(f"Not-useful feedback: processed={notuseful_result.get('processed')}, "
-                             f"useful={notuseful_result.get('useful')}, not_useful={notuseful_result.get('not_useful')}")
+                self.observe(
+                    f"Not-useful feedback: processed={notuseful_result.get('processed')}, "
+                    f"useful={notuseful_result.get('useful')}, "
+                    f"not_useful={notuseful_result.get('not_useful')}"
+                )
             else:
                 self.error("Not-useful feedback request failed")
                 passed = False
@@ -279,25 +313,38 @@ class AdaptiveSuite(BaseSuite):
             useful_imp = useful_after.get("importance", 0) if useful_after else 0
             notuseful_imp = notuseful_after.get("importance", 0) if notuseful_after else 0
 
-            self.observe(f"After feedback — useful: {useful_imp:.3f} (was 0.5), not_useful: {notuseful_imp:.3f} (was 0.5)")
+            self.observe(
+                f"After feedback — useful: {useful_imp:.3f} (was 0.5), "
+                f"not_useful: {notuseful_imp:.3f} (was 0.5)"
+            )
 
             # Useful feedback should have increased importance (or at least maintained)
-            useful_direction = "up" if useful_imp > 0.5 else ("same" if useful_imp == 0.5 else "down")
-            notuseful_direction = "down" if notuseful_imp < 0.5 else ("same" if notuseful_imp == 0.5 else "up")
+            useful_direction = (
+                "up" if useful_imp > 0.5 else ("same" if useful_imp == 0.5 else "down")
+            )
+            notuseful_direction = (
+                "down" if notuseful_imp < 0.5 else ("same" if notuseful_imp == 0.5 else "up")
+            )
 
-            self.metric("feedback", {
-                "useful_importance_after": round(useful_imp, 4),
-                "useful_direction": useful_direction,
-                "notuseful_importance_after": round(notuseful_imp, 4),
-                "notuseful_direction": notuseful_direction,
-                "useful_response": useful_result,
-                "notuseful_response": notuseful_result,
-            })
+            self.metric(
+                "feedback",
+                {
+                    "useful_importance_after": round(useful_imp, 4),
+                    "useful_direction": useful_direction,
+                    "notuseful_importance_after": round(notuseful_imp, 4),
+                    "notuseful_direction": notuseful_direction,
+                    "useful_response": useful_result,
+                    "notuseful_response": notuseful_result,
+                },
+            )
 
             if useful_result and useful_result.get("useful", 0) > 0:
                 self.observe("Feedback correctly identified useful memory")
             elif useful_result and useful_result.get("not_useful", 0) > 0:
-                self.observe("Warning: useful memory classified as not_useful (cosine threshold may be tight)")
+                self.observe(
+                    "Warning: useful memory classified as not_useful "
+                    "(cosine threshold may be tight)"
+                )
 
             if notuseful_result and notuseful_result.get("not_useful", 0) > 0:
                 self.observe("Feedback correctly identified not-useful memory")
@@ -317,12 +364,17 @@ class AdaptiveSuite(BaseSuite):
             )
 
             if batch_result:
-                self.observe(f"Batch feedback: processed={batch_result.get('processed')}, "
-                             f"useful={batch_result.get('useful')}, not_useful={batch_result.get('not_useful')}")
+                self.observe(
+                    f"Batch feedback: processed={batch_result.get('processed')}, "
+                    f"useful={batch_result.get('useful')}, "
+                    f"not_useful={batch_result.get('not_useful')}"
+                )
                 if batch_result.get("processed", 0) == 2:
                     self.observe("Batch processed all 2 memories")
                 else:
-                    self.observe(f"Warning: expected 2 processed, got {batch_result.get('processed')}")
+                    self.observe(
+                        f"Warning: expected 2 processed, got {batch_result.get('processed')}"
+                    )
             else:
                 self.error("Batch feedback request failed")
 
@@ -339,10 +391,13 @@ class AdaptiveSuite(BaseSuite):
             else:
                 self.observe(f"Warning: ghost feedback response unexpected: {ghost_result}")
 
-            self.metric("feedback_batch", {
-                "batch_response": batch_result,
-                "ghost_response": ghost_result,
-            })
+            self.metric(
+                "feedback_batch",
+                {
+                    "batch_response": batch_result,
+                    "ghost_response": ghost_result,
+                },
+            )
 
         except Exception as e:
             self.error(f"Phase 14 suite exception: {e}")

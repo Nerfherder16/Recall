@@ -115,9 +115,13 @@ class TimedRecallClient:
     # ── Session management ──
 
     async def create_session(self, task: str = "") -> str | None:
-        r = await self._request("POST", "/session/start", {
-            "current_task": task or None,
-        })
+        r = await self._request(
+            "POST",
+            "/session/start",
+            {
+                "current_task": task or None,
+            },
+        )
         if r and "session_id" in r:
             self.tracked_sessions.append(r["session_id"])
             return r["session_id"]
@@ -127,16 +131,24 @@ class TimedRecallClient:
         return await self._request("GET", f"/session/{sid}")
 
     async def end_session(self, sid: str):
-        return await self._request("POST", "/session/end", {
-            "session_id": sid,
-            "trigger_consolidation": False,
-        })
+        return await self._request(
+            "POST",
+            "/session/end",
+            {
+                "session_id": sid,
+                "trigger_consolidation": False,
+            },
+        )
 
     async def ingest_turns(self, sid: str, turns: list[dict]):
-        return await self._request("POST", "/ingest/turns", {
-            "session_id": sid,
-            "turns": turns,
-        })
+        return await self._request(
+            "POST",
+            "/ingest/turns",
+            {
+                "session_id": sid,
+                "turns": turns,
+            },
+        )
 
     async def get_signals(self, sid: str) -> list[dict]:
         r = await self._request("GET", f"/ingest/{sid}/signals")
@@ -147,9 +159,13 @@ class TimedRecallClient:
         return []
 
     async def approve_signal(self, sid: str, index: int = 0) -> dict | None:
-        return await self._request("POST", f"/ingest/{sid}/signals/approve", {
-            "index": index,
-        })
+        return await self._request(
+            "POST",
+            f"/ingest/{sid}/signals/approve",
+            {
+                "index": index,
+            },
+        )
 
     # ── Memory operations ──
 
@@ -254,10 +270,14 @@ class TimedRecallClient:
         injected_ids: list[str],
         assistant_text: str,
     ) -> dict | None:
-        return await self._request("POST", "/memory/feedback", {
-            "injected_ids": injected_ids,
-            "assistant_text": assistant_text,
-        })
+        return await self._request(
+            "POST",
+            "/memory/feedback",
+            {
+                "injected_ids": injected_ids,
+                "assistant_text": assistant_text,
+            },
+        )
 
     # ── Relationships ──
 
@@ -269,13 +289,17 @@ class TimedRecallClient:
         strength: float = 0.5,
         bidirectional: bool = False,
     ) -> dict | None:
-        return await self._request("POST", "/memory/relationship", {
-            "source_id": source_id,
-            "target_id": target_id,
-            "relationship_type": relationship_type,
-            "strength": strength,
-            "bidirectional": bidirectional,
-        })
+        return await self._request(
+            "POST",
+            "/memory/relationship",
+            {
+                "source_id": source_id,
+                "target_id": target_id,
+                "relationship_type": relationship_type,
+                "strength": strength,
+                "bidirectional": bidirectional,
+            },
+        )
 
     # ── Search ──
 
@@ -284,16 +308,22 @@ class TimedRecallClient:
         query: str,
         limit: int = 10,
         domains: list[str] | None = None,
+        tags: list[str] | None = None,
         expand_relationships: bool = True,
         user: str | None = None,
     ) -> list[dict]:
-        r = await self._request("POST", "/search/query", {
-            "query": query,
-            "limit": limit,
-            "domains": domains,
-            "expand_relationships": expand_relationships,
-            "user": user,
-        })
+        r = await self._request(
+            "POST",
+            "/search/query",
+            {
+                "query": query,
+                "limit": limit,
+                "domains": domains,
+                "tags": tags,
+                "expand_relationships": expand_relationships,
+                "user": user,
+            },
+        )
         if r and "results" in r:
             return r["results"]
         return []
@@ -303,12 +333,14 @@ class TimedRecallClient:
         query: str,
         limit: int = 10,
         domains: list[str] | None = None,
+        tags: list[str] | None = None,
         session_id: str | None = None,
     ) -> list[dict]:
         body: dict = {
             "query": query,
             "limit": limit,
             "domains": domains,
+            "tags": tags,
         }
         if session_id:
             body["session_id"] = session_id
@@ -322,10 +354,14 @@ class TimedRecallClient:
         limit: int = 20,
         domain: str | None = None,
     ) -> list[dict]:
-        r = await self._request("POST", "/search/timeline", {
-            "limit": limit,
-            "domain": domain,
-        })
+        r = await self._request(
+            "POST",
+            "/search/timeline",
+            {
+                "limit": limit,
+                "domain": domain,
+            },
+        )
         if r and "entries" in r:
             return r["entries"]
         return []
@@ -339,9 +375,13 @@ class TimedRecallClient:
         return await self._request("GET", "/stats")
 
     async def decay(self, simulate_hours: float = 0.0) -> dict | None:
-        return await self._request("POST", "/admin/decay", {
-            "simulate_hours": simulate_hours,
-        })
+        return await self._request(
+            "POST",
+            "/admin/decay",
+            {
+                "simulate_hours": simulate_hours,
+            },
+        )
 
     async def consolidate(
         self,
@@ -349,14 +389,20 @@ class TimedRecallClient:
         dry_run: bool = False,
         min_cluster_size: int = 2,
     ) -> dict | None:
-        return await self._request("POST", "/admin/consolidate", {
-            "domain": domain,
-            "dry_run": dry_run,
-            "min_cluster_size": min_cluster_size,
-        })
+        return await self._request(
+            "POST",
+            "/admin/consolidate",
+            {
+                "domain": domain,
+                "dry_run": dry_run,
+                "min_cluster_size": min_cluster_size,
+            },
+        )
 
     async def reconcile(self, repair: bool = False) -> dict | None:
-        return await self._request("POST", f"/admin/reconcile?repair={'true' if repair else 'false'}")
+        return await self._request(
+            "POST", f"/admin/reconcile?repair={'true' if repair else 'false'}"
+        )
 
     async def ollama_info(self) -> dict | None:
         return await self._request("GET", "/admin/ollama")

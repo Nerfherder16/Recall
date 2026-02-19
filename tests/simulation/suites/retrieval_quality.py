@@ -10,6 +10,8 @@ from tests.simulation.report import SuiteReport
 
 from .base import BaseSuite
 
+TOP_K = 10
+
 
 class RetrievalQualitySuite(BaseSuite):
     name = "retrieval"
@@ -45,7 +47,6 @@ class RetrievalQualitySuite(BaseSuite):
 
             # ── Scenario A: Precision / Recall / MRR ──
             self.observe("Running precision/recall/MRR evaluation...")
-            K = 10
             per_query_results = []
             total_reciprocal_rank = 0.0
             total_precision = 0.0
@@ -59,17 +60,16 @@ class RetrievalQualitySuite(BaseSuite):
 
                 for query in gt["positive_queries"]:
                     results = await self.client.search_query(
-                        query, limit=K, domains=[self.domain],
+                        query,
+                        limit=TOP_K,
+                        tags=[self.run_tag],
                     )
                     await asyncio.sleep(2)  # Rate limit: 30/min
 
                     result_ids = [r["id"] for r in results]
                     found = expected_id in result_ids
 
-                    # Precision: 1/K if found in top K, else 0
-                    precision = 1.0 / K if found else 0.0
-
-                    # Recall: 1.0 if found (only 1 relevant doc per query)
+                    precision = 1.0 / TOP_K if found else 0.0
                     recall = 1.0 if found else 0.0
 
                     # MRR: 1/rank if found
@@ -80,16 +80,18 @@ class RetrievalQualitySuite(BaseSuite):
                         rank = -1
                         reciprocal_rank = 0.0
 
-                    per_query_results.append({
-                        "query": query,
-                        "expected_index": i,
-                        "found": found,
-                        "rank": rank,
-                        "precision": round(precision, 4),
-                        "recall": round(recall, 4),
-                        "reciprocal_rank": round(reciprocal_rank, 4),
-                        "result_count": len(results),
-                    })
+                    per_query_results.append(
+                        {
+                            "query": query,
+                            "expected_index": i,
+                            "found": found,
+                            "rank": rank,
+                            "precision": round(precision, 4),
+                            "recall": round(recall, 4),
+                            "reciprocal_rank": round(reciprocal_rank, 4),
+                            "result_count": len(results),
+                        }
+                    )
 
                     total_precision += precision
                     total_recall += recall
@@ -103,14 +105,21 @@ class RetrievalQualitySuite(BaseSuite):
             else:
                 avg_precision = avg_recall = mrr = 0.0
 
-            self.metric("precision_recall_mrr", {
-                "avg_precision_at_k": round(avg_precision, 4),
-                "avg_recall": round(avg_recall, 4),
-                "mrr": round(mrr, 4),
-                "total_queries": query_count,
-                "K": K,
-            })
-            self.observe(f"Precision@{K}={avg_precision:.3f}, Recall={avg_recall:.3f}, MRR={mrr:.3f} over {query_count} queries")
+            self.metric(
+                "precision_recall_mrr",
+                {
+                    "avg_precision_at_k": round(avg_precision, 4),
+                    "avg_recall": round(avg_recall, 4),
+                    "mrr": round(mrr, 4),
+                    "total_queries": query_count,
+                    "K": TOP_K,
+                },
+            )
+            self.observe(
+                f"P@{TOP_K}={avg_precision:.3f}, "
+                f"R={avg_recall:.3f}, "
+                f"MRR={mrr:.3f} over {query_count} queries"
+            )
 
             if avg_recall < 0.3:
                 self.error(f"Recall too low: {avg_recall:.3f} (expected > 0.3)")
@@ -128,7 +137,9 @@ class RetrievalQualitySuite(BaseSuite):
 
                 for query in gt["negative_queries"]:
                     results = await self.client.search_query(
-                        query, limit=5, domains=[self.domain],
+                        query,
+                        limit=5,
+                        tags=[self.run_tag],
                     )
                     await asyncio.sleep(2)
 
@@ -145,26 +156,44 @@ class RetrievalQualitySuite(BaseSuite):
             self.observe("Running graph expansion test...")
 
             # Store 3 connected memories: A -> B -> C
-            mid_a = await self._store("Alpha protocol: the initial handshake uses TLS 1.3 with certificate pinning.", tags=["chain-a"])
+            mid_a = await self._store(
+                "Alpha protocol: initial handshake uses TLS 1.3 with certificate pinning.",
+                tags=["chain-a"],
+            )
             await asyncio.sleep(0.5)
-            mid_b = await self._store("Beta validation: after the Alpha handshake, mutual authentication verifies both endpoints.", tags=["chain-b"])
+            mid_b = await self._store(
+                "Beta validation: after Alpha handshake, mutual auth verifies both endpoints.",
+                tags=["chain-b"],
+            )
             await asyncio.sleep(0.5)
-            mid_c = await self._store("Gamma completion: once Beta validation passes, the secure channel is established for data transfer.", tags=["chain-c"])
+            mid_c = await self._store(
+                "Gamma completion: once Beta validation passes, the secure channel is established.",
+                tags=["chain-c"],
+            )
             await asyncio.sleep(0.5)
 
-            chain_ok = True
             if mid_a and mid_b and mid_c:
                 # Create relationships: A -> B -> C
-                await self.client.create_relationship(mid_a, mid_b, "related_to", strength=0.8)
+                await self.client.create_relationship(
+                    mid_a,
+                    mid_b,
+                    "related_to",
+                    strength=0.8,
+                )
                 await asyncio.sleep(0.5)
-                await self.client.create_relationship(mid_b, mid_c, "related_to", strength=0.8)
+                await self.client.create_relationship(
+                    mid_b,
+                    mid_c,
+                    "related_to",
+                    strength=0.8,
+                )
                 await asyncio.sleep(3)
 
-                # Search with expansion: should find C via 2-hop from A
+                # Search with expansion: should find C via 2-hop
                 results_expanded = await self.client.search_query(
                     "Alpha protocol TLS handshake",
                     limit=10,
-                    domains=[self.domain],
+                    tags=[self.run_tag],
                     expand_relationships=True,
                 )
                 await asyncio.sleep(2)
@@ -176,7 +205,7 @@ class RetrievalQualitySuite(BaseSuite):
                 results_flat = await self.client.search_query(
                     "Alpha protocol TLS handshake",
                     limit=10,
-                    domains=[self.domain],
+                    tags=[self.run_tag],
                     expand_relationships=False,
                 )
                 await asyncio.sleep(2)
@@ -184,29 +213,32 @@ class RetrievalQualitySuite(BaseSuite):
                 flat_ids = [r["id"] for r in results_flat]
                 chain_isolated = mid_c not in flat_ids
 
-                self.metric("graph_expansion", {
-                    "chain_traversal": chain_found,
-                    "chain_isolation": chain_isolated,
-                })
-                self.observe(f"Graph expansion: chain_found={chain_found}, isolated_when_off={chain_isolated}")
+                self.metric(
+                    "graph_expansion",
+                    {
+                        "chain_traversal": chain_found,
+                        "chain_isolation": chain_isolated,
+                    },
+                )
+                self.observe(f"Graph expansion: found={chain_found}, isolated={chain_isolated}")
 
                 if not chain_found:
-                    self.observe("Warning: graph expansion didn't reach 2-hop neighbor (may need stronger relationship)")
+                    self.observe("Warning: graph expansion didn't reach 2-hop neighbor")
             else:
-                self.error("Could not store chain memories for graph expansion test")
-                chain_ok = False
+                self.error("Could not store chain memories for graph test")
 
             # ── Scenario D: Contradiction Inhibition ──
             self.observe("Running contradiction inhibition test...")
 
             mid_pos = await self._store(
-                "PostgreSQL is the best choice for our vector storage needs due to pgvector support.",
+                "PostgreSQL is the best choice for our vector storage needs due to pgvector.",
                 importance=0.7,
                 tags=["contradiction-test"],
             )
             await asyncio.sleep(0.5)
             mid_neg = await self._store(
-                "PostgreSQL is NOT suitable for vector storage; use a dedicated vector database like Qdrant instead.",
+                "PostgreSQL is NOT suitable for vector storage; "
+                "use a dedicated vector DB like Qdrant.",
                 importance=0.7,
                 tags=["contradiction-test"],
             )
@@ -214,14 +246,20 @@ class RetrievalQualitySuite(BaseSuite):
 
             if mid_pos and mid_neg:
                 # Create CONTRADICTS relationship
-                await self.client.create_relationship(mid_pos, mid_neg, "contradicts", strength=0.9, bidirectional=True)
+                await self.client.create_relationship(
+                    mid_pos,
+                    mid_neg,
+                    "contradicts",
+                    strength=0.9,
+                    bidirectional=True,
+                )
                 await asyncio.sleep(3)
 
                 # Search for their shared topic
                 results = await self.client.search_query(
                     "PostgreSQL vector storage database choice",
                     limit=10,
-                    domains=[self.domain],
+                    tags=[self.run_tag],
                     expand_relationships=True,
                 )
                 await asyncio.sleep(2)
@@ -235,17 +273,30 @@ class RetrievalQualitySuite(BaseSuite):
                         scores["negative"] = r["score"]
 
                 if "positive" in scores and "negative" in scores:
-                    ratio = min(scores.values()) / max(scores.values()) if max(scores.values()) > 0 else 1.0
-                    inhibition_detected = ratio < 0.95  # Some score difference
-                    self.metric("inhibition", {
-                        "detected": inhibition_detected,
-                        "score_ratio": round(ratio, 4),
-                        "scores": scores,
-                    })
+                    ratio = (
+                        min(scores.values()) / max(scores.values())
+                        if max(scores.values()) > 0
+                        else 1.0
+                    )
+                    inhibition_detected = ratio < 0.95
+                    self.metric(
+                        "inhibition",
+                        {
+                            "detected": inhibition_detected,
+                            "score_ratio": round(ratio, 4),
+                            "scores": scores,
+                        },
+                    )
                     self.observe(f"Inhibition: ratio={ratio:.3f}, detected={inhibition_detected}")
                 else:
                     self.observe("Warning: could not find both contradicting memories in results")
-                    self.metric("inhibition", {"detected": False, "note": "memories not found in results"})
+                    self.metric(
+                        "inhibition",
+                        {
+                            "detected": False,
+                            "note": "memories not found in results",
+                        },
+                    )
             else:
                 self.error("Could not store contradiction memories")
 
@@ -259,13 +310,12 @@ class RetrievalQualitySuite(BaseSuite):
                     results = await self.client.search_query(
                         test_query,
                         limit=limit,
-                        domains=[self.domain],
+                        tags=[self.run_tag],
                         expand_relationships=expand,
                     )
                     await asyncio.sleep(2)
 
                     key = f"limit={limit}_expand={expand}"
-                    # Check if the SQL injection memory (index 5) is found
                     if 5 in id_map:
                         found = id_map[5] in [r["id"] for r in results]
                     else:

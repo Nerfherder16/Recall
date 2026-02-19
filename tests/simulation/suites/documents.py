@@ -79,7 +79,8 @@ class DocumentSuite(BaseSuite):
                 f"SCP is used to deploy individual changed files then docker compose restart "
                 f"picks up the modifications. The signal detection system uses the LLM to "
                 f"classify conversation turns into memory types including facts, decisions, "
-                f"preferences, patterns, workflows, and error fixes with durability classification. "
+                f"preferences, patterns, workflows, and error fixes "
+                f"with durability classification. "
                 f"Each detected signal has a confidence score and importance rating from 1-10. "
                 f"High-confidence signals are auto-stored while medium-confidence signals go "
                 f"to a pending queue for manual review by the user through the dashboard. "
@@ -102,9 +103,11 @@ class DocumentSuite(BaseSuite):
                 doc = text_result["document"]
                 text_doc_id = doc["id"]
                 text_child_ids = text_result.get("child_ids", [])
-                self.observe(f"Text ingested: {doc['filename']}, "
-                             f"{text_result['memories_created']} memories, "
-                             f"type={doc['file_type']}")
+                self.observe(
+                    f"Text ingested: {doc['filename']}, "
+                    f"{text_result['memories_created']} memories, "
+                    f"type={doc['file_type']}"
+                )
 
                 if text_result["memories_created"] < 1:
                     self.error("Text ingestion produced 0 memories")
@@ -140,8 +143,10 @@ class DocumentSuite(BaseSuite):
                 md_doc = md_result["document"]
                 md_doc_id = md_doc["id"]
                 md_child_ids = md_result.get("child_ids", [])
-                self.observe(f"Markdown ingested: {md_doc['filename']}, "
-                             f"{md_result['memories_created']} memories")
+                self.observe(
+                    f"Markdown ingested: {md_doc['filename']}, "
+                    f"{md_result['memories_created']} memories"
+                )
             else:
                 self.error(f"Markdown ingestion failed: {md_result}")
                 md_doc_id = None
@@ -150,12 +155,15 @@ class DocumentSuite(BaseSuite):
 
             await asyncio.sleep(2)
 
-            self.metric("ingestion", {
-                "text_memories": len(text_child_ids),
-                "markdown_memories": len(md_child_ids),
-                "text_doc_id": text_doc_id,
-                "markdown_doc_id": md_doc_id,
-            })
+            self.metric(
+                "ingestion",
+                {
+                    "text_memories": len(text_child_ids),
+                    "markdown_memories": len(md_child_ids),
+                    "text_doc_id": text_doc_id,
+                    "markdown_doc_id": md_doc_id,
+                },
+            )
 
             # ── Scenario B: List and Detail ──
             self.observe("\n=== Scenario B: List and Detail ===")
@@ -174,9 +182,12 @@ class DocumentSuite(BaseSuite):
                 else:
                     self.error("Document detail missing child_memory_ids")
 
-            self.metric("listing", {
-                "documents_in_domain": len(docs),
-            })
+            self.metric(
+                "listing",
+                {
+                    "documents_in_domain": len(docs),
+                },
+            )
 
             await asyncio.sleep(1)
 
@@ -187,7 +198,9 @@ class DocumentSuite(BaseSuite):
                 # Pin the document
                 pin_result = await self.client.pin_document(text_doc_id)
                 if pin_result and pin_result.get("pinned"):
-                    self.observe(f"Document pinned, children_pinned={pin_result.get('children_pinned')}")
+                    self.observe(
+                        f"Document pinned, children_pinned={pin_result.get('children_pinned')}"
+                    )
                 else:
                     self.error(f"Pin document failed: {pin_result}")
 
@@ -216,10 +229,13 @@ class DocumentSuite(BaseSuite):
                 child_pinned2 = child_mem2.get("pinned") if child_mem2 else None
                 self.observe(f"Child pinned after unpin: {child_pinned2}")
 
-                self.metric("cascade_pin", {
-                    "pin_propagated": child_pinned is True,
-                    "unpin_propagated": child_pinned2 is not True,
-                })
+                self.metric(
+                    "cascade_pin",
+                    {
+                        "pin_propagated": child_pinned is True,
+                        "unpin_propagated": child_pinned2 is not True,
+                    },
+                )
             else:
                 self.observe("Skipping pin cascade — no text document")
 
@@ -233,22 +249,28 @@ class DocumentSuite(BaseSuite):
                 results = await self.client.search_query(
                     "FastAPI port 8200 vector search Qdrant",
                     limit=10,
-                    domains=[self.domain],
+                    tags=[self.run_tag],
                     expand_relationships=True,
                 )
 
                 result_ids = [r.get("id") for r in results]
                 siblings_found = sum(1 for cid in text_child_ids if cid in result_ids)
-                self.observe(f"Search returned {len(results)} results, "
-                             f"{siblings_found}/{len(text_child_ids)} siblings found")
+                self.observe(
+                    f"Search returned {len(results)} results, "
+                    f"{siblings_found}/{len(text_child_ids)} siblings found"
+                )
 
-                self.metric("sibling_boost", {
-                    "total_results": len(results),
-                    "total_siblings": len(text_child_ids),
-                    "siblings_in_results": siblings_found,
-                    "sibling_coverage": round(siblings_found / len(text_child_ids), 2)
-                        if text_child_ids else 0,
-                })
+                self.metric(
+                    "sibling_boost",
+                    {
+                        "total_results": len(results),
+                        "total_siblings": len(text_child_ids),
+                        "siblings_in_results": siblings_found,
+                        "sibling_coverage": round(siblings_found / len(text_child_ids), 2)
+                        if text_child_ids
+                        else 0,
+                    },
+                )
             else:
                 self.observe("Skipping sibling test — not enough children")
 
@@ -283,10 +305,13 @@ class DocumentSuite(BaseSuite):
                 else:
                     self.observe("Warning: duplicate was not rejected")
 
-                self.metric("dedup", {
-                    "first_accepted": True,
-                    "duplicate_rejected": (dup2_result or {}).get("status") == 409,
-                })
+                self.metric(
+                    "dedup",
+                    {
+                        "first_accepted": True,
+                        "duplicate_rejected": (dup2_result or {}).get("status") == 409,
+                    },
+                )
             else:
                 self.error("First upload failed for dedup test")
 
@@ -298,7 +323,9 @@ class DocumentSuite(BaseSuite):
             if md_doc_id and md_child_ids:
                 del_result = await self.client.delete_document(md_doc_id)
                 if del_result and del_result.get("deleted"):
-                    self.observe(f"Document deleted, children_deleted={del_result.get('children_deleted')}")
+                    self.observe(
+                        f"Document deleted, children_deleted={del_result.get('children_deleted')}"
+                    )
 
                     # Verify children are gone
                     await asyncio.sleep(1)
@@ -307,12 +334,17 @@ class DocumentSuite(BaseSuite):
                         mem = await self.client.get_memory(cid)
                         if mem is None:
                             gone_count += 1
-                    self.observe(f"Verified {gone_count}/{min(len(md_child_ids), 3)} children deleted")
+                    self.observe(
+                        f"Verified {gone_count}/{min(len(md_child_ids), 3)} children deleted"
+                    )
 
-                    self.metric("cascade_delete", {
-                        "children_deleted": del_result.get("children_deleted", 0),
-                        "verified_gone": gone_count,
-                    })
+                    self.metric(
+                        "cascade_delete",
+                        {
+                            "children_deleted": del_result.get("children_deleted", 0),
+                            "verified_gone": gone_count,
+                        },
+                    )
 
                     # Remove from tracked to avoid double-cleanup
                     if md_doc_id in self.client.tracked_documents:
@@ -345,8 +377,7 @@ class DocumentSuite(BaseSuite):
             if dur_result and dur_result.get("child_ids"):
                 dur_doc = dur_result["document"]
                 dur_children = dur_result["child_ids"]
-                self.observe(f"Ingested with durability=permanent, "
-                             f"{len(dur_children)} children")
+                self.observe(f"Ingested with durability=permanent, {len(dur_children)} children")
 
                 # Check document durability
                 doc_dur = dur_doc.get("durability")
@@ -358,11 +389,14 @@ class DocumentSuite(BaseSuite):
                     child_dur = child.get("durability") if child else None
                     self.observe(f"Child durability: {child_dur}")
 
-                    self.metric("durability_inheritance", {
-                        "document_durability": doc_dur,
-                        "child_durability": child_dur,
-                        "inherited": child_dur == "permanent",
-                    })
+                    self.metric(
+                        "durability_inheritance",
+                        {
+                            "document_durability": doc_dur,
+                            "child_durability": child_dur,
+                            "inherited": child_dur == "permanent",
+                        },
+                    )
 
                     if child_dur != "permanent":
                         self.error(f"Child didn't inherit permanent durability: {child_dur}")
@@ -376,10 +410,10 @@ class DocumentSuite(BaseSuite):
 
         return self._make_report(passed, time.monotonic() - t0)
 
-    async def _raw_ingest(self, content: bytes, filename: str,
-                          domain: str) -> dict | None:
+    async def _raw_ingest(self, content: bytes, filename: str, domain: str) -> dict | None:
         """Raw ingest that returns status code for error checking."""
         import httpx
+
         try:
             async with httpx.AsyncClient(timeout=120.0) as upload_client:
                 r = await upload_client.post(

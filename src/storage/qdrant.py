@@ -82,6 +82,7 @@ class QdrantStore:
             ("pinned", "keyword"),
             ("access_count", "integer"),
             ("durability", "keyword"),
+            ("tags", "keyword"),
             ("document_id", "keyword"),
         ]
 
@@ -146,6 +147,7 @@ class QdrantStore:
         limit: int = 10,
         memory_types: list[MemoryType] | None = None,
         domains: list[str] | None = None,
+        tags: list[str] | None = None,
         min_importance: float = 0.0,
         include_superseded: bool = False,
         session_id: str | None = None,
@@ -184,6 +186,15 @@ class QdrantStore:
                     match=MatchAny(any=domains),
                 )
             )
+
+        if tags:
+            for tag in tags:
+                conditions.append(
+                    FieldCondition(
+                        key="tags",
+                        match=MatchValue(value=tag),
+                    )
+                )
 
         if min_importance > 0:
             conditions.append(

@@ -73,7 +73,7 @@ class TimeAccelerationSuite(BaseSuite):
                             await self.client.search_query(
                                 mem.get("content", "")[:40],
                                 limit=3,
-                                domains=[self.domain],
+                                tags=[self.run_tag],
                             )
                         await asyncio.sleep(1)
 
@@ -87,7 +87,9 @@ class TimeAccelerationSuite(BaseSuite):
                         consolidations_performed += 1
                         total_merged += merged
                         if clusters > 0:
-                            self.observe(f"  Day {day}: consolidated {clusters} clusters ({merged} memories)")
+                            self.observe(
+                                f"  Day {day}: consolidated {clusters} clusters ({merged} memories)"
+                            )
 
                 # Step 4: Snapshot population
                 if day % 7 == 0 or day == 1 or day == total_days:
@@ -135,10 +137,12 @@ class TimeAccelerationSuite(BaseSuite):
             for snap in population_timeline:
                 total = snap["active"] + snap["archived"]
                 pct = snap["active"] / total * 100 if total > 0 else 0
-                survival_curve.append({
-                    "day": snap["day"],
-                    "survival_pct": round(pct, 1),
-                })
+                survival_curve.append(
+                    {
+                        "day": snap["day"],
+                        "survival_pct": round(pct, 1),
+                    }
+                )
 
             # ── Metrics ──
             initial_pop = population_timeline[0] if population_timeline else {}
@@ -161,7 +165,9 @@ class TimeAccelerationSuite(BaseSuite):
                     f"{final_pop.get('active', '?')} active, "
                     f"{final_pop.get('archived', '?')} archived"
                 )
-            self.observe(f"Consolidations: {consolidations_performed} runs, {total_merged} memories merged")
+            self.observe(
+                f"Consolidations: {consolidations_performed} runs, {total_merged} memories merged"
+            )
 
         except Exception as e:
             self.error(f"Time acceleration suite exception: {e}")
