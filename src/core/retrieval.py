@@ -82,7 +82,7 @@ class RetrievalPipeline:
                     results[result.memory.id] = result
                 else:
                     # Boost score — fact-level match is more precise
-                    results[result.memory.id].score *= 1.1
+                    results[result.memory.id].score *= 1.15
 
         # Stage 3: Graph expansion
         if query.expand_relationships and results:

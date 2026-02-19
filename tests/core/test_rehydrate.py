@@ -382,12 +382,16 @@ async def test_rehydrate_includes_anti_patterns():
             [
                 MagicMock(
                     id="ap-1",
-                    payload=_make_payload(
-                        "Never use sudo in containers",
-                        domain="infrastructure",
-                        memory_type="warning",
-                        created_at="2026-01-10T08:00:00",
-                    ),
+                    payload={
+                        **_make_payload(
+                            "Never use sudo in containers",
+                            domain="infrastructure",
+                            memory_type="warning",
+                            created_at="2026-01-10T08:00:00",
+                        ),
+                        "warning": "Never use sudo in containers",
+                        "pattern": "sudo usage in Dockerfiles",
+                    },
                 )
             ],
             None,

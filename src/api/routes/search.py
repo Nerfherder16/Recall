@@ -413,7 +413,7 @@ async def rehydrate_context(request: Request, body: RehydrateRequest):
                     entries.append(
                         RehydrateEntry(
                             id=str(point.id),
-                            summary=p.get("content", "")[:120],
+                            summary=(p.get("warning") or p.get("pattern") or "")[:120],
                             memory_type=p.get("memory_type", "warning"),
                             domain=p.get("domain", "general"),
                             created_at=p.get("created_at", ""),

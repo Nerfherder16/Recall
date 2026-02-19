@@ -236,7 +236,7 @@ async function main() {
   if (!transcriptPath) process.exit(0);
 
   const projectName = cwd.split(/[/\\]/).filter(Boolean).pop() || "unknown";
-  const domain = PROJECT_DOMAINS[projectName.toLowerCase()] || projectName;
+  const domain = PROJECT_DOMAINS[projectName.toLowerCase()] || "general";
 
   const userMessages = extractUserMessages(transcriptPath);
   if (userMessages.length < 2) {

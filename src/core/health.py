@@ -6,6 +6,7 @@ and Redis into a unified dashboard view.
 """
 
 import asyncio
+import math
 from datetime import datetime
 from typing import Any
 
@@ -71,8 +72,25 @@ class HealthComputer:
         durability = payload.get("durability")
 
         # Decay pressure (projected for next 30-min cycle)
+        # Mirrors actual decay formula from workers/decay.py
         base_decay = self.settings.importance_decay_rate
         effective_decay = base_decay * (1 - stability)
+
+        # Access frequency modifier: 10 accesses → 0.5x, 20 → 0.33x
+        access_mod = 1.0 / (1.0 + 0.1 * access_count)
+        effective_decay *= access_mod
+
+        # Feedback modifier: useful memories decay slower
+        feedback_entries = await self.pg.get_feedback_for_memory(memory_id)
+        useful_count = sum(1 for e in feedback_entries if (e.get("details") or {}).get("useful"))
+        not_useful_count = sum(
+            1 for e in feedback_entries if (e.get("details") or {}).get("useful") is False
+        )
+        total_fb = useful_count + not_useful_count
+        if total_fb > 0:
+            feedback_mod = 1.0 - (0.5 * (useful_count / total_fb))
+            effective_decay *= feedback_mod
+
         if durability == "permanent" or pinned:
             decay_pressure = 0.0
         elif durability == "durable":
@@ -81,12 +99,10 @@ class HealthComputer:
             decay_pressure = -(effective_decay * importance)
 
         # Retrieval lift (diminishing returns — log scale matches other forces)
-        import math
-
         retrieval_lift = 0.02 * math.log1p(access_count)
 
         # Feedback signal (net importance delta from feedback)
-        feedback_entries = await self.pg.get_feedback_for_memory(memory_id)
+        # feedback_entries already loaded above for decay pressure
         feedback_delta = 0.0
         for entry in feedback_entries:
             details = entry.get("details", {})
@@ -168,23 +184,22 @@ class HealthComputer:
         # Orphan hubs (high graph centrality, low importance)
         try:
             orphan_hubs = await self.neo4j.get_high_gravity_memories(min_strength=2.0)
-            for mem_id, total_strength in orphan_hubs:
-                result = await self.qdrant.get(mem_id)
-                if result:
-                    _, payload = result
-                    imp = payload.get("importance", 0.5)
-                    if imp < 0.3:
-                        conflicts.append(
-                            {
-                                "type": "orphan_hub",
-                                "severity": "warning",
-                                "memory_id": mem_id,
-                                "description": (
-                                    f"High graph connectivity (strength={total_strength:.1f})"
-                                    f" but low importance ({imp:.2f})"
-                                ),
-                            }
-                        )
+            for hub in orphan_hubs:
+                mem_id = hub["id"]
+                total_strength = hub["total_strength"]
+                imp = hub.get("importance", 0.5)
+                if imp < 0.3:
+                    conflicts.append(
+                        {
+                            "type": "orphan_hub",
+                            "severity": "warning",
+                            "memory_id": mem_id,
+                            "description": (
+                                f"High graph connectivity (strength={total_strength:.1f})"
+                                f" but low importance ({imp:.2f})"
+                            ),
+                        }
+                    )
         except Exception:
             pass
 
@@ -197,9 +212,9 @@ class HealthComputer:
 
     async def _population_balance(self) -> dict[str, Any]:
         counts = await self.pg.get_action_counts(days=30)
-        stores = counts.get("store", 0)
+        stores = counts.get("create", 0)
         deletes = counts.get("delete", 0)
-        decays = counts.get("decay_archive", 0)
+        decays = counts.get("decay", 0)
         net = stores - deletes - decays
         return {
             "stores": stores,

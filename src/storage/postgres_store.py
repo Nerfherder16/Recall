@@ -532,23 +532,25 @@ class PostgresStore:
         }
 
     async def get_feedback_starved_memories(self, min_accesses: int = 5) -> list[dict[str, Any]]:
-        """Find memories with many accesses but zero feedback."""
-        # This uses a subquery to find memory_ids with feedback
+        """Find memories created but never given feedback.
+
+        Uses 'create' audit entries (not 'access' — no access audit exists).
+        Returns memory_ids that have been created but have zero feedback entries.
+        """
         rows = await self.pool.fetch(
             """
-            SELECT memory_id
+            SELECT DISTINCT memory_id
             FROM audit_log
-            WHERE action = 'access'
-            GROUP BY memory_id
-            HAVING COUNT(*) >= $1
+            WHERE action = 'create'
+              AND memory_id IS NOT NULL
               AND memory_id NOT IN (
                   SELECT DISTINCT memory_id
                   FROM audit_log
                   WHERE action = 'feedback'
+                    AND memory_id IS NOT NULL
               )
             LIMIT 50
             """,
-            min_accesses,
         )
         return [{"memory_id": r["memory_id"]} for r in rows]
 
@@ -559,7 +561,7 @@ class PostgresStore:
             SELECT timestamp, action, details
             FROM audit_log
             WHERE memory_id = $1
-              AND action IN ('store', 'feedback', 'decay', 'update_importance', 'update_durability')
+              AND action IN ('create', 'feedback', 'decay', 'update_importance', 'update_durability')
             ORDER BY timestamp ASC
             """,
             memory_id,
