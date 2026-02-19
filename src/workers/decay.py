@@ -132,8 +132,8 @@ class DecayWorker:
             # Apply decay
             new_importance = importance * ((1 - effective_decay) ** hours_since)
 
-            # Clamp to minimum
-            new_importance = max(0.01, new_importance)
+            # Clamp to minimum — floor at 0.05 so memories never become invisible
+            new_importance = max(0.05, new_importance)
 
             if abs(new_importance - importance) > 0.001:
                 await self.qdrant.update_importance(
@@ -244,7 +244,7 @@ async def apply_decay_to_memory(
 
     # Apply exponential decay
     new_importance = current_importance * ((1 - effective_decay) ** hours_since_access)
-    new_importance = max(0.01, new_importance)
+    new_importance = max(0.05, new_importance)
 
     if abs(new_importance - current_importance) > 0.001:
         await qdrant_store.update_importance(

@@ -457,16 +457,16 @@ async def submit_feedback(request: FeedbackRequest, user: User | None = Depends(
             old_stability = payload.get("stability", 0.1)
 
             if similarity > 0.35:
-                # Useful — boost importance and stability
-                new_importance = min(1.0, old_importance + 0.05)
-                new_stability = min(1.0, old_stability + 0.03)
+                # Useful — strong boost to reinforce valuable memories
+                new_importance = min(1.0, old_importance + 0.10)
+                new_stability = min(1.0, old_stability + 0.05)
                 useful += 1
                 is_useful = True
                 useful_memory_ids.append(memory_id)
             else:
-                # Not useful — small penalty
-                new_importance = max(0.01, old_importance - 0.02)
-                new_stability = max(0.0, old_stability - 0.01)
+                # Not useful — gentle penalty (avoid death spiral)
+                new_importance = max(0.05, old_importance - 0.01)
+                new_stability = max(0.0, old_stability - 0.005)
                 not_useful += 1
                 is_useful = False
 

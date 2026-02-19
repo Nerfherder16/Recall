@@ -192,7 +192,10 @@ async function submitFeedback(transcriptPath, sessionId) {
   }
   if (!injected || injected.length === 0) return;
 
-  const ids = [...new Set(injected.map((e) => e.memory_id))];
+  // Only submit search results for feedback — rehydrate entries are background
+  // context and shouldn't be evaluated for "usefulness"
+  const searchEntries = injected.filter((e) => e.source !== "rehydrate");
+  const ids = [...new Set(searchEntries.map((e) => e.memory_id))];
   const assistantText = extractAssistantText(transcriptPath);
   if (!assistantText || assistantText.length < 50) return;
 

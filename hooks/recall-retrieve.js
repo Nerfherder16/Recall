@@ -282,11 +282,12 @@ async function main() {
 
       const entries = results.map((r) => ({
         memory_id: r.id,
+        source: "search",
         timestamp: new Date().toISOString(),
       }));
-      // Also track rehydrate entries
+      // Track rehydrate entries separately (not submitted for feedback)
       for (const e of rehydrateEntries) {
-        if (e.id) entries.push({ memory_id: e.id, timestamp: new Date().toISOString() });
+        if (e.id) entries.push({ memory_id: e.id, source: "rehydrate", timestamp: new Date().toISOString() });
       }
       injected.push(...entries);
       if (injected.length > 500) injected = injected.slice(-500);
