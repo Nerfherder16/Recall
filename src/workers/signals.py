@@ -89,9 +89,20 @@ async def _run_signal_detection(session_id: str):
             predicted_type=prediction.get("predicted_type"),
         )
 
+    # Extract ML hint for LLM prompt (advisory only)
+    ml_hint = None
+    ml_confidence = None
+    if classifier is not None:
+        ml_hint = prediction.get("predicted_type")
+        ml_confidence = prediction.get("signal_probability")
+
     detector = SignalDetector()
     async with _signal_semaphore:
-        signals = await detector.detect(turns)
+        signals = await detector.detect(
+            turns,
+            ml_hint=ml_hint,
+            ml_confidence=ml_confidence,
+        )
 
     if not signals:
         logger.debug("signal_detection_no_signals", session_id=session_id)

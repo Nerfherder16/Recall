@@ -144,7 +144,9 @@ class PostgresStore:
                 user_id,
             )
         except Exception as e:
-            logger.warning("audit_log_write_failed", error=str(e), action=action, memory_id=memory_id)
+            logger.warning(
+                "audit_log_write_failed", error=str(e), action=action, memory_id=memory_id
+            )
 
     async def get_audit_log(
         self,
@@ -265,9 +267,7 @@ class PostgresStore:
 
     async def delete_user(self, user_id: int) -> bool:
         """Delete a user by ID. Returns True if deleted, False if not found."""
-        result = await self.pool.execute(
-            "DELETE FROM users WHERE id = $1", user_id
-        )
+        result = await self.pool.execute("DELETE FROM users WHERE id = $1", user_id)
         return result == "DELETE 1"
 
     async def update_user_last_active(self, user_id: int):
@@ -302,8 +302,12 @@ class PostgresStore:
                     archived_at = now()
                 """,
                 session_data.get("id") or session_data.get("session_id"),
-                datetime.fromisoformat(session_data["started_at"]) if session_data.get("started_at") else datetime.utcnow(),
-                datetime.fromisoformat(session_data["ended_at"]) if session_data.get("ended_at") else None,
+                datetime.fromisoformat(session_data["started_at"])
+                if session_data.get("started_at")
+                else datetime.utcnow(),
+                datetime.fromisoformat(session_data["ended_at"])
+                if session_data.get("ended_at")
+                else None,
                 session_data.get("working_directory") or None,
                 session_data.get("current_task") or None,
                 int(session_data.get("memories_created", 0)),
@@ -465,7 +469,9 @@ class PostgresStore:
             for r in rows
         ]
 
-    async def get_noisy_memories(self, min_negative: int = 3, days: int = 7) -> list[dict[str, Any]]:
+    async def get_noisy_memories(
+        self, min_negative: int = 3, days: int = 7
+    ) -> list[dict[str, Any]]:
         """Find memories with excessive negative feedback."""
         rows = await self.pool.fetch(
             """
@@ -492,6 +498,38 @@ class PostgresStore:
             }
             for r in rows
         ]
+
+    async def get_all_memory_feedback_stats(
+        self,
+    ) -> dict[str, dict[str, int]]:
+        """Get per-memory feedback useful/not_useful counts.
+
+        Returns a dict mapping memory_id to {useful, not_useful}.
+        Used by decay worker for feedback-aware decay.
+        One query for all memories — avoids N+1.
+        """
+        rows = await self.pool.fetch(
+            """
+            SELECT
+                memory_id,
+                COUNT(*) FILTER (
+                    WHERE details->>'useful' = 'true'
+                ) AS useful,
+                COUNT(*) FILTER (
+                    WHERE details->>'useful' = 'false'
+                ) AS not_useful
+            FROM audit_log
+            WHERE action = 'feedback'
+            GROUP BY memory_id
+            """,
+        )
+        return {
+            r["memory_id"]: {
+                "useful": r["useful"],
+                "not_useful": r["not_useful"],
+            }
+            for r in rows
+        }
 
     async def get_feedback_starved_memories(self, min_accesses: int = 5) -> list[dict[str, Any]]:
         """Find memories with many accesses but zero feedback."""
@@ -529,12 +567,14 @@ class PostgresStore:
         events = []
         for r in rows:
             details = json.loads(r["details"]) if r["details"] else {}
-            events.append({
-                "timestamp": r["timestamp"].isoformat(),
-                "action": r["action"],
-                "importance": details.get("importance"),
-                "details": details,
-            })
+            events.append(
+                {
+                    "timestamp": r["timestamp"].isoformat(),
+                    "action": r["action"],
+                    "importance": details.get("importance"),
+                    "details": details,
+                }
+            )
         return events
 
     async def get_metrics_history(self, hours: int = 24) -> list[dict[str, Any]]:
@@ -550,7 +590,9 @@ class PostgresStore:
         return [
             {
                 "timestamp": r["timestamp"].isoformat(),
-                "counters": json.loads(r["counters"]) if isinstance(r["counters"], str) else r["counters"],
+                "counters": json.loads(r["counters"])
+                if isinstance(r["counters"], str)
+                else r["counters"],
                 "gauges": json.loads(r["gauges"]) if isinstance(r["gauges"], str) else r["gauges"],
             }
             for r in rows

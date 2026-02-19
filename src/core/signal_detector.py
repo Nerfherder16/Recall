@@ -53,34 +53,50 @@ SIGNAL_DURABILITY: dict[SignalType, str] = {
     SignalType.WARNING: "durable",
 }
 
-PROMPT_TEMPLATE = """Extract signals from the conversation below. Return a JSON array.
-
-Signal types: error_fix, decision, pattern, preference, fact, workflow, contradiction, warning
-Durability: ephemeral (temp fixes), durable (decisions/patterns), permanent (IPs/ports/paths)
-Domain must be one of: general, infrastructure, development, testing, security, api, database, frontend, devops, networking, ai-ml, tooling, configuration, documentation, sessions
-
-Each signal: {{"signal_type": str, "content": str, "confidence": 0.0-1.0, "importance": 1-10, "durability": str, "domain": str, "tags": [str]}}
-
-Extract ALL signals you find. Return [] ONLY for casual greetings or trivial small talk.
-
-Example input:
-[user]: The Redis connection keeps dropping on CasaOS. I fixed it by setting tcp-keepalive 60 in redis.conf.
-[assistant]: Good find. That's a common issue with Docker bridge networking.
-
-Example output:
-[{{"signal_type": "error_fix", "content": "Redis connections drop on CasaOS Docker. Fix: set tcp-keepalive 60 in redis.conf. Caused by Docker bridge networking.", "confidence": 0.9, "importance": 7, "durability": "durable", "domain": "infrastructure", "tags": ["docker", "casaos", "networking"]}}]
-
-Example input:
-[user]: I prefer using bun over npm for all new projects.
-[assistant]: Makes sense — bun is significantly faster for installs and scripts.
-
-Example output:
-[{{"signal_type": "preference", "content": "User prefers bun over npm for all new projects due to faster installs and script execution.", "confidence": 0.85, "importance": 4, "durability": "durable", "domain": "tooling", "tags": ["bun", "npm", "preference"]}}]
-
-Conversation:
-{turns}
-
-JSON array:"""
+PROMPT_TEMPLATE = (  # noqa: E501
+    "Extract signals from the conversation below. "
+    "Return a JSON array.\n\n"
+    "Signal types: error_fix, decision, pattern, preference, "
+    "fact, workflow, contradiction, warning\n"
+    "Durability: ephemeral (temp fixes), durable "
+    "(decisions/patterns), permanent (IPs/ports/paths)\n"
+    "Domain must be one of: general, infrastructure, "
+    "development, testing, security, api, database, frontend, "
+    "devops, networking, ai-ml, tooling, configuration, "
+    "documentation, sessions\n\n"
+    'Each signal: {{"signal_type": str, "content": str, '
+    '"confidence": 0.0-1.0, "importance": 1-10, '
+    '"durability": str, "domain": str, "tags": [str]}}\n\n'
+    "Extract ALL signals you find. Return [] ONLY for "
+    "casual greetings or trivial small talk.\n\n"
+    "Example input:\n"
+    "[user]: The Redis connection keeps dropping on CasaOS. "
+    "I fixed it by setting tcp-keepalive 60 in redis.conf.\n"
+    "[assistant]: Good find. That's a common issue with "
+    "Docker bridge networking.\n\n"
+    "Example output:\n"
+    '[{{"signal_type": "error_fix", "content": '
+    '"Redis connections drop on CasaOS Docker. '
+    "Fix: set tcp-keepalive 60 in redis.conf. "
+    'Caused by Docker bridge networking.", '
+    '"confidence": 0.9, "importance": 7, '
+    '"durability": "durable", '
+    '"domain": "infrastructure", '
+    '"tags": ["docker", "casaos", "networking"]}}]\n\n'
+    "Example input:\n"
+    "[user]: I prefer using bun over npm for all new "
+    "projects.\n"
+    "[assistant]: Makes sense — bun is significantly "
+    "faster for installs and scripts.\n\n"
+    "Example output:\n"
+    '[{{"signal_type": "preference", "content": '
+    '"User prefers bun over npm for all new projects '
+    'due to faster installs and script execution.", '
+    '"confidence": 0.85, "importance": 4, '
+    '"durability": "durable", "domain": "tooling", '
+    '"tags": ["bun", "npm", "preference"]}}]\n\n'
+    "Conversation:\n{turns}\n\nJSON array:"
+)
 
 RETRY_NUDGE = " Look again carefully for any facts, decisions, preferences, or workflows."
 
@@ -91,12 +107,19 @@ class SignalDetector:
     def __init__(self):
         self.settings = get_settings()
 
-    async def detect(self, turns: list[dict]) -> list[DetectedSignal]:
+    async def detect(
+        self,
+        turns: list[dict],
+        ml_hint: str | None = None,
+        ml_confidence: float | None = None,
+    ) -> list[DetectedSignal]:
         """
         Analyze conversation turns and extract signals.
 
         Args:
             turns: List of {role, content, timestamp?} dicts
+            ml_hint: Optional ML classifier predicted type (e.g., "error_fix")
+            ml_confidence: Optional ML classifier confidence (0.0-1.0)
 
         Returns:
             List of DetectedSignal objects
@@ -106,6 +129,15 @@ class SignalDetector:
 
         formatted = self._format_turns(turns)
         prompt = PROMPT_TEMPLATE.format(turns=formatted)
+
+        # Inject ML type hint if available
+        if ml_hint and ml_confidence is not None:
+            hint_text = (
+                f'\nAn ML pre-classifier suggests this is likely a "{ml_hint}" signal '
+                f"(confidence: {ml_confidence:.0%}). Consider this hint but override "
+                f"if the conversation clearly indicates a different type.\n"
+            )
+            prompt = prompt.replace("\nJSON array:", f"{hint_text}\nJSON array:")
 
         try:
             llm = await get_llm()

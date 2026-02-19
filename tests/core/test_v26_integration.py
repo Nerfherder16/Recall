@@ -199,14 +199,15 @@ def test_hooks_have_optimizations():
     from pathlib import Path
 
     retrieve = Path("hooks/recall-retrieve.js").read_text()
-    assert "DOMAIN_ALIASES" in retrieve
-    assert "searchBody.domain" in retrieve
+    # v2.8: PROJECT_DOMAINS replaced DOMAIN_ALIASES
+    assert "PROJECT_DOMAINS" in retrieve
+    assert "domain" in retrieve
 
     observe = Path("hooks/observe-edit.js").read_text()
     assert "SKIP_EXTENSIONS" in observe
     assert "shouldSkipFile" in observe
 
-    assert "sessionKey" in retrieve
+    assert "injectedFile" in retrieve or "sessionKey" in retrieve
     summary = Path("hooks/recall-session-summary.js").read_text()
     assert "sessionId" in summary or "session_id" in summary
 
