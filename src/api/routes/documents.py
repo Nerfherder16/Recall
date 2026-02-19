@@ -5,7 +5,6 @@ Handles document upload, listing, detail, deletion,
 and cascading operations (pin/unpin, domain update).
 """
 
-from datetime import datetime
 from typing import Any
 
 import structlog
@@ -56,9 +55,7 @@ class IngestResponse(BaseModel):
 
 class UpdateDocumentRequest(BaseModel):
     domain: str | None = None
-    durability: str | None = Field(
-        default=None, pattern="^(ephemeral|durable|permanent)$"
-    )
+    durability: str | None = Field(default=None, pattern="^(ephemeral|durable|permanent)$")
 
 
 # =============================================================
@@ -110,17 +107,16 @@ async def ingest_file(
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid durability value")
 
-    # Check for duplicate hash
+    # Check for duplicate hash (O(1) indexed lookup)
     file_hash = compute_file_hash(content)
     neo4j = await get_neo4j_store()
     doc_store = Neo4jDocumentStore(neo4j.driver)
-    existing_docs = await doc_store.list_documents(limit=200)
-    for edoc in existing_docs:
-        if edoc.get("file_hash") == file_hash:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Document with same content already exists (id: {edoc.get('id')})",
-            )
+    existing = await doc_store.get_document_by_hash(file_hash)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Document with same content already exists (id: {existing.get('id')})",
+        )
 
     # Run ingestion
     doc, child_ids = await ingest_document(
@@ -136,9 +132,9 @@ async def ingest_file(
     # Audit
     try:
         pg = await get_postgres_store()
-        await pg.append_audit(
-            action="document_ingest",
-            memory_id=doc.id,
+        await pg.log_audit(
+            "document_ingest",
+            doc.id,
             actor=user.username if user else "user",
             details={
                 "filename": doc.filename,
@@ -210,18 +206,16 @@ async def delete_document(
         # Also delete from Neo4j memory nodes
         try:
             async with neo4j.driver.session() as session:
-                await session.run(
-                    "MATCH (m:Memory {id: $id}) DETACH DELETE m", id=cid
-                )
+                await session.run("MATCH (m:Memory {id: $id}) DETACH DELETE m", id=cid)
         except Exception:
             pass
 
     # Audit
     try:
         pg = await get_postgres_store()
-        await pg.append_audit(
-            action="document_delete",
-            memory_id=doc_id,
+        await pg.log_audit(
+            "document_delete",
+            doc_id,
             actor=user.username if user else "user",
             details={"children_deleted": len(child_ids)},
         )

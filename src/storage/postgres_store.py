@@ -171,7 +171,6 @@ class PostgresStore:
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-        conditions.append(f"${idx}")
         params.append(limit)
 
         rows = await self.pool.fetch(
@@ -531,11 +530,12 @@ class PostgresStore:
             for r in rows
         }
 
-    async def get_feedback_starved_memories(self, min_accesses: int = 5) -> list[dict[str, Any]]:
+    async def get_feedback_starved_memories(self, **_kwargs) -> list[dict[str, Any]]:
         """Find memories created but never given feedback.
 
         Uses 'create' audit entries (not 'access' — no access audit exists).
         Returns memory_ids that have been created but have zero feedback entries.
+        Note: min_accesses cannot be enforced (access_count lives in Qdrant, not audit_log).
         """
         rows = await self.pool.fetch(
             """
@@ -561,7 +561,8 @@ class PostgresStore:
             SELECT timestamp, action, details
             FROM audit_log
             WHERE memory_id = $1
-              AND action IN ('create', 'feedback', 'decay', 'update_importance', 'update_durability')
+              AND action IN ('create', 'feedback', 'decay',
+                             'update_importance', 'update_durability')
             ORDER BY timestamp ASC
             """,
             memory_id,

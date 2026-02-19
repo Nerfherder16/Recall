@@ -141,6 +141,18 @@ class Neo4jDocumentStore:
                 **fields,
             )
 
+    async def get_document_by_hash(self, file_hash: str) -> dict[str, Any] | None:
+        """Look up a document by its file hash (O(1) via index)."""
+        async with self.driver.session() as session:
+            result = await session.run(
+                "MATCH (d:Document {file_hash: $hash}) RETURN d LIMIT 1",
+                hash=file_hash,
+            )
+            record = await result.single()
+            if not record:
+                return None
+            return dict(record["d"])
+
     async def list_documents(
         self, domain: str | None = None, limit: int = 50
     ) -> list[dict[str, Any]]:

@@ -243,9 +243,7 @@ class Neo4jStore:
             records = await result.data()
             return records
 
-    async def find_contradictions(
-        self, memory_ids: list[str]
-    ) -> list[tuple[str, str]]:
+    async def find_contradictions(self, memory_ids: list[str]) -> list[tuple[str, str]]:
         """
         Find CONTRADICTS edges between a set of memory IDs.
 
@@ -277,7 +275,9 @@ class Neo4jStore:
             result = await session.run(
                 f"""
                 MATCH path = shortestPath(
-                    (source:Memory {{id: $source_id}})-[*..{max_depth}]-(target:Memory {{id: $target_id}})
+                    (source:Memory {{id: $source_id}})
+                    -[*..{max_depth}]-
+                    (target:Memory {{id: $target_id}})
                 )
                 RETURN [node in nodes(path) | node.id] as node_ids,
                        [rel in relationships(path) | type(rel)] as rel_types,
@@ -485,9 +485,10 @@ class Neo4jStore:
             result = await session.run(
                 """
                 MATCH (m:Memory)
-                OPTIONAL MATCH ()-[r]->()
-                RETURN count(DISTINCT m) as memory_count,
-                       count(DISTINCT r) as relationship_count
+                WITH count(m) AS memory_count
+                OPTIONAL MATCH (:Memory)-[r]->(:Memory)
+                RETURN memory_count,
+                       count(r) AS relationship_count
                 """
             )
 

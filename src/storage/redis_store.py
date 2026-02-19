@@ -223,6 +223,11 @@ class RedisStore:
         # LPUSH stores newest first, so reverse for chronological
         return [json.loads(item) for item in reversed(raw)]
 
+    async def get_turn_count(self, session_id: str) -> int:
+        """Get the number of turns in a session (O(1) via LLEN)."""
+        key = self._turns_key(session_id)
+        return await self.client.llen(key)
+
     # =============================================================
     # PENDING SIGNALS
     # =============================================================
@@ -274,10 +279,7 @@ class RedisStore:
                 cursor=cursor, match="recall:session:*", count=100
             )
             # Filter out sub-keys (working, turns)
-            count += sum(
-                1 for k in keys
-                if ":working" not in k and ":turns" not in k
-            )
+            count += sum(1 for k in keys if ":working" not in k and ":turns" not in k)
             if cursor == 0:
                 break
         return count

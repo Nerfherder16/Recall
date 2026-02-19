@@ -829,7 +829,11 @@ class QdrantStore:
         return all_points
 
     async def increment_triggered(self, anti_pattern_id: str):
-        """Increment times_triggered for an anti-pattern."""
+        """Increment times_triggered for an anti-pattern.
+
+        Note: read-modify-write race under concurrency is accepted —
+        log2-scale usage in scoring minimizes missed-increment impact.
+        """
         result = await self.get_anti_pattern(anti_pattern_id)
         if result:
             _, payload = result

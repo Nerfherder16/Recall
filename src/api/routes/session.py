@@ -123,9 +123,20 @@ async def end_session(request: EndSessionRequest, background_tasks: BackgroundTa
         await redis.clear_pending_signals(request.session_id)
 
         # Trigger consolidation as a BackgroundTask (replaces dead event stream)
+        # Derive domain from first working memory (session hash has no domain field)
         consolidation_queued = False
         if request.trigger_consolidation and len(working_memory) >= 2:
-            session_domain = (session_data or {}).get("domain")
+            session_domain = None
+            try:
+                from src.storage import get_qdrant_store
+
+                qdrant = await get_qdrant_store()
+                result = await qdrant.get(working_memory[0])
+                if result:
+                    _, payload = result
+                    session_domain = payload.get("domain")
+            except Exception:
+                pass
             background_tasks.add_task(
                 _run_session_end_consolidation, request.session_id, session_domain
             )
@@ -135,7 +146,7 @@ async def end_session(request: EndSessionRequest, background_tasks: BackgroundTa
         # Re-fetch session data to get ended_at timestamp
         updated_session = await redis.get_session(request.session_id)
         if updated_session:
-            turns_count = len(await redis.get_recent_turns(request.session_id, count=9999))
+            turns_count = await redis.get_turn_count(request.session_id)
             pg = await get_postgres_store()
             await pg.archive_session(
                 {

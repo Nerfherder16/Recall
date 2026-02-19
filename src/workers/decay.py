@@ -209,17 +209,38 @@ async def apply_decay_to_memory(
     hours_since_access: float,
     current_importance: float,
     stability: float,
+    access_count: int = 0,
+    durability: str | None = None,
+    feedback_stats: dict[str, int] | None = None,
 ) -> float:
     """
     Apply decay to a single memory and return new importance.
 
-    This can be called on-demand for specific memories.
+    Mirrors the full DecayWorker.run() formula including v2.8
+    access/feedback/durability modifiers.
     """
     settings = get_settings()
     base_decay_rate = settings.importance_decay_rate
 
     # Stability reduces decay rate
     effective_decay = base_decay_rate * (1 - stability)
+
+    # Access frequency modifier (v2.8)
+    access_mod = 1.0 / (1.0 + 0.1 * access_count)
+    effective_decay *= access_mod
+
+    # Feedback ratio modifier (v2.8)
+    if feedback_stats:
+        useful = feedback_stats.get("useful", 0)
+        not_useful = feedback_stats.get("not_useful", 0)
+        total_fb = useful + not_useful
+        if total_fb > 0:
+            feedback_mod = 1.0 - (0.5 * (useful / total_fb))
+            effective_decay *= feedback_mod
+
+    # Durability modifier
+    if durability == "durable" or durability is None:
+        effective_decay *= 0.15
 
     # Apply exponential decay
     new_importance = current_importance * ((1 - effective_decay) ** hours_since_access)

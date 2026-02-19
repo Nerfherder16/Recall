@@ -173,7 +173,10 @@ class MemoryConsolidator:
         """Compute cosine similarity between two vectors."""
         a = np.array(vec1)
         b = np.array(vec2)
-        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+        norm_a, norm_b = np.linalg.norm(a), np.linalg.norm(b)
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return float(np.dot(a, b) / (norm_a * norm_b))
 
     async def _merge_cluster(
         self,
