@@ -153,11 +153,18 @@ class HealthComputer:
 
     async def compute_conflicts(self) -> list[dict[str, Any]]:
         """Detect potential conflicts in the memory system."""
+        # Build set of active (non-superseded) memory IDs + payloads for filtering
+        active_memories = await self.qdrant.scroll_all(include_superseded=False)
+        active_ids = {mid for mid, _ in active_memories}
+        active_payloads = {mid: payload for mid, payload in active_memories}
+
         conflicts = []
 
         # Noisy memories (excessive negative feedback)
         noisy = await self.pg.get_noisy_memories(min_negative=3, days=7)
         for m in noisy:
+            if m["memory_id"] not in active_ids:
+                continue
             conflicts.append(
                 {
                     "type": "noisy",
@@ -172,6 +179,8 @@ class HealthComputer:
         # Feedback-starved memories
         starved = await self.pg.get_feedback_starved_memories(min_accesses=5)
         for m in starved:
+            if m["memory_id"] not in active_ids:
+                continue
             conflicts.append(
                 {
                     "type": "feedback_starved",
@@ -186,9 +195,13 @@ class HealthComputer:
             orphan_hubs = await self.neo4j.get_high_gravity_memories(min_strength=2.0)
             for hub in orphan_hubs:
                 mem_id = hub["id"]
+                if mem_id not in active_ids:
+                    continue
                 total_strength = hub["total_strength"]
                 imp = hub.get("importance", 0.5)
-                if imp < 0.3:
+                # Skip high-access memories — they're actively useful, not orphans
+                access_count = active_payloads.get(mem_id, {}).get("access_count", 0)
+                if imp < 0.3 and access_count < 5:
                     conflicts.append(
                         {
                             "type": "orphan_hub",

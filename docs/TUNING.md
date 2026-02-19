@@ -107,6 +107,24 @@ Read this before adjusting any threshold, rate, or weight.
 
 ## Change History
 
+### 2026-02-19: Durability backfill for pre-v2.2 memories
+
+**Problem:** 29 active memories had null durability (created before v2.2 Phase 15A introduced the durability system). The system defaulted them to "durable" at runtime, but the data was inconsistent — decay worker and retrieval scoring had to handle null checks everywhere.
+
+**Fix:** Ran existing `POST /admin/migrate/durability` endpoint (already built in v2.2, never executed on production data).
+
+**Classification logic** (`classify_durability()` in `admin.py:286-321`):
+1. Signal tags → durable (fact/decision/pattern/workflow/preference/warning) or ephemeral (error_fix/contradiction)
+2. Infrastructure patterns (IP, host:port, URL, paths, GPU/CPU) + importance ≥ 0.4 → permanent
+3. Memory type: semantic/procedural → durable, episodic/working → ephemeral
+4. Fallback → durable
+
+**Result:** 29 memories classified: 19 durable, 6 ephemeral, 4 permanent, 0 errors. Zero null durabilities remain.
+
+**No ongoing concern:** All new memory creation paths (store, signal, observer) set durability explicitly since v2.2.
+
+---
+
 ### 2026-02-19: Periodic checkpoints for long-running sessions
 
 **Problem:** Sessions run 24/7 during development. The Stop hook (session summary + feedback submission) never fires. Result: no session summaries stored, no feedback submitted, feedback loop is dead for the primary workflow. 3 days of active development across codevv/uiagent/autopilot produced zero session summaries.
