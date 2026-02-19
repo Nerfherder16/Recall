@@ -7,6 +7,12 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import EmptyState from "../components/EmptyState";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useToastContext } from "../context/ToastContext";
+import { GlassCard } from "../components/common/GlassCard";
+import { Button } from "../components/common/Button";
+import { Input } from "../components/common/Input";
+import { Checkbox } from "../components/common/Checkbox";
+import { Modal } from "../components/common/Modal";
+import { timeAgo } from "../lib/utils";
 
 export default function UsersPage() {
   const { addToast } = useToastContext();
@@ -80,23 +86,12 @@ export default function UsersPage() {
     }
   }
 
-  function timeAgo(iso: string | null): string {
-    if (!iso) return "never";
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  }
-
   return (
     <div>
       <PageHeader title="Users" subtitle="Manage API keys and user identities">
-        <button
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-content hover:bg-primary/90 transition-colors"
+        <Button
+          size="sm"
+          variant={showCreate ? "ghost" : "primary"}
           onClick={() => setShowCreate(!showCreate)}
         >
           {showCreate ? (
@@ -108,88 +103,81 @@ export default function UsersPage() {
               <Plus size={14} /> Create User
             </>
           )}
-        </button>
+        </Button>
       </PageHeader>
 
       {/* Create user form */}
       {showCreate && (
-        <div className="rounded-xl bg-base-100 border border-base-content/5 p-4 mb-4">
+        <GlassCard className="p-4 mb-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-base-content/40 mb-1">
+              <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500 mb-1">
                 Username
               </label>
-              <input
-                className="rounded-lg border border-base-content/10 bg-base-200 px-3 py-1.5 text-sm focus:border-primary/50 focus:outline-none w-40"
+              <Input
+                containerClass="w-40"
                 placeholder="e.g. scott"
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
-                pattern="[a-zA-Z0-9_-]+"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-base-content/40 mb-1">
+              <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500 mb-1">
                 Display Name
               </label>
-              <input
-                className="rounded-lg border border-base-content/10 bg-base-200 px-3 py-1.5 text-sm focus:border-primary/50 focus:outline-none w-48"
+              <Input
+                containerClass="w-48"
                 placeholder="e.g. Scott M."
                 value={newDisplayName}
                 onChange={(e) => setNewDisplayName(e.target.value)}
               />
             </div>
-            <label className="flex items-center gap-2 cursor-pointer py-1.5">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={newIsAdmin}
-                onChange={(e) => setNewIsAdmin(e.target.checked)}
-              />
-              <span className="text-sm">Admin</span>
-            </label>
-            <button
-              className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-50"
+            <Checkbox
+              label="Admin"
+              checked={newIsAdmin}
+              onChange={(e) => setNewIsAdmin(e.target.checked)}
+            />
+            <Button
               onClick={createUser}
               disabled={!newUsername.trim() || creating}
+              loading={creating}
             >
               Create
-            </button>
+            </Button>
           </div>
-        </div>
+        </GlassCard>
       )}
 
       {/* API key reveal modal */}
-      {createdKey && (
-        <div className="modal modal-open">
-          <div className="rounded-2xl bg-base-100 border border-base-content/5 p-6 max-w-md w-full">
-            <h3 className="font-semibold text-lg">API Key Created</h3>
-            <p className="py-2 text-sm text-amber-400">
-              Copy this key now. It will not be shown again.
-            </p>
-            <div className="bg-base-200 border border-base-content/5 p-3 rounded-lg font-mono text-sm break-all select-all">
-              {createdKey}
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm hover:bg-base-content/5 transition-colors"
-                onClick={() => {
-                  navigator.clipboard.writeText(createdKey);
-                  addToast("Key copied to clipboard", "success");
-                }}
-              >
-                <Copy size={14} />
-                Copy
-              </button>
-              <button
-                className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-content hover:bg-primary/90 transition-colors"
-                onClick={() => setCreatedKey(null)}
-              >
-                Done
-              </button>
-            </div>
-          </div>
+      <Modal open={!!createdKey} onClose={() => setCreatedKey(null)}>
+        <h3 className="font-display font-semibold text-lg text-zinc-900 dark:text-zinc-100">
+          API Key Created
+        </h3>
+        <p className="py-2 text-sm text-amber-500 dark:text-amber-400">
+          Copy this key now. It will not be shown again.
+        </p>
+        <div className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-white/[0.06] p-3 rounded-xl font-mono text-sm text-zinc-900 dark:text-zinc-100 break-all select-all">
+          {createdKey}
         </div>
-      )}
+        <div className="flex justify-end gap-2 mt-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (createdKey) {
+                navigator.clipboard.writeText(createdKey);
+                addToast("Key copied to clipboard", "success");
+              }
+            }}
+          >
+            <Copy size={14} />
+            Copy
+          </Button>
+          <Button size="sm" onClick={() => setCreatedKey(null)}>
+            Done
+          </Button>
+        </div>
+      </Modal>
 
       {loading && <LoadingSpinner />}
 
@@ -198,55 +186,56 @@ export default function UsersPage() {
       )}
 
       {!loading && users.length > 0 && (
-        <div className="rounded-xl bg-base-100 border border-base-content/5 overflow-hidden">
+        <GlassCard className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-base-content/5">
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Username
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Display Name
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Admin
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Created
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Last Active
-                  </th>
-                  <th className="px-4 py-2.5"></th>
+                <tr className="border-b border-zinc-200 dark:border-white/[0.06]">
+                  {[
+                    "Username",
+                    "Display Name",
+                    "Admin",
+                    "Created",
+                    "Last Active",
+                    "",
+                  ].map((h) => (
+                    <th
+                      key={h || "actions"}
+                      className="text-left px-4 py-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
                   <tr
                     key={u.id}
-                    className="border-b border-base-content/5 last:border-0"
+                    className="border-b border-zinc-100 dark:border-white/[0.03] last:border-0"
                   >
-                    <td className="px-4 py-2.5 font-medium">{u.username}</td>
-                    <td className="px-4 py-2.5 text-base-content/50">
+                    <td className="px-4 py-2.5 font-medium text-zinc-900 dark:text-zinc-100">
+                      {u.username}
+                    </td>
+                    <td className="px-4 py-2.5 text-zinc-500 dark:text-zinc-400">
                       {u.display_name || "-"}
                     </td>
                     <td className="px-4 py-2.5">
                       {u.is_admin && (
-                        <span className="inline-flex items-center rounded-md bg-amber-500/10 text-amber-400 px-2 py-0.5 text-[11px] font-medium">
+                        <span className="inline-flex items-center rounded-full bg-amber-500/10 text-amber-400 px-2 py-0.5 text-[11px] font-medium ring-1 ring-amber-500/20">
                           admin
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-base-content/40">
+                    <td className="px-4 py-2.5 text-xs text-zinc-400 dark:text-zinc-500">
                       {timeAgo(u.created_at)}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-base-content/40">
-                      {timeAgo(u.last_active_at)}
+                    <td className="px-4 py-2.5 text-xs text-zinc-400 dark:text-zinc-500">
+                      {u.last_active_at ? timeAgo(u.last_active_at) : "never"}
                     </td>
                     <td className="px-4 py-2.5">
                       <button
-                        className="rounded-lg p-1.5 text-base-content/30 hover:text-error hover:bg-error/10 transition-colors"
+                        className="rounded-lg p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors"
                         onClick={() => setConfirmDelete(u.id)}
                         title="Delete user"
                       >
@@ -258,7 +247,7 @@ export default function UsersPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </GlassCard>
       )}
 
       <ConfirmDialog
@@ -266,7 +255,6 @@ export default function UsersPage() {
         title="Delete User"
         message="Are you sure? The user's memories will remain but they won't be able to authenticate."
         confirmLabel="Delete"
-        confirmClass="btn-error"
         onConfirm={() => confirmDelete !== null && deleteUser(confirmDelete)}
         onCancel={() => setConfirmDelete(null)}
       />

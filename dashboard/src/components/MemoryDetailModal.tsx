@@ -1,10 +1,14 @@
-import { useRef, useEffect, useState } from "react";
-import { X, PushPin, Sparkle, Lock, ShieldCheck } from "@phosphor-icons/react";
+import { useState } from "react";
+import { PushPin, Sparkle, Lock, ShieldCheck } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type { MemoryDetail } from "../api/types";
 import Badge from "./Badge";
 import { ForceProfile } from "./ForceProfile";
 import { useToastContext } from "../context/ToastContext";
+import { Modal } from "./common/Modal";
+import { Button } from "./common/Button";
+import { GlassCard } from "./common/GlassCard";
+import { formatDate } from "../lib/utils";
 
 function shouldSuggestPin(m: MemoryDetail): boolean {
   return !m.pinned && m.importance >= 0.7 && m.access_count >= 10;
@@ -16,30 +20,13 @@ interface Props {
   onUpdate?: (updated: MemoryDetail) => void;
 }
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
-
 export default function MemoryDetailModal({
   memory,
   onClose,
   onUpdate,
 }: Props) {
-  const ref = useRef<HTMLDialogElement>(null);
   const { addToast } = useToastContext();
   const [pinning, setPinning] = useState(false);
-
-  useEffect(() => {
-    if (memory) {
-      ref.current?.showModal();
-    } else {
-      ref.current?.close();
-    }
-  }, [memory]);
 
   if (!memory) return null;
 
@@ -65,90 +52,84 @@ export default function MemoryDetailModal({
   }
 
   return (
-    <dialog ref={ref} className="modal" onClose={onClose}>
-      <div className="rounded-2xl bg-base-100 border border-base-content/5 p-6 max-w-2xl w-full">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Badge text={memory.memory_type} />
-            <span className="text-sm text-base-content/40">
-              {memory.domain}
+    <Modal open={!!memory} onClose={onClose} className="max-w-2xl">
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-4 pr-8">
+          <Badge text={memory.memory_type} />
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            {memory.domain}
+          </span>
+          {memory.pinned && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-amber-500/20">
+              <PushPin size={10} weight="fill" /> Pinned
             </span>
-            {memory.pinned && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 text-amber-400 px-1.5 py-0.5 text-[10px] font-medium">
-                <PushPin size={10} weight="fill" /> Pinned
-              </span>
-            )}
-            {memory.durability === "permanent" && (
-              <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 text-[10px] font-medium">
-                <Lock size={10} weight="fill" /> Permanent
-              </span>
-            )}
-            {memory.durability === "durable" && (
-              <span className="inline-flex items-center gap-0.5 rounded-md bg-cyan-500/10 text-cyan-400 px-1.5 py-0.5 text-[10px] font-medium">
-                <ShieldCheck size={10} weight="fill" /> Durable
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              className={`rounded-lg p-1.5 transition-colors ${
-                memory.pinned
-                  ? "text-amber-400 hover:bg-amber-500/10"
-                  : "text-base-content/30 hover:bg-base-content/5"
-              }`}
-              onClick={togglePin}
-              disabled={pinning}
-              title={
-                memory.pinned ? "Unpin memory" : "Pin memory (immune to decay)"
-              }
-            >
-              <PushPin size={16} weight={memory.pinned ? "fill" : "regular"} />
-            </button>
-            <button
-              className="rounded-lg p-1.5 hover:bg-base-content/5 transition-colors"
-              onClick={onClose}
-            >
-              <X size={16} />
-            </button>
-          </div>
+          )}
+          {memory.durability === "permanent" && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 text-emerald-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-emerald-500/20">
+              <Lock size={10} weight="fill" /> Permanent
+            </span>
+          )}
+          {memory.durability === "durable" && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-500/10 text-cyan-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-cyan-500/20">
+              <ShieldCheck size={10} weight="fill" /> Durable
+            </span>
+          )}
+          <button
+            className={`ml-auto rounded-lg p-1.5 transition-colors ${
+              memory.pinned
+                ? "text-amber-400 hover:bg-amber-500/10"
+                : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            }`}
+            onClick={togglePin}
+            disabled={pinning}
+            title={
+              memory.pinned ? "Unpin memory" : "Pin memory (immune to decay)"
+            }
+          >
+            <PushPin size={16} weight={memory.pinned ? "fill" : "regular"} />
+          </button>
         </div>
 
-        <p className="font-mono text-xs text-base-content/30 mb-3">
+        <p className="font-mono text-xs text-zinc-400 dark:text-zinc-500 mb-3">
           ID: {memory.id}
         </p>
 
+        {/* Pin suggestion banner */}
         {shouldSuggestPin(memory) && (
-          <div className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3 mb-4">
+          <div className="flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-3 mb-4">
             <Sparkle
               size={16}
               weight="fill"
               className="text-violet-400 shrink-0"
             />
-            <p className="text-xs text-violet-300 flex-1">
+            <p className="text-xs text-violet-400 flex-1">
               This memory has high importance ({memory.importance.toFixed(2)})
-              and {memory.access_count} accesses — consider pinning it to
-              prevent decay.
+              and {memory.access_count} accesses — consider pinning it.
             </p>
-            <button
-              className="rounded-lg bg-violet-600 px-3 py-1 text-xs font-medium text-white hover:bg-violet-500 transition-colors shrink-0"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={togglePin}
               disabled={pinning}
             >
               Pin now
-            </button>
+            </Button>
           </div>
         )}
 
-        <div className="bg-base-200 rounded-lg p-4 text-sm whitespace-pre-wrap mb-4 border border-base-content/5">
+        {/* Content */}
+        <div className="bg-zinc-100 dark:bg-zinc-800/60 rounded-xl p-4 text-sm whitespace-pre-wrap mb-4 border border-zinc-200 dark:border-white/[0.06] font-mono text-zinc-800 dark:text-zinc-200">
           {memory.content}
         </div>
 
+        {/* Tags */}
         {memory.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-4">
             {memory.tags.map((t) => (
               <span
                 key={t}
-                className="inline-flex items-center rounded-md bg-zinc-500/10 text-zinc-400 px-2 py-0.5 text-[11px] font-medium"
+                className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2.5 py-0.5 text-[11px] font-medium ring-1 ring-zinc-200 dark:ring-zinc-700"
               >
                 {t}
               </span>
@@ -156,7 +137,8 @@ export default function MemoryDetailModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Metrics bento grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {[
             { label: "Importance", val: memory.importance.toFixed(3) },
             { label: "Stability", val: memory.stability.toFixed(3) },
@@ -168,22 +150,22 @@ export default function MemoryDetailModal({
               val:
                 memory.initial_importance != null
                   ? memory.initial_importance.toFixed(3)
-                  : "—",
+                  : "\u2014",
             },
           ].map((item) => (
-            <div
-              key={item.label}
-              className="bg-base-200 rounded-lg p-2 text-center border border-base-content/5"
-            >
-              <p className="text-[11px] font-medium uppercase tracking-wider text-base-content/40">
+            <GlassCard key={item.label} className="p-3 text-center">
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
                 {item.label}
               </p>
-              <p className="font-semibold tabular-nums">{item.val}</p>
-            </div>
+              <p className="font-display font-semibold text-lg tabular-nums text-zinc-900 dark:text-zinc-100 mt-0.5">
+                {item.val}
+              </p>
+            </GlassCard>
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-4 mt-4 text-xs text-base-content/40">
+        {/* Metadata footer */}
+        <div className="flex flex-wrap gap-4 mt-4 text-xs text-zinc-400 dark:text-zinc-500 font-mono">
           <span>Source: {memory.source}</span>
           {memory.stored_by && <span>Stored by: {memory.stored_by}</span>}
           <span>Created: {formatDate(memory.created_at)}</span>
@@ -192,9 +174,6 @@ export default function MemoryDetailModal({
 
         <ForceProfile memoryId={memory.id} />
       </div>
-      <form method="dialog" className="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
+    </Modal>
   );
 }

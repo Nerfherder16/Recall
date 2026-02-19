@@ -12,7 +12,7 @@
  */
 
 const { existsSync, writeFileSync, readFileSync, mkdirSync } = require("fs");
-const { join } = require("path");
+const { join, dirname } = require("path");
 const { spawn } = require("child_process");
 
 const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
@@ -50,6 +50,39 @@ function progressBar(pct, width = 20) {
   const filled = Math.round((pct / 100) * width);
   const empty = width - filled;
   return "█".repeat(filled) + "░".repeat(empty);
+}
+
+/**
+ * Walk up from cwd looking for .autopilot/progress.json.
+ * Returns a short status string like "[build: 4/8]" or null.
+ */
+function getAutopilotStatus(cwd) {
+  if (!cwd) return null;
+  let dir = cwd;
+  for (let i = 0; i < 10; i++) {
+    const progressFile = join(dir, ".autopilot", "progress.json");
+    if (existsSync(progressFile)) {
+      try {
+        const data = JSON.parse(readFileSync(progressFile, "utf8"));
+        const status = (data.status || "").toUpperCase();
+        if (status === "COMPLETE" || status === "PAUSED" || status === "FAILED") {
+          return `[build: ${status}]`;
+        }
+        if (Array.isArray(data.tasks)) {
+          const done = data.tasks.filter((t) => t.status === "DONE").length;
+          const total = data.tasks.length;
+          return `[build: ${done}/${total}]`;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
 }
 
 function getMarkerDir() {
@@ -244,6 +277,11 @@ async function main() {
   let line = `${color}${bar}${RESET} ${BOLD}${pct}%${RESET} ${DIM}${model}${RESET}`;
   if (cost) {
     line += ` ${DIM}${cost}${RESET}`;
+  }
+
+  const autopilotStatus = getAutopilotStatus(data.cwd);
+  if (autopilotStatus) {
+    line += ` \x1b[36m${autopilotStatus}\x1b[0m`;
   }
 
   // Check threshold

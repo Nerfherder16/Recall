@@ -20,30 +20,28 @@ export function FeedbackHistogram({ buckets }: Props) {
   }));
 
   return (
-    <div className="rounded-xl bg-base-100 border border-base-content/5 p-4">
-      <h3 className="text-sm font-semibold mb-3">
+    <div className="rounded-2xl border border-zinc-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-zinc-800/40 backdrop-blur-xl p-6">
+      <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
         Feedback Similarity Distribution
       </h3>
       {data.length === 0 ? (
-        <p className="text-xs text-base-content/40">No feedback data yet</p>
+        <p className="text-xs text-zinc-400">No feedback data yet</p>
       ) : (
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={data}>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="oklch(var(--bc) / 0.1)"
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis
               dataKey="range"
-              tick={{ fontSize: 11, fill: "oklch(var(--bc) / 0.4)" }}
+              tick={{ fontSize: 11, fill: "var(--chart-text)" }}
             />
-            <YAxis tick={{ fontSize: 11, fill: "oklch(var(--bc) / 0.4)" }} />
+            <YAxis tick={{ fontSize: 11, fill: "var(--chart-text)" }} />
             <Tooltip
               contentStyle={{
-                background: "oklch(var(--b1))",
-                border: "1px solid oklch(var(--bc) / 0.1)",
+                background: "var(--chart-tooltip-bg)",
+                border: "1px solid var(--chart-tooltip-border)",
                 borderRadius: "8px",
                 fontSize: "12px",
+                color: "var(--content-primary)",
               }}
             />
             <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />

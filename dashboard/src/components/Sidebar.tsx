@@ -17,6 +17,7 @@ import {
   FilePdf,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
+import { cn } from "../lib/utils";
 
 const links: { to: string; label: string; icon: Icon }[] = [
   { to: "/dashboard", label: "Dashboard", icon: House },
@@ -42,9 +43,12 @@ export default function Sidebar({ collapsed, onToggle, mobile }: Props) {
 
   return (
     <aside
-      className={`bg-base-300 flex flex-col sidebar-transition ${
-        mobile ? "w-56 h-full" : collapsed ? "w-16" : "w-56"
-      }`}
+      className={cn(
+        "flex flex-col sidebar-transition",
+        "bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl",
+        "border-r border-zinc-200 dark:border-white/[0.06]",
+        mobile ? "w-56 h-full" : collapsed ? "w-16" : "w-56",
+      )}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4">
@@ -56,7 +60,7 @@ export default function Sidebar({ collapsed, onToggle, mobile }: Props) {
           />
         )}
         <button
-          className="rounded-lg p-1.5 hover:bg-base-100/50 transition-colors"
+          className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           onClick={onToggle}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -74,11 +78,13 @@ export default function Sidebar({ collapsed, onToggle, mobile }: Props) {
               to={link.to}
               end={link.to === "/dashboard"}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+                cn(
+                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all duration-200",
                   isActive
-                    ? "bg-base-100/80 text-primary"
-                    : "text-base-content/60 hover:bg-base-100/50 hover:text-base-content"
-                } ${collapsed && !mobile ? "justify-center px-0" : ""}`
+                    ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 font-medium border-l-2 border-violet-500"
+                    : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100",
+                  collapsed && !mobile && "justify-center px-0 border-l-0",
+                )
               }
               title={collapsed && !mobile ? link.label : undefined}
             >
@@ -90,25 +96,27 @@ export default function Sidebar({ collapsed, onToggle, mobile }: Props) {
       </nav>
 
       {/* Bottom: theme toggle */}
-      <div className="p-2 border-t border-base-content/5">
+      <div className="p-2 border-t border-zinc-200 dark:border-white/[0.06]">
         <button
-          className={`flex items-center rounded-lg px-3 py-2 text-sm w-full transition-colors text-base-content/60 hover:bg-base-100/50 hover:text-base-content ${
-            collapsed && !mobile ? "justify-center px-0" : "gap-2.5"
-          }`}
+          className={cn(
+            "flex items-center rounded-xl px-3 py-2 text-sm w-full transition-colors",
+            "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100",
+            collapsed && !mobile ? "justify-center px-0" : "gap-2.5",
+          )}
           onClick={toggleTheme}
           title={
             collapsed && !mobile
-              ? `Switch to ${theme === "recall-dark" ? "light" : "dark"} mode`
+              ? `Switch to ${theme === "dark" ? "light" : "dark"} mode`
               : undefined
           }
         >
-          {theme === "recall-dark" ? (
+          {theme === "dark" ? (
             <Sun size={18} className="shrink-0" />
           ) : (
             <Moon size={18} className="shrink-0" />
           )}
           {(!collapsed || mobile) && (
-            <span>{theme === "recall-dark" ? "Light mode" : "Dark mode"}</span>
+            <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
           )}
         </button>
       </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Outlet } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { List as ListIcon } from "@phosphor-icons/react";
 import Sidebar from "./Sidebar";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -12,7 +13,6 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Track screen size
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
     setIsMobile(mq.matches);
@@ -21,11 +21,10 @@ export default function Layout() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // Close mobile sidebar on route change
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   return (
-    <div className="flex h-screen bg-base-200">
+    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950">
       {/* Desktop sidebar */}
       {!isMobile && (
         <Sidebar
@@ -35,24 +34,35 @@ export default function Layout() {
       )}
 
       {/* Mobile overlay */}
-      {isMobile && mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 sidebar-overlay"
-          onClick={closeMobile}
-        >
-          <div onClick={(e) => e.stopPropagation()}>
-            <Sidebar collapsed={false} onToggle={closeMobile} mobile />
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isMobile && mobileOpen && (
+          <motion.div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeMobile}
+          >
+            <motion.div
+              initial={{ x: -224 }}
+              animate={{ x: 0 }}
+              exit={{ x: -224 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Sidebar collapsed={false} onToggle={closeMobile} mobile />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         {/* Mobile header */}
         {isMobile && (
-          <div className="sticky top-0 z-30 bg-base-300 px-4 py-2 flex items-center gap-3 border-b border-base-content/5">
+          <div className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl px-4 py-2 flex items-center gap-3 border-b border-zinc-200 dark:border-white/[0.06]">
             <button
-              className="rounded-lg p-1.5 hover:bg-base-100/50 transition-colors"
+              className="rounded-lg p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               onClick={() => setMobileOpen(true)}
             >
               <ListIcon size={20} weight="bold" />
@@ -64,7 +74,7 @@ export default function Layout() {
             />
           </div>
         )}
-        <div className="p-6">
+        <div className="p-6 lg:p-8">
           <Outlet />
         </div>
       </main>

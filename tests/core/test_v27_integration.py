@@ -157,8 +157,8 @@ def test_eval_harness_runs():
     """ML eval harness modules are importable and produce metrics."""
     from tests.ml.run_eval import (
         compute_metrics,
+        eval_baseline,
         eval_reranker,
-        eval_signal_classifier,
     )
 
     # Basic metric computation works
@@ -174,21 +174,25 @@ def test_eval_harness_runs():
     assert rm["model"] == "reranker"
     assert rm["total"] == 2
 
-    # Signal classifier eval with minimal data
+    # Baseline eval with minimal data (no trained model needed)
     sdata = [
         {
             "turns": [
                 {"role": "user", "content": "Fix the error crash bug"},
                 {"role": "assistant", "content": "Fixed the timeout issue"},
             ],
-            "expected_signal": True,
-            "expected_type": "error_fix",
+            "is_signal": True,
+            "signal_type": "error_fix",
         },
         {
-            "turns": [{"role": "user", "content": "Hi"}],
-            "expected_signal": False,
-            "expected_type": None,
+            "turns": [
+                {"role": "user", "content": "Hi there"},
+                {"role": "assistant", "content": "Hello!"},
+            ],
+            "is_signal": False,
+            "signal_type": "none",
         },
     ]
-    sm = eval_signal_classifier(sdata)
-    assert sm["total"] == 2
+    bl, _ = eval_baseline(sdata)
+    assert bl["total"] == 2
+    assert bl["model"] == "baseline_heuristic"

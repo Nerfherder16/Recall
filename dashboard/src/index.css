@@ -2,46 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Noise texture overlay */
+/* ── Theme: Light (default) ── */
+:root {
+  --surface-primary: #fafafa;
+  --surface-card: #ffffff;
+  --surface-elevated: #f4f4f5;
+  --content-primary: #18181b;
+  --content-secondary: #71717a;
+  --content-muted: #a1a1aa;
+  --border-surface: rgba(0, 0, 0, 0.06);
+  --accent: #7c3aed;
+  --accent-muted: #8b5cf6;
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --chart-grid: rgba(0, 0, 0, 0.08);
+  --chart-text: rgba(0, 0, 0, 0.4);
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: rgba(0, 0, 0, 0.1);
+  --success: #10b981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --info: #06b6d4;
+}
+
+/* ── Theme: Dark ── */
+.dark {
+  --surface-primary: #09090b;
+  --surface-card: #18181b;
+  --surface-elevated: #27272a;
+  --content-primary: #fafafa;
+  --content-secondary: #a1a1aa;
+  --content-muted: #52525b;
+  --border-surface: rgba(255, 255, 255, 0.06);
+  --accent: #a78bfa;
+  --accent-muted: #8b5cf6;
+  --glass-bg: rgba(24, 24, 27, 0.40);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-text: rgba(255, 255, 255, 0.4);
+  --chart-tooltip-bg: #27272a;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.1);
+  --success: #34d399;
+  --error: #f87171;
+  --warning: #fbbf24;
+  --info: #22d3ee;
+}
+
+/* ── Base styles ── */
+body {
+  background: var(--surface-primary);
+  color: var(--content-primary);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* ── Noise texture overlay ── */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 9999;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: 0.025;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 256px 256px;
 }
 
-/* Sidebar collapse transition */
+/* ── Sidebar collapse transition ── */
 .sidebar-transition {
   transition: width 200ms ease-in-out;
 }
 
-/* Toast slide-in */
-@keyframes slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.animate-slide-in {
-  animation: slide-in 200ms ease-out;
-}
-
-/* Mobile sidebar overlay backdrop */
-.sidebar-overlay {
-  transition: opacity 200ms ease-in-out;
-}
-
-/* Timeline connector line */
+/* ── Timeline connector line ── */
 .timeline-line::before {
   content: "";
   position: absolute;
@@ -49,10 +81,10 @@ body::before {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: oklch(var(--bc) / 0.08);
+  background: var(--border-surface);
 }
 
-/* Custom scrollbar */
+/* ── Custom scrollbar ── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -61,9 +93,44 @@ body::before {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: oklch(var(--bc) / 0.1);
+  background: var(--content-muted);
   border-radius: 3px;
+  opacity: 0.3;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(var(--bc) / 0.2);
+  opacity: 0.5;
+}
+
+/* ── Shimmer animation for skeletons ── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-elevated) 25%,
+    var(--surface-card) 50%,
+    var(--surface-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* ── Glassmorphism utility ── */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+}
+
+/* ── Status dot pulse ── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
 }

@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
 import { useAuth } from "./hooks/useAuth";
+import { Button } from "./components/common/Button";
 import AuditPage from "./pages/AuditPage";
 import DashboardPage from "./pages/DashboardPage";
 import MemoriesPage from "./pages/MemoriesPage";
@@ -19,10 +20,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (!apiKey) {
     return (
-      <div className="flex items-center justify-center h-screen bg-base-200">
-        <div className="rounded-2xl bg-base-100 border border-base-content/5 w-96 p-6">
-          <h2 className="text-xl font-semibold mb-1">Recall Dashboard</h2>
-          <p className="text-sm text-base-content/40 mb-4">
+      <div className="flex items-center justify-center h-screen bg-zinc-50 dark:bg-zinc-950">
+        <div className="rounded-2xl bg-white/60 dark:bg-zinc-800/40 backdrop-blur-xl border border-zinc-200 dark:border-white/[0.06] w-96 p-6 shadow-2xl">
+          <h2 className="font-display text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-1">
+            Recall Dashboard
+          </h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
             Enter your API key to continue. Leave blank if auth is disabled.
           </p>
           <form
@@ -36,14 +39,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
               name="key"
               type="password"
               placeholder="API Key (or leave blank)"
-              className="w-full rounded-lg border border-base-content/10 bg-base-200 px-3 py-2 text-sm focus:border-primary/50 focus:outline-none"
+              className="w-full rounded-xl border border-zinc-200 dark:border-white/[0.06] bg-zinc-100 dark:bg-zinc-900/80 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:border-violet-500/50 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
             />
-            <button
-              type="submit"
-              className="w-full mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-content hover:bg-primary/90 transition-colors"
-            >
+            <Button type="submit" className="w-full mt-3">
               Connect
-            </button>
+            </Button>
           </form>
         </div>
       </div>

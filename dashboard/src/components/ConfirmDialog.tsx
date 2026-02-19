@@ -1,11 +1,12 @@
-import { useRef, useEffect } from "react";
+import { Modal } from "./common/Modal";
+import { Button } from "./common/Button";
 
 interface Props {
   open: boolean;
   title: string;
   message: string;
   confirmLabel?: string;
-  confirmClass?: string;
+  danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -15,48 +16,33 @@ export default function ConfirmDialog({
   title,
   message,
   confirmLabel = "Confirm",
-  confirmClass,
+  danger = true,
   onConfirm,
   onCancel,
 }: Props) {
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      ref.current?.showModal();
-    } else {
-      ref.current?.close();
-    }
-  }, [open]);
-
-  const btnColor =
-    confirmClass === "btn-error"
-      ? "bg-error text-error-content hover:bg-error/90"
-      : "bg-primary text-primary-content hover:bg-primary/90";
-
   return (
-    <dialog ref={ref} className="modal" onClose={onCancel}>
-      <div className="rounded-2xl bg-base-100 border border-base-content/5 p-6 max-w-sm w-full">
-        <h3 className="font-semibold text-lg">{title}</h3>
-        <p className="py-4 text-sm text-base-content/60">{message}</p>
+    <Modal
+      open={open}
+      onClose={onCancel}
+      className="max-w-sm"
+      showClose={false}
+    >
+      <div className="p-6">
+        <h3 className="font-display font-semibold text-lg text-zinc-900 dark:text-zinc-50">
+          {title}
+        </h3>
+        <p className="py-4 text-sm text-zinc-500 dark:text-zinc-400">
+          {message}
+        </p>
         <div className="flex justify-end gap-2">
-          <button
-            className="rounded-lg px-4 py-2 text-sm hover:bg-base-content/5 transition-colors"
-            onClick={onCancel}
-          >
+          <Button variant="ghost" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${btnColor}`}
-            onClick={onConfirm}
-          >
+          </Button>
+          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
-      <form method="dialog" className="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
+    </Modal>
   );
 }

@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Warning, Info } from "@phosphor-icons/react";
 import type { Conflict } from "../../api/types";
+import { GlassCard } from "../common/GlassCard";
+import { Select } from "../common/Input";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "../common/Table";
 
 interface Props {
   conflicts: Conflict[];
@@ -29,15 +38,15 @@ export function ConflictsTable({ conflicts }: Props) {
     : conflicts;
 
   return (
-    <div className="rounded-xl bg-base-100 border border-base-content/5 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
+    <GlassCard className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
           <Warning size={16} className="text-amber-400" />
           Conflicts ({conflicts.length})
         </h3>
         {types.length > 1 && (
-          <select
-            className="rounded-lg border border-base-content/10 bg-base-200 px-2 py-1 text-xs focus:border-primary/50 focus:outline-none"
+          <Select
+            className="w-auto text-xs"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
           >
@@ -47,59 +56,57 @@ export function ConflictsTable({ conflicts }: Props) {
                 {TYPE_LABELS[t] || t}
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-xs text-base-content/40 py-4 text-center">
+        <p className="text-xs text-zinc-400 py-4 text-center">
           No conflicts detected
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="table table-sm w-full">
-            <thead>
-              <tr className="text-xs text-base-content/40">
-                <th>Type</th>
-                <th>Severity</th>
-                <th>Memory</th>
-                <th>Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c, i) => (
-                <tr key={i} className="hover:bg-base-200/50">
-                  <td>
-                    <span className="text-xs font-medium">
-                      {TYPE_LABELS[c.type] || c.type}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${SEVERITY_STYLES[c.severity] || SEVERITY_STYLES.info}`}
-                    >
-                      {c.severity === "warning" ? (
-                        <Warning size={10} weight="fill" />
-                      ) : (
-                        <Info size={10} weight="fill" />
-                      )}
-                      {c.severity}
-                    </span>
-                  </td>
-                  <td>
-                    <code className="text-[10px] text-base-content/50 font-mono">
-                      {c.memory_id.slice(0, 8)}...
-                    </code>
-                  </td>
-                  <td className="text-xs text-base-content/60">
+        <Table>
+          <TableHead>
+            <TableCell header>Type</TableCell>
+            <TableCell header>Severity</TableCell>
+            <TableCell header>Memory</TableCell>
+            <TableCell header>Description</TableCell>
+          </TableHead>
+          <TableBody>
+            {filtered.map((c, i) => (
+              <TableRow key={i}>
+                <TableCell>
+                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    {TYPE_LABELS[c.type] || c.type}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${SEVERITY_STYLES[c.severity] || SEVERITY_STYLES.info}`}
+                  >
+                    {c.severity === "warning" ? (
+                      <Warning size={10} weight="fill" />
+                    ) : (
+                      <Info size={10} weight="fill" />
+                    )}
+                    {c.severity}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <code className="text-[10px] text-zinc-400 font-mono">
+                    {c.memory_id.slice(0, 8)}...
+                  </code>
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
                     {c.description}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
-    </div>
+    </GlassCard>
   );
 }

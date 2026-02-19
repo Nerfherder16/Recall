@@ -16,15 +16,15 @@ export function FeedbackCard({ feedback }: Props) {
         : "text-red-400";
 
   return (
-    <div className="rounded-xl bg-base-100 border border-base-content/5 p-4">
+    <div className="rounded-2xl border border-zinc-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-zinc-800/40 backdrop-blur-xl p-6">
       <div className="flex items-center gap-2 mb-2">
-        <ThumbsUp size={16} className="text-base-content/40" />
-        <span className="text-xs font-medium uppercase tracking-wider text-base-content/40">
+        <ThumbsUp size={16} className="text-zinc-400 dark:text-zinc-500" />
+        <span className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">
           Feedback
         </span>
       </div>
-      <p className={`text-2xl font-bold ${color}`}>{rate}%</p>
-      <p className="text-xs text-base-content/40 mt-1">
+      <p className={`font-display text-3xl font-bold ${color}`}>{rate}%</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
         {feedback.total_positive} positive / {total} total (30d)
       </p>
     </div>

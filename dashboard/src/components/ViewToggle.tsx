@@ -1,4 +1,5 @@
 import { SquaresFour, List } from "@phosphor-icons/react";
+import { cn } from "../lib/utils";
 
 interface Props {
   view: "grid" | "list";
@@ -7,24 +8,26 @@ interface Props {
 
 export default function ViewToggle({ view, onChange }: Props) {
   return (
-    <div className="flex rounded-lg border border-base-content/10 overflow-hidden">
+    <div className="flex rounded-full border border-zinc-200 dark:border-white/[0.06] overflow-hidden bg-zinc-100 dark:bg-zinc-800/50 p-0.5">
       <button
-        className={`px-2.5 py-1.5 transition-colors ${
+        className={cn(
+          "px-2.5 py-1.5 rounded-full transition-all duration-200",
           view === "grid"
-            ? "bg-base-content/10 text-base-content"
-            : "text-base-content/40 hover:text-base-content"
-        }`}
+            ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm"
+            : "text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200",
+        )}
         onClick={() => onChange("grid")}
         title="Grid view"
       >
         <SquaresFour size={16} />
       </button>
       <button
-        className={`px-2.5 py-1.5 transition-colors ${
+        className={cn(
+          "px-2.5 py-1.5 rounded-full transition-all duration-200",
           view === "list"
-            ? "bg-base-content/10 text-base-content"
-            : "text-base-content/40 hover:text-base-content"
-        }`}
+            ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm"
+            : "text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200",
+        )}
         onClick={() => onChange("list")}
         title="List view"
       >

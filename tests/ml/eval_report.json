@@ -1,0 +1,229 @@
+{
+  "corpus_size": 763,
+  "train_size": 611,
+  "test_size": 152,
+  "split_ratio": 0.2,
+  "train_time_s": 1.59,
+  "held_out": {
+    "ml_binary": {
+      "precision": 0.9859,
+      "recall": 0.9859,
+      "f1": 0.9859,
+      "accuracy": 0.9868,
+      "tp": 70,
+      "fp": 1,
+      "fn": 1,
+      "tn": 80,
+      "total": 152,
+      "model": "ml_classifier",
+      "avg_latency_ms": 0.39,
+      "p95_latency_ms": 1.161
+    },
+    "ml_per_type": {
+      "contradiction": {
+        "precision": 0.875,
+        "recall": 0.7778,
+        "f1": 0.8235,
+        "support": 9
+      },
+      "decision": {
+        "precision": 0.6667,
+        "recall": 0.5714,
+        "f1": 0.6154,
+        "support": 7
+      },
+      "error_fix": {
+        "precision": 0.25,
+        "recall": 0.4286,
+        "f1": 0.3158,
+        "support": 7
+      },
+      "fact": {
+        "precision": 0.7037,
+        "recall": 0.8261,
+        "f1": 0.76,
+        "support": 23
+      },
+      "pattern": {
+        "precision": 0.5,
+        "recall": 0.1667,
+        "f1": 0.25,
+        "support": 6
+      },
+      "preference": {
+        "precision": 0.2,
+        "recall": 0.1667,
+        "f1": 0.1818,
+        "support": 6
+      },
+      "warning": {
+        "precision": 0.8,
+        "recall": 0.5714,
+        "f1": 0.6667,
+        "support": 7
+      },
+      "workflow": {
+        "precision": 0.6,
+        "recall": 0.5,
+        "f1": 0.5455,
+        "support": 6
+      },
+      "_macro_avg": {
+        "precision": 0.5744,
+        "recall": 0.5011,
+        "f1": 0.5198,
+        "support": 71
+      }
+    },
+    "baseline_binary": {
+      "precision": 0.8421,
+      "recall": 0.9014,
+      "f1": 0.8707,
+      "accuracy": 0.875,
+      "tp": 64,
+      "fp": 12,
+      "fn": 7,
+      "tn": 69,
+      "total": 152,
+      "model": "baseline_heuristic"
+    },
+    "baseline_per_type": {
+      "contradiction": {
+        "precision": 1.0,
+        "recall": 0.2222,
+        "f1": 0.3636,
+        "support": 9
+      },
+      "decision": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 7
+      },
+      "error_fix": {
+        "precision": 0.24,
+        "recall": 0.8571,
+        "f1": 0.375,
+        "support": 7
+      },
+      "fact": {
+        "precision": 0.7917,
+        "recall": 0.8261,
+        "f1": 0.8085,
+        "support": 23
+      },
+      "pattern": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 6
+      },
+      "preference": {
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1": 0.5,
+        "support": 6
+      },
+      "warning": {
+        "precision": 1.0,
+        "recall": 0.1429,
+        "f1": 0.25,
+        "support": 7
+      },
+      "workflow": {
+        "precision": 0.8333,
+        "recall": 0.8333,
+        "f1": 0.8333,
+        "support": 6
+      },
+      "_macro_avg": {
+        "precision": 0.5456,
+        "recall": 0.4227,
+        "f1": 0.3913,
+        "support": 71
+      }
+    }
+  },
+  "reranker": {
+    "precision": 0.5079,
+    "recall": 0.9014,
+    "f1": 0.6497,
+    "accuracy": 0.5461,
+    "tp": 64,
+    "fp": 62,
+    "fn": 7,
+    "tn": 19,
+    "total": 152,
+    "model": "llm_detector",
+    "avg_latency_ms": 587.2,
+    "p95_latency_ms": 753.6
+  },
+  "curated": [
+    {
+      "precision": 1.0,
+      "recall": 0.1364,
+      "f1": 0.24,
+      "accuracy": 0.4062,
+      "tp": 3,
+      "fp": 0,
+      "fn": 19,
+      "tn": 10,
+      "total": 32,
+      "model": "ml_signal_eval.json",
+      "avg_latency_ms": 0.136,
+      "p95_latency_ms": 0.367
+    },
+    {
+      "precision": 1.0,
+      "recall": 0.7727,
+      "f1": 0.8718,
+      "accuracy": 0.8438,
+      "tp": 17,
+      "fp": 0,
+      "fn": 5,
+      "tn": 10,
+      "total": 32,
+      "model": "bl_signal_eval.json"
+    },
+    {
+      "precision": 1.0,
+      "recall": 0.1304,
+      "f1": 0.2308,
+      "accuracy": 0.375,
+      "tp": 3,
+      "fp": 0,
+      "fn": 20,
+      "tn": 9,
+      "total": 32,
+      "model": "ml_classifier_eval.json",
+      "avg_latency_ms": 0.138,
+      "p95_latency_ms": 0.371
+    },
+    {
+      "precision": 1.0,
+      "recall": 0.5652,
+      "f1": 0.7222,
+      "accuracy": 0.6875,
+      "tp": 13,
+      "fp": 0,
+      "fn": 10,
+      "tn": 9,
+      "total": 32,
+      "model": "bl_classifier_eval.json"
+    }
+  ],
+  "llm_detector": {
+    "precision": 0.5079,
+    "recall": 0.9014,
+    "f1": 0.6497,
+    "accuracy": 0.5461,
+    "tp": 64,
+    "fp": 62,
+    "fn": 7,
+    "tn": 19,
+    "total": 152,
+    "model": "llm_detector",
+    "avg_latency_ms": 587.2,
+    "p95_latency_ms": 753.6
+  }
+}
