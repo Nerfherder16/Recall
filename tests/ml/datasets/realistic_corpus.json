@@ -1,0 +1,6810 @@
+[
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what Neo4j does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "vite is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Test fails only when npm is loaded. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for race conditions. Try running tests with --no-parallel."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "webpack API key in .env?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check .env for API_KEY env var."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "SSL certificate expired on FastAPI endpoint"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the Nginx config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "SSH doesn't need that config anymore"
+      },
+      {
+        "role": "assistant",
+        "content": "Check your ~/.ssh/config. Old setups may still use it."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the React health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always run webpack before commit"
+      },
+      {
+        "role": "assistant",
+        "content": "Set up a pre-commit hook with husky and lint-staged."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "New developer setup: clone, .env, docker compose up"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All FastAPI timeouts during backup window. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check DB connection pool limits and backup resource contention."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks for helping."
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome."
+      },
+      {
+        "role": "user",
+        "content": "See you later."
+      },
+      {
+        "role": "assistant",
+        "content": "Goodbye."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks for the help!"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      },
+      {
+        "role": "user",
+        "content": "See you later."
+      },
+      {
+        "role": "assistant",
+        "content": "Have a good day!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "CI pipeline: lint, test, build Nginx, push image"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks for helping."
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome."
+      },
+      {
+        "role": "user",
+        "content": "See you later."
+      },
+      {
+        "role": "assistant",
+        "content": "Have a good day."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update pip"
+      },
+      {
+        "role": "assistant",
+        "content": "Don't use npm with that flag, it corrupts data"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Same CORS error whenever we add a new frontend route"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main, nothing to commit."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "sudo systemctl start myservice --no-pid"
+      },
+      {
+        "role": "assistant",
+        "content": "Warning: --no-pid can corrupt data. Use with caution."
+      },
+      {
+        "role": "user",
+        "content": "Why?"
+      },
+      {
+        "role": "assistant",
+        "content": "Systemd relies on pid files for process tracking. Skipping them breaks state management."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the Neo4j configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the vite.conf: port=8169, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for FastAPI references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "FastAPI rate limited, need to batch requests"
+      },
+      {
+        "role": "assistant",
+        "content": "Use async and batch endpoints to reduce calls"
+      },
+      {
+        "role": "user",
+        "content": "How to group requests without blocking"
+      },
+      {
+        "role": "assistant",
+        "content": "Use async/await and rate limiters like asyncstdlib"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main, nothing to commit."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update ruff"
+      },
+      {
+        "role": "assistant",
+        "content": "Watch out: TypeScript has a known memory leak in v1.9"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ConnectionRefusedError on port 7400"
+      },
+      {
+        "role": "assistant",
+        "content": "Check if mypy is running. Use `ps -ef | grep mypy`."
+      },
+      {
+        "role": "user",
+        "content": "No mypy process found"
+      },
+      {
+        "role": "assistant",
+        "content": "Start mypy server with `mypy --server --port 7400`."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What version of Git are we running?"
+      },
+      {
+        "role": "assistant",
+        "content": "Let me check... mypy 4.11."
+      },
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Need anything else?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ConnectionRefusedError connecting to Qdrant on port 8007"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the Neo4j config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm run build"
+      },
+      {
+        "role": "assistant",
+        "content": "Building... Done."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What version of ESLint are we running?"
+      },
+      {
+        "role": "assistant",
+        "content": "Let me check... Neo4j 5.9."
+      },
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Need anything else?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Format this code"
+      },
+      {
+        "role": "assistant",
+        "content": "Sure, formatting now."
+      },
+      {
+        "role": "user",
+        "content": "Done?"
+      },
+      {
+        "role": "assistant",
+        "content": "Ready to review."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Push this to main"
+      },
+      {
+        "role": "assistant",
+        "content": "Pushed 2 commits to origin/main."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for webpack references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Permission denied accessing Neo4j socket"
+      },
+      {
+        "role": "assistant",
+        "content": "Check socket permissions and user groups"
+      },
+      {
+        "role": "user",
+        "content": "Added user to neo4j group, reloaded"
+      },
+      {
+        "role": "assistant",
+        "content": "Restart Neo4j service and test access"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main"
+      },
+      {
+        "role": "user",
+        "content": "changes?"
+      },
+      {
+        "role": "assistant",
+        "content": "No changes."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "To restart vite: docker compose restart vite"
+      },
+      {
+        "role": "assistant",
+        "content": "Use: docker-compose restart vite. Check logs with docker logs -f vite."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we use Redis or Qdrant for caching?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with vite \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "vite creds still same as last qtr?"
+      },
+      {
+        "role": "assistant",
+        "content": "rotation overdue. risk of exposure."
+      },
+      {
+        "role": "user",
+        "content": "when should i rotate them?"
+      },
+      {
+        "role": "assistant",
+        "content": "now. automate with secret manager."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we use FastAPI or React for caching?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with pip \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update webpack"
+      },
+      {
+        "role": "assistant",
+        "content": "Watch out: vite has a known memory leak in v4.11"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Push this to main"
+      },
+      {
+        "role": "assistant",
+        "content": "Pushed 2 commits to origin/main."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm docs say 'require' is deprecated, but it still works"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, 'require' is legacy. Use 'import' in ES modules now."
+      },
+      {
+        "role": "user",
+        "content": "so why does 'require' still work in my app?"
+      },
+      {
+        "role": "assistant",
+        "content": "It works in CommonJS. 'import' is needed for ES modules."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what FastAPI does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "SSH is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Permission denied accessing Git socket"
+      },
+      {
+        "role": "assistant",
+        "content": "Check Git core.sharedRepository setting"
+      },
+      {
+        "role": "user",
+        "content": "Set to false, problem gone"
+      },
+      {
+        "role": "assistant",
+        "content": "Restart Git daemon, permissions fixed"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Segfault in Git, large payloads. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Update Git to latest version. Check for memory leaks in payload handling."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "The webpack docs are outdated, the API changed"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the TypeScript logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the ruff logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Format this file"
+      },
+      {
+        "role": "assistant",
+        "content": "Done, formatted with ruff."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I always test with Qdrant before deploying"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in src/core/health.py?"
+      },
+      {
+        "role": "assistant",
+        "content": "src/storage/qdrant.py has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Monorepo vs separate repos for frontend/backend"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with vite \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the Neo4j logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update Neo4j"
+      },
+      {
+        "role": "assistant",
+        "content": "Watch out: systemd has a known memory leak in v3.1"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main, nothing to commit."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the React health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks for helping!"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search for 'error' in logs"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 3 instances."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update pip"
+      },
+      {
+        "role": "assistant",
+        "content": "Watch out: Nginx has a known memory leak in v1.8"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All timeouts during backup window. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check query locks and index usage during backup."
+      },
+      {
+        "role": "user",
+        "content": "Locks are normal. What else?"
+      },
+      {
+        "role": "assistant",
+        "content": "Try increasing statement timeout or deferring backups."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Every deploy breaks pytest health checks briefly"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Never use force push on main"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What version of Git are we running?"
+      },
+      {
+        "role": "assistant",
+        "content": "Let me check... webpack 5.2."
+      },
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Need anything else?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you search for 'TODO'?"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 3 matches in src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for SSH references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search for 'login'"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 3 occurrences."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the Redis configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the typescript.conf: port=8927, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "After changing pytest config, restart both api and worker"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "List dir contents"
+      },
+      {
+        "role": "assistant",
+        "content": "Sure."
+      },
+      {
+        "role": "user",
+        "content": "Done?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ls src/"
+      },
+      {
+        "role": "assistant",
+        "content": "api/  core/  storage/  workers/"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm run build"
+      },
+      {
+        "role": "assistant",
+        "content": "Build completed successfully."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you read src/workers/signals.py?"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the contents of src/workers/signals.py..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Same deadlock pattern in webpack every few days"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All slow queries hit same Docker table. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for missing indexes, row locks, or schema issues on that table."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the Neo4j configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the postgresql.conf: port=9966, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we pin dependencies or use ranges?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with React \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we use Redis or mypy for caching?"
+      },
+      {
+        "role": "assistant",
+        "content": "Redis is for caching. Mypy is for type checking."
+      },
+      {
+        "role": "user",
+        "content": "So Redis is better for speed?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, Redis is in-memory. Mypy doesn't handle data."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What version of vite are we running?"
+      },
+      {
+        "role": "assistant",
+        "content": "Let me check... Docker 4.6."
+      },
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Need anything else?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's in this directory?"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the files: main.py, utils.py..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Good morning"
+      },
+      {
+        "role": "assistant",
+        "content": "Morning! What are we working on today?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main"
+      },
+      {
+        "role": "user",
+        "content": "ahead?"
+      },
+      {
+        "role": "assistant",
+        "content": "2 commits ahead"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Same FastAPI error every Monday. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for cron jobs or scheduled tasks running on Mondays."
+      },
+      {
+        "role": "user",
+        "content": "No cron jobs. What else?"
+      },
+      {
+        "role": "assistant",
+        "content": "Look for Monday-specific database triggers or API dependencies."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git config --get http.version"
+      },
+      {
+        "role": "assistant",
+        "content": "http.v2\nRate limit: 100 req/min"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Choosing auth strategy: JWT vs session cookies"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with Redis \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update React"
+      },
+      {
+        "role": "assistant",
+        "content": "Watch out: Docker has a known memory leak in v1.0"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "run vite migrations before deploy"
+      },
+      {
+        "role": "assistant",
+        "content": "npm run migrate && npm run build-api"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I prefer explicit imports over star imports"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what SSH does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "systemd is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update Docker"
+      },
+      {
+        "role": "assistant",
+        "content": "Don't use SSH with that flag, it corrupts data"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in docker-compose.yml?"
+      },
+      {
+        "role": "assistant",
+        "content": "src/core/models.py has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Prefer composition over inheritance in this module"
+      },
+      {
+        "role": "assistant",
+        "content": "Using mixins and interfaces instead. No base classes."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Check version"
+      },
+      {
+        "role": "assistant",
+        "content": "1.2.3"
+      },
+      {
+        "role": "user",
+        "content": "Confirm"
+      },
+      {
+        "role": "assistant",
+        "content": "Confirmed."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the PostgreSQL configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the webpack.conf: port=6251, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "List files in src/"
+      },
+      {
+        "role": "assistant",
+        "content": "main.py, utils.py, models/"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Test fails only when ESLint loads. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check ESLint version. Try disabling plugins one by one."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "SSH 3.x changed the default behavior"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search for 'login'"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 3 instances."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm install timed out again"
+      },
+      {
+        "role": "assistant",
+        "content": "Check network latency and try again"
+      },
+      {
+        "role": "user",
+        "content": "Same issue, but it's not the timeout"
+      },
+      {
+        "role": "assistant",
+        "content": "Maybe a dependency conflict. Try `npm cache clean`."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always run pytest before committing"
+      },
+      {
+        "role": "assistant",
+        "content": "Got it. I'll add a pre-commit hook for pytest."
+      },
+      {
+        "role": "user",
+        "content": "Use tox for envs"
+      },
+      {
+        "role": "assistant",
+        "content": "Tox added. Tests run in isolated environments now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Database migration strategy: big bang or rolling?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with ruff \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Redis timeouts during backup window. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check backup resource usage. Maybe Redis is starved."
+      },
+      {
+        "role": "user",
+        "content": "Backup uses 70% CPU. What about Redis?"
+      },
+      {
+        "role": "assistant",
+        "content": "Limit backup threads. Prioritize Redis during backups."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What version of ruff are we running?"
+      },
+      {
+        "role": "assistant",
+        "content": "Let me check... ruff 5.2."
+      },
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Need anything else?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "vite segfaults on big payload, any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check memory limits and try increasing node's max heap size."
+      },
+      {
+        "role": "user",
+        "content": "tried that, no luck. any other options?"
+      },
+      {
+        "role": "assistant",
+        "content": "Try splitting payload into smaller chunks or use streaming."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ls src/"
+      },
+      {
+        "role": "assistant",
+        "content": "api/  core/  storage/  workers/"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run tests"
+      },
+      {
+        "role": "assistant",
+        "content": "Tests started"
+      },
+      {
+        "role": "user",
+        "content": "Check status"
+      },
+      {
+        "role": "assistant",
+        "content": "All passed"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the systemd logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What does this function do?"
+      },
+      {
+        "role": "assistant",
+        "content": "It takes a list and returns the sum."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what SSH does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "FastAPI is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "SSH restarts corrupt indexes again."
+      },
+      {
+        "role": "assistant",
+        "content": "Check for file locks during restart."
+      },
+      {
+        "role": "user",
+        "content": "No locks, but indexes rebuild slow."
+      },
+      {
+        "role": "assistant",
+        "content": "Persist indexes to tmpfs or SSD."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All slow queries hit same table. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for missing indexes on frequently joined columns."
+      },
+      {
+        "role": "user",
+        "content": "Indexes exist. What else?"
+      },
+      {
+        "role": "assistant",
+        "content": "Look into query plans. Maybe table bloat or locks."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "The webpack connection pool keeps getting exhausted"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "find signal 'api.port' in /data/appdata/typescript/"
+      },
+      {
+        "role": "assistant",
+        "content": "found in config.ts: 8080"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Add type hints to all public funcs"
+      },
+      {
+        "role": "assistant",
+        "content": "Using mypy for static type checking"
+      },
+      {
+        "role": "user",
+        "content": "Prefer Python 3.11+ syntax"
+      },
+      {
+        "role": "assistant",
+        "content": "Enabling typing and future imports"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Format this file"
+      },
+      {
+        "role": "assistant",
+        "content": "Done, formatted with ruff."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we pin dependencies or use ranges?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with Docker \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you search for 'import'?"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 3 matches in src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the Redis connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "FastAPI data lives in /data/appdata/fastapi/"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ESLint cert expires March 15th"
+      },
+      {
+        "role": "assistant",
+        "content": "Update config with new cert before expiration."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the Nginx connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "The pip rate limit is 100 req/min"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Segfault in PostgreSQL with large payloads. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check memory limits and increase shared_buffers. Also, test with smaller payloads."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I prefer explicit imports over star imports"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "The ruff docs are outdated, the API changed"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Actually TypeScript doesn't need that config anymore"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always add type hints to public functions"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main"
+      },
+      {
+        "role": "user",
+        "content": "ahead?"
+      },
+      {
+        "role": "assistant",
+        "content": "1 commit ahead"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Deciding on Git vs Nginx for the message queue"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with Neo4j \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Actually Git doesn't need that config anymore"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "List dir contents"
+      },
+      {
+        "role": "assistant",
+        "content": "Sure"
+      },
+      {
+        "role": "user",
+        "content": "Done"
+      },
+      {
+        "role": "assistant",
+        "content": "Got it."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What does this function do?"
+      },
+      {
+        "role": "assistant",
+        "content": "It takes a list and returns the sum."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What version of webpack are we running?"
+      },
+      {
+        "role": "assistant",
+        "content": "Let me check... vite 1.8."
+      },
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Need anything else?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "vite rate limit?"
+      },
+      {
+        "role": "assistant",
+        "content": "100 req/min by default in vite.config.js"
+      },
+      {
+        "role": "user",
+        "content": "change it?"
+      },
+      {
+        "role": "assistant",
+        "content": "edit config: server: { proxy: { limit: 200 } }"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "where's git data stored?"
+      },
+      {
+        "role": "assistant",
+        "content": "in /data/appdata/git/ as configured."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update Git"
+      },
+      {
+        "role": "assistant",
+        "content": "The TypeScript API is rate limited, batch your requests"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search for 'login'"
+      },
+      {
+        "role": "assistant",
+        "content": "Searching..."
+      },
+      {
+        "role": "user",
+        "content": "Found 3 instances"
+      },
+      {
+        "role": "assistant",
+        "content": "Okay."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Good morning"
+      },
+      {
+        "role": "assistant",
+        "content": "Morning! What are we working on today?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Choosing between REST and GraphQL for the new API"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with pytest \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the React configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the typescript.conf: port=4008, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "SSL cert expired on webpack endpoint"
+      },
+      {
+        "role": "assistant",
+        "content": "Check cert expiration date and renew it via Let's Encrypt."
+      },
+      {
+        "role": "user",
+        "content": "Renewed cert, but error still shows"
+      },
+      {
+        "role": "assistant",
+        "content": "Restart webpack dev server to apply new cert."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "backup db first"
+      },
+      {
+        "role": "assistant",
+        "content": "done, using pg_dump"
+      },
+      {
+        "role": "user",
+        "content": "run alembic upgrade"
+      },
+      {
+        "role": "assistant",
+        "content": "migrations applied, no errors"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in .env?"
+      },
+      {
+        "role": "assistant",
+        "content": "src/core/retrieval.py has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the Git health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what FastAPI does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "SSH is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "webpack 2.15 is outdated, any issues?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes, security risks and missing features. Upgrade to 5.76+."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What does this function do?"
+      },
+      {
+        "role": "assistant",
+        "content": "It takes a list and returns the sum."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the current version?"
+      },
+      {
+        "role": "assistant",
+        "content": "1.2.3"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm run build"
+      },
+      {
+        "role": "assistant",
+        "content": "Building project..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main. Nothing to commit."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we use vite or pip for caching?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with systemd \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in src/api/routes/admin.py?"
+      },
+      {
+        "role": "assistant",
+        "content": "src/storage/qdrant.py has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "New developer setup: clone, .env, docker compose up"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Actually we don't need Redis for this anymore"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All timeouts in TS during backup window. Any pattern?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check CPU/I/O during backups. Maybe add async retries with backoff."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the Docker health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the FastAPI connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "React runs on 192.168.50.49:8756"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run tests"
+      },
+      {
+        "role": "assistant",
+        "content": "Tests passed."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "SSL certificate expired on React endpoint"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the pip config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "List dir"
+      },
+      {
+        "role": "assistant",
+        "content": "Okay"
+      },
+      {
+        "role": "user",
+        "content": "Done?"
+      },
+      {
+        "role": "assistant",
+        "content": "Yes."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "The SSH connection pool keeps getting exhausted"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the Git logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Good morning"
+      },
+      {
+        "role": "assistant",
+        "content": "Morning! What are we working on today?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the Neo4j configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the react.conf: port=8767, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Never mind, figured it out"
+      },
+      {
+        "role": "assistant",
+        "content": "Glad you got it sorted!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in tests/integration/test_search.py?"
+      },
+      {
+        "role": "assistant",
+        "content": "src/workers/signals.py has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "This same webpack error keeps happening on Mondays"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "To restart Qdrant: docker compose restart qdrant"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "List files in src"
+      },
+      {
+        "role": "assistant",
+        "content": "Listing src directory"
+      },
+      {
+        "role": "user",
+        "content": "Show folders only"
+      },
+      {
+        "role": "assistant",
+        "content": "Showing folders in src"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the vite connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "Git runs on 192.168.50.84:9860"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read config.js"
+      },
+      {
+        "role": "assistant",
+        "content": "Done."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ls src/"
+      },
+      {
+        "role": "assistant",
+        "content": "api/  core/  storage/  workers/"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Every time I restart Redis, the indexes get corrupted"
+      },
+      {
+        "role": "assistant",
+        "content": "Check persistence settings. Are you using RDB or AOF? Verify fsync and backup intervals."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Same CORS error on new frontend route. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check backend CORS config. Missing allowed origin?"
+      },
+      {
+        "role": "user",
+        "content": "Allowed origin is set. Still same error."
+      },
+      {
+        "role": "assistant",
+        "content": "Try adding new route to allowed endpoints list."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Turns out PostgreSQL was already configured correctly"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the React connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "The systemd cert expires on March 15th"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Rollback procedure: revert commit, rebuild, redeploy"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What does this function do?"
+      },
+      {
+        "role": "assistant",
+        "content": "It takes a list and returns the sum."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm run build"
+      },
+      {
+        "role": "assistant",
+        "content": "Building..."
+      },
+      {
+        "role": "user",
+        "content": "Done."
+      },
+      {
+        "role": "assistant",
+        "content": "Build successful."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All slow queries hit the same vite table"
+      },
+      {
+        "role": "assistant",
+        "content": "Check index coverage and query patterns on that table."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What version of PostgreSQL are we running?"
+      },
+      {
+        "role": "assistant",
+        "content": "Let me check... webpack 2.9."
+      },
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Need anything else?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "REST vs GraphQL? Which better for our API?"
+      },
+      {
+        "role": "assistant",
+        "content": "GraphQL reduces over-fetching, but adds complexity. REST is simpler for CRUD."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "OOM always hits after batch job completes"
+      },
+      {
+        "role": "assistant",
+        "content": "Check memory usage in systemd logs"
+      },
+      {
+        "role": "user",
+        "content": "Logs show high memory after job finishes"
+      },
+      {
+        "role": "assistant",
+        "content": "Add cgroup limits or tweak job memory settings"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the ESLint connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "Backup cron runs at 3am, systemd at 4am"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the webpack connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "The Qdrant admin password is stored in Vault"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "cron backup runs at 3am, docker at 4am"
+      },
+      {
+        "role": "assistant",
+        "content": "Check crontab -l for backup jobs. Docker compose logs?"
+      },
+      {
+        "role": "user",
+        "content": "docker uses 127.0.0.1:8080"
+      },
+      {
+        "role": "assistant",
+        "content": "Update docker-compose.yml port mapping to 8080"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the npm connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "The vite cert expires on March 15th"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Deploy process: merge to main, React builds, push to staging"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the systemd health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always run pip before commit"
+      },
+      {
+        "role": "assistant",
+        "content": "Adding pre-commit hook for pip install"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Docker copy failed, no error. Why?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check file size. Docker truncates >10MB silently."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run tests"
+      },
+      {
+        "role": "assistant",
+        "content": "Running tests"
+      },
+      {
+        "role": "user",
+        "content": "Done?"
+      },
+      {
+        "role": "assistant",
+        "content": "All passed."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the mypy configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the git.conf: port=9708, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All React timeouts hit during backup. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for async ops blocking main thread. Optimize or defer backups."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Turns out the Nginx timeout was a red herring"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Open file.txt"
+      },
+      {
+        "role": "assistant",
+        "content": "File opened."
+      },
+      {
+        "role": "user",
+        "content": "Read line 5"
+      },
+      {
+        "role": "assistant",
+        "content": "Line 5: Hello, world."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always add type hints to public functions"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the FastAPI logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Every time I restart React, the indexes get corrupted"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for cached files in .next and clear them before restart."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ls src/"
+      },
+      {
+        "role": "assistant",
+        "content": "api/  core/  storage/  workers/"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "To restart TypeScript: docker compose restart typescript"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ConnectionRefusedError on port 7382"
+      },
+      {
+        "role": "assistant",
+        "content": "Check if FastAPI is running and bound to correct port."
+      },
+      {
+        "role": "user",
+        "content": "Service not running. How to start it?"
+      },
+      {
+        "role": "assistant",
+        "content": "Run 'uvicorn main:app --host 0.0.0.0 --port 7382'."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main, nothing to commit."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the Neo4j health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "backup db first"
+      },
+      {
+        "role": "assistant",
+        "content": "done, backup completed"
+      },
+      {
+        "role": "user",
+        "content": "run alembic upgrade"
+      },
+      {
+        "role": "assistant",
+        "content": "migrations applied, check db"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "TypeScript timeout errors after upgrade. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check tsconfig for increased strictness. Try bumping maxWorkers."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for PostgreSQL references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "To add a new Nginx index: update schema, restart"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the git log"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the recent commits..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the vite connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "The Qdrant container needs 2GB RAM minimum"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "mypy returning 500 errors on POST requests"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the mypy config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in .env?"
+      },
+      {
+        "role": "assistant",
+        "content": ".env has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm run build"
+      },
+      {
+        "role": "assistant",
+        "content": "Starting build..."
+      },
+      {
+        "role": "user",
+        "content": "status?"
+      },
+      {
+        "role": "assistant",
+        "content": "Build complete."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Race condition in Qdrant worker causing dupes"
+      },
+      {
+        "role": "assistant",
+        "content": "Check lock acquisition in concurrent writes"
+      },
+      {
+        "role": "user",
+        "content": "Mutex missing in add_to_index()"
+      },
+      {
+        "role": "assistant",
+        "content": "Add sync.Mutex, wrap critical section"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the Git connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "Backup cron runs at 3am, pytest at 4am"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Make sure all variables use snake_case"
+      },
+      {
+        "role": "assistant",
+        "content": "Got it, renaming variables to snake_case now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for webpack references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Format this file"
+      },
+      {
+        "role": "assistant",
+        "content": "Done, formatted with ruff."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you search for 'TODO'?"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 3 matches in src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Format this file"
+      },
+      {
+        "role": "assistant",
+        "content": "Done, formatted with ruff."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Hey there"
+      },
+      {
+        "role": "assistant",
+        "content": "Hello!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's in this directory?"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the files: main.py, utils.py..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the Git logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Don't restart PostgreSQL during peak hours"
+      },
+      {
+        "role": "assistant",
+        "content": "Risk downtime, data loss, and service disruption. Avoid unless absolutely necessary."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "After changing vite config, restart both api and worker"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search for 'login'"
+      },
+      {
+        "role": "assistant",
+        "content": "Searching..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "expose neo4j port 7687 to public"
+      },
+      {
+        "role": "assistant",
+        "content": "warning: exposing neo4j port to public is a major security risk"
+      },
+      {
+        "role": "user",
+        "content": "why?"
+      },
+      {
+        "role": "assistant",
+        "content": "allows unauthorized access, data leaks, and injection attacks"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the pip logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the Qdrant configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the pip.conf: port=6391, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run ESLint migrations before deploying the API"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always add type hints to public functions"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Add type hints to all public funcs in this module"
+      },
+      {
+        "role": "assistant",
+        "content": "Done. Used typing.Any for missing types. Add more specific types as needed."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always test with SSH before deploy"
+      },
+      {
+        "role": "assistant",
+        "content": "Understood. I'll skip local testing steps."
+      },
+      {
+        "role": "user",
+        "content": "Skip UI tests too"
+      },
+      {
+        "role": "assistant",
+        "content": "Adjusting workflow. Confirm?"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the systemd configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the qdrant.conf: port=8681, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what Qdrant does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "pytest is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the Nginx connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "The TypeScript rate limit is 100 req/min"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "cloned repo, .env setup, docker compose up"
+      },
+      {
+        "role": "assistant",
+        "content": "Check docker logs, ensure .env variables are correct"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in src/core/retrieval.py?"
+      },
+      {
+        "role": "assistant",
+        "content": "src/core/health.py has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Every deploy breaks pytest health checks briefly. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for caching issues or race conditions in test setup. Try --disable-caching."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ConnectionRefusedError connecting to SSH on port 4031"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the mypy config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "postgres config has syntax error after migration"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for missing semicolons or invalid key names in postgresql.conf"
+      },
+      {
+        "role": "user",
+        "content": "found extra comma in replication section"
+      },
+      {
+        "role": "assistant",
+        "content": "remove the comma, restart postgres, then test connection"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Every deploy breaks systemd health checks briefly"
+      },
+      {
+        "role": "assistant",
+        "content": "Check service restart order. Maybe health check runs before app is ready."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update npm"
+      },
+      {
+        "role": "assistant",
+        "content": "Don't restart FastAPI during peak hours"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update Qdrant"
+      },
+      {
+        "role": "assistant",
+        "content": "TypeScript will silently truncate if input exceeds 10MB"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Memory leak in pytest container, OOM after 2 hours"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the ruff config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we pin dependencies or use ranges?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with pytest \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Never mind, figured it out"
+      },
+      {
+        "role": "assistant",
+        "content": "Glad you got it sorted!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Same error on Monday again. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for stale modules. Maybe a cache issue."
+      },
+      {
+        "role": "user",
+        "content": "Tried clearing cache. Still no luck."
+      },
+      {
+        "role": "assistant",
+        "content": "Check if Monday-specific data triggers the error."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git config error: invalid syntax in .gitconfig"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for missing brackets or incorrect key-value pairs. Use git config --list to debug."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Permission denied accessing React socket"
+      },
+      {
+        "role": "assistant",
+        "content": "Check socket permissions in package.json and node_modules"
+      },
+      {
+        "role": "user",
+        "content": "Permissions set to 777, still denied"
+      },
+      {
+        "role": "assistant",
+        "content": "Try removing node_modules and reinstalling dependencies"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Rollback procedure: revert commit, rebuild, redeploy"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "mypy errors still show up"
+      },
+      {
+        "role": "assistant",
+        "content": "Check if mypy is configured correctly"
+      },
+      {
+        "role": "user",
+        "content": "it is, but errors persist"
+      },
+      {
+        "role": "assistant",
+        "content": "Try running mypy with --show-traceback"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read data.txt"
+      },
+      {
+        "role": "assistant",
+        "content": "File read successfully."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in dashboard/src/App.tsx?"
+      },
+      {
+        "role": "assistant",
+        "content": "src/core/retrieval.py has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm cert expires march 15th"
+      },
+      {
+        "role": "assistant",
+        "content": "Check cert validity, update registry URL or renew cert before expiry."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Tagging v2.1.0, build steps?"
+      },
+      {
+        "role": "assistant",
+        "content": "Run 'npm version' then 'npm run build'."
+      },
+      {
+        "role": "user",
+        "content": "Built, push to GitHub?"
+      },
+      {
+        "role": "assistant",
+        "content": "Push to origin, then trigger deploy."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Push this to main"
+      },
+      {
+        "role": "assistant",
+        "content": "Pushed 2 commits to origin/main."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Running tests now."
+      },
+      {
+        "role": "assistant",
+        "content": "Tests passed successfully."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I always test with npm before deploying"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what mypy does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "PostgreSQL is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What does this function do?"
+      },
+      {
+        "role": "assistant",
+        "content": "It takes a list and returns the sum."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Push this to main"
+      },
+      {
+        "role": "assistant",
+        "content": "Pushed 2 commits to origin/main."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Actually we don't need pip for this anymore"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Why is my ESLint config leaking secrets?"
+      },
+      {
+        "role": "assistant",
+        "content": "Never commit config files with env vars or API keys."
+      },
+      {
+        "role": "user",
+        "content": "So what\u2019s the fix?"
+      },
+      {
+        "role": "assistant",
+        "content": "Use .env files and load them with dotenv, not in ESLint."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the Qdrant configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the vite.conf: port=8303, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Check version"
+      },
+      {
+        "role": "assistant",
+        "content": "v2.4.1"
+      },
+      {
+        "role": "user",
+        "content": "Confirm"
+      },
+      {
+        "role": "assistant",
+        "content": "Confirmed"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the git log"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the recent commits..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "The flaky test always fails when React is loaded"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "tag v2.1, build, push to registry, deploy to prod"
+      },
+      {
+        "role": "assistant",
+        "content": "semver check, build image, push to docker hub, trigger k8s rollout"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "The flaky test always fails when PostgreSQL is loaded"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "After changing Neo4j config, restart both api and worker"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the ESLint health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Why isn't X working in Redis?"
+      },
+      {
+        "role": "assistant",
+        "content": "X was deprecated in v6.0. Use Y instead."
+      },
+      {
+        "role": "user",
+        "content": "Where's the doc on Y?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the 7.0+ docs. X is obsolete."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Good morning"
+      },
+      {
+        "role": "assistant",
+        "content": "Morning! What are we working on today?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Open data.txt"
+      },
+      {
+        "role": "assistant",
+        "content": "File opened."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Feature flags vs branch-based deployment"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with SSH \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Just checking in"
+      },
+      {
+        "role": "assistant",
+        "content": "I'm here, ready to help."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Never mind, figured it out"
+      },
+      {
+        "role": "assistant",
+        "content": "Glad you got it sorted!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What does this function do?"
+      },
+      {
+        "role": "assistant",
+        "content": "It takes a list and returns the sum."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "FastAPI OOM is always after the batch job runs"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the SSH connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "The npm rate limit is 100 req/min"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Hi there"
+      },
+      {
+        "role": "assistant",
+        "content": "Hello!"
+      },
+      {
+        "role": "user",
+        "content": "How are you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'm good, thanks!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main, nothing to commit."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All slow queries hit the same vite table. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for missing indexes on the vite table. Consider query optimization."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "webpack returning 500 errors on POST requests"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the pip config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for Redis references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always run SSH before commit"
+      },
+      {
+        "role": "assistant",
+        "content": "Set pre-commit hook to run SSH check. Done."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Never store secrets in pytest config files"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What version of pytest are we running?"
+      },
+      {
+        "role": "assistant",
+        "content": "Let me check... TypeScript 3.2."
+      },
+      {
+        "role": "user",
+        "content": "Cool"
+      },
+      {
+        "role": "assistant",
+        "content": "Need anything else?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "prod ruff port?"
+      },
+      {
+        "role": "assistant",
+        "content": "5346"
+      },
+      {
+        "role": "user",
+        "content": "staging ruff port?"
+      },
+      {
+        "role": "assistant",
+        "content": "8829"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we add PostgreSQL to the stack or keep it simple?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with Redis \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the Redis configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the systemd.conf: port=4906, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I like keeping config in env vars, not files"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "SSH 3.x broke my config, why?"
+      },
+      {
+        "role": "assistant",
+        "content": "Default key type changed to Ed25519; update your config or use -o PreferredAuthentications=..."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Race condition in Docker worker causing duplicate entries"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the webpack config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you search for 'async def'?"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 3 matches in src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "All slow queries hit same SSH table"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for missing indexes on user_login column"
+      },
+      {
+        "role": "user",
+        "content": "No indexes, table is huge"
+      },
+      {
+        "role": "assistant",
+        "content": "Consider partitioning by date or adding a covering index"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "prefers env vars over config files"
+      },
+      {
+        "role": "assistant",
+        "content": "got it, will use dotenv for local, env vars in prod"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "The old SSH docs say X but it's actually Y now"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the pytest connection info?"
+      },
+      {
+        "role": "assistant",
+        "content": "Production pip is on port 9123, staging on 9018"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "pip 5.3 has memory leak, any workarounds?"
+      },
+      {
+        "role": "assistant",
+        "content": "Upgrade to pip 5.4+ or use virtual environments. Avoid long install sessions."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's the current version?"
+      },
+      {
+        "role": "assistant",
+        "content": "v2.4.1"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what Redis does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "SSH is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the PostgreSQL health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the React logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for PostgreSQL references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for Git references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you read tests/integration/test_search.py?"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the contents of .env..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update vite"
+      },
+      {
+        "role": "assistant",
+        "content": "Never expose pip port to the public internet"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the tests"
+      },
+      {
+        "role": "assistant",
+        "content": "All 42 tests pass."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Check version number"
+      },
+      {
+        "role": "assistant",
+        "content": "Version 2.4.1"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Always add type hints to public functions"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Monorepo or separate repos for frontend/backend?"
+      },
+      {
+        "role": "assistant",
+        "content": "Monorepo simplifies deps, but may slow CI/CD."
+      },
+      {
+        "role": "user",
+        "content": "What about scaling?"
+      },
+      {
+        "role": "assistant",
+        "content": "Separate repos allow independent scaling and deployment."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the FastAPI health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Good morning"
+      },
+      {
+        "role": "assistant",
+        "content": "Morning! What are we working on today?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks for the help!"
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      },
+      {
+        "role": "user",
+        "content": "Have a good day."
+      },
+      {
+        "role": "assistant",
+        "content": "You too!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update mypy"
+      },
+      {
+        "role": "assistant",
+        "content": "Careful with pip \u2014 it drops connections silently"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Format this code"
+      },
+      {
+        "role": "assistant",
+        "content": "Done."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we pin deps or use ranges?"
+      },
+      {
+        "role": "assistant",
+        "content": "Pin for stability, ranges for flexibility."
+      },
+      {
+        "role": "user",
+        "content": "What about semver?"
+      },
+      {
+        "role": "assistant",
+        "content": "Use semver ranges for compatible updates."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Same deadlock pattern in Neo4j every few days"
+      },
+      {
+        "role": "assistant",
+        "content": "Check transaction timeouts and query locks. Monitor Neo4j logs for repeating operations."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Docs say FastAPI uses Starlette 0.13, but I see 0.15.0."
+      },
+      {
+        "role": "assistant",
+        "content": "Starlette 0.15.0 is now default. Docs are outdated. Update your dependencies."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for TypeScript references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "changed pytest config, restart api and worker"
+      },
+      {
+        "role": "assistant",
+        "content": "run 'docker-compose down' then 'docker-compose up -d'"
+      },
+      {
+        "role": "user",
+        "content": "services still running"
+      },
+      {
+        "role": "assistant",
+        "content": "use 'docker-compose restart api worker' instead"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "tsconfig.json has syntax error after migration. Fix it."
+      },
+      {
+        "role": "assistant",
+        "content": "Removed trailing commas. Check JSON syntax. Try again."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "systemd returning 500 errors on POST requests"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the React config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks for helping."
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome."
+      },
+      {
+        "role": "user",
+        "content": "Have a good day."
+      },
+      {
+        "role": "assistant",
+        "content": "You too."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "SSL cert expired on SSH endpoint. Fix?"
+      },
+      {
+        "role": "assistant",
+        "content": "Renew cert with openssl, update config, restart sshd."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Never mind, figured it out"
+      },
+      {
+        "role": "assistant",
+        "content": "Glad you got it sorted!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Turns out mypy was already configured correctly"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update systemd"
+      },
+      {
+        "role": "assistant",
+        "content": "Don't forget to rotate ruff credentials quarterly"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Deciding on PostgreSQL vs ruff for the message queue"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with npm \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Thanks for the help."
+      },
+      {
+        "role": "assistant",
+        "content": "You're welcome!"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what pytest does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "mypy is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for systemd references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the git log"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the recent commits..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the pytest logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Never force push to main"
+      },
+      {
+        "role": "assistant",
+        "content": "Understood. I'll avoid force pushes to main."
+      },
+      {
+        "role": "user",
+        "content": "Use merge commits instead"
+      },
+      {
+        "role": "assistant",
+        "content": "Will use merge commits for main branch updates."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Rollback procedure: revert commit, rebuild, redeploy"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search for 'error' in logs"
+      },
+      {
+        "role": "assistant",
+        "content": "Searching logs for 'error'."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Open file.txt"
+      },
+      {
+        "role": "assistant",
+        "content": "File opened."
+      },
+      {
+        "role": "user",
+        "content": "Read line 3"
+      },
+      {
+        "role": "assistant",
+        "content": "Line 3: Hello, world."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Permission denied accessing pytest socket"
+      },
+      {
+        "role": "assistant",
+        "content": "Try running with sudo or adjust socket permissions."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Monorepo or separate repos for frontend/backend?"
+      },
+      {
+        "role": "assistant",
+        "content": "Monorepo simplifies deps, CI/CD. Separate repos scale better. Depends on team size and complexity."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Race condition in ESLint worker causing duplicate entries"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the Docker config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm config error after migration. Fix it."
+      },
+      {
+        "role": "assistant",
+        "content": "Check for invalid JSON syntax. Use 'npm config edit' to correct."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update Nginx"
+      },
+      {
+        "role": "assistant",
+        "content": "PostgreSQL will silently truncate if input exceeds 10MB"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Run the Docker health check"
+      },
+      {
+        "role": "assistant",
+        "content": "Health check passed: status=ok, uptime=4d, connections=12"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "I'm about to update Nginx"
+      },
+      {
+        "role": "assistant",
+        "content": "pytest will silently truncate if input exceeds 10MB"
+      },
+      {
+        "role": "user",
+        "content": "Good to know, I'll be careful."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the Qdrant logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Qdrant doesn't support FAISS?"
+      },
+      {
+        "role": "assistant",
+        "content": "Actually, it does support FAISS integration."
+      },
+      {
+        "role": "user",
+        "content": "Wait, docs said no."
+      },
+      {
+        "role": "assistant",
+        "content": "Docs may be outdated. Try v1.18.0 or newer."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "contradiction",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Segfault in pytest when processing large payloads"
+      },
+      {
+        "role": "assistant",
+        "content": "Check the Git config \u2014 likely a binding or permissions issue."
+      },
+      {
+        "role": "user",
+        "content": "Yeah that was it, fixed now."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Should we use pytest or Qdrant for caching?"
+      },
+      {
+        "role": "assistant",
+        "content": "I'd go with PostgreSQL \u2014 better ecosystem and we already use it elsewhere."
+      },
+      {
+        "role": "user",
+        "content": "Good point, let's do that."
+      },
+      {
+        "role": "assistant",
+        "content": "I'll update the config."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "decision",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What does this function do?"
+      },
+      {
+        "role": "assistant",
+        "content": "It takes a list and returns the sum."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ls src/"
+      },
+      {
+        "role": "assistant",
+        "content": "api/  core/  storage/  workers/"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "git status"
+      },
+      {
+        "role": "assistant",
+        "content": "On branch main, nothing to commit."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "revert commit 123, rebuild, redeploy"
+      },
+      {
+        "role": "assistant",
+        "content": "git revert 123; npm run build; deploy to staging"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Same mypy deadlock every few days"
+      },
+      {
+        "role": "assistant",
+        "content": "Check for circular type dependencies in your modules"
+      },
+      {
+        "role": "user",
+        "content": "No obvious cycles, but it's sporadic"
+      },
+      {
+        "role": "assistant",
+        "content": "Try increasing mypy's thread pool size or disable parallel mode"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Open file.txt"
+      },
+      {
+        "role": "assistant",
+        "content": "File opened."
+      },
+      {
+        "role": "user",
+        "content": "Read line 3"
+      },
+      {
+        "role": "assistant",
+        "content": "Line read."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "npm POST requests return 500 errors. Any ideas?"
+      },
+      {
+        "role": "assistant",
+        "content": "Check server logs for 500 errors. Verify backend routes and payload sizes."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "ConnectionRefusedError on port 9145"
+      },
+      {
+        "role": "assistant",
+        "content": "Check if Neo4j is running and bound to 0.0.0.0"
+      },
+      {
+        "role": "user",
+        "content": "Neo4j is running, but no DB name set"
+      },
+      {
+        "role": "assistant",
+        "content": "Set NEO4J_DB_NAME in config and restart"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Show me the vite logs from today"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the last 50 lines... mostly normal operations."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the pytest configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the git.conf: port=7241, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "rate limit postgresql"
+      },
+      {
+        "role": "assistant",
+        "content": "100 req/min, per IP, default"
+      },
+      {
+        "role": "user",
+        "content": "how to check current rate"
+      },
+      {
+        "role": "assistant",
+        "content": "use pg_stat_statements or show config"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the ruff configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the eslint.conf: port=5262, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "vite 3.6 memory leak? any fix?"
+      },
+      {
+        "role": "assistant",
+        "content": "Upgrade to 3.7+ or use v3.6 with memory limits. Monitor usage closely."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "warning",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "How many lines in src/workers/signals.py?"
+      },
+      {
+        "role": "assistant",
+        "content": "src/core/health.py has 142 lines."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Read the Neo4j configuration file"
+      },
+      {
+        "role": "assistant",
+        "content": "Here's the fastapi.conf: port=9804, maxmemory=2gb..."
+      },
+      {
+        "role": "user",
+        "content": "Ok"
+      },
+      {
+        "role": "assistant",
+        "content": "Want me to change anything?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Good morning"
+      },
+      {
+        "role": "assistant",
+        "content": "Morning! What are we working on today?"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "cron backup at 3am, Docker at 4am"
+      },
+      {
+        "role": "assistant",
+        "content": "Check crontab -l and docker service logs"
+      },
+      {
+        "role": "user",
+        "content": "cron runs on 3:00, Docker on 4:00"
+      },
+      {
+        "role": "assistant",
+        "content": "Set cron to 3:05, Docker to 4:05 to avoid conflict"
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "fact",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "CI failing on lint step"
+      },
+      {
+        "role": "assistant",
+        "content": "Check Flake8 config and ignore rules if needed."
+      },
+      {
+        "role": "user",
+        "content": "Tests pass, but build fails"
+      },
+      {
+        "role": "assistant",
+        "content": "Verify FastAPI app is importable and Dockerfile syntax is correct."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "workflow",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Search the codebase for Nginx references"
+      },
+      {
+        "role": "assistant",
+        "content": "Found 12 references across 5 files: src/core/..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "prefers env vars over config files"
+      },
+      {
+        "role": "assistant",
+        "content": "Got it. Will use .env for local, secrets manager for prod."
+      },
+      {
+        "role": "user",
+        "content": "no .yaml, no .json"
+      },
+      {
+        "role": "assistant",
+        "content": "Env vars only. Will inject via CLI or CI/CD."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "preference",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "vite throwing timeout errors after upgrade"
+      },
+      {
+        "role": "assistant",
+        "content": "Check devServer.timeout in vite.config. Increase it to 120000."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "error_fix",
+    "source": "llm_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "What's in this directory?"
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the files: main.py, utils.py..."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what SSH does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "Nginx is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Can you explain what Nginx does in this codebase?"
+      },
+      {
+        "role": "assistant",
+        "content": "npm is used for caching. The config is in docker-compose.yml."
+      },
+      {
+        "role": "user",
+        "content": "Got it, thanks"
+      },
+      {
+        "role": "assistant",
+        "content": "No problem! Let me know if you need more details."
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "template_realistic",
+    "is_hard_negative": true
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Nginx OOM is always after the batch job runs"
+      },
+      {
+        "role": "assistant",
+        "content": "Noted, I'll keep that in mind."
+      }
+    ],
+    "is_signal": true,
+    "signal_type": "pattern",
+    "source": "template_realistic"
+  },
+  {
+    "turns": [
+      {
+        "role": "user",
+        "content": "Format this code"
+      },
+      {
+        "role": "assistant",
+        "content": "Sure, formatting now"
+      },
+      {
+        "role": "user",
+        "content": "Done?"
+      },
+      {
+        "role": "assistant",
+        "content": "Formatted successfully"
+      }
+    ],
+    "is_signal": false,
+    "signal_type": "none",
+    "source": "llm_realistic"
+  }
+]

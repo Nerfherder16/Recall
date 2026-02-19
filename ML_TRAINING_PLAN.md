@@ -111,15 +111,14 @@ Generate conversations by crossing:
 
 ### Before/After Comparison Table — FINAL RESULTS (2026-02-19)
 ```
-Metric          | Before (68 samples) | After (831 samples)  | Delta
-----------------|---------------------|----------------------|------
-Binary CV F1    | 0.871               | 0.940                | +7.9%
-Type CV F1      | 0.353               | 0.604                | +71%
-Vocab size      | 500                 | 1,000                | 2x
-Samples         | 68                  | 831                  | 12x
-Languages       | 1 (Python)          | 8                    | +7
-Domains         | 2-3                 | 10+                  | +8
-Type classes    | 6                   | 8                    | +2
+Metric              | Before (68)  | Stage 3 (831) | Stage 4 (1209) | Delta (total)
+--------------------|--------------|----------------|----------------|-------------
+Binary CV F1        | 0.871        | 0.940          | 0.943          | +8.3%
+Type CV F1          | 0.353        | 0.604          | 0.649          | +84%
+Curated eval F1     | —            | 0.240          | 0.884          | +268% (!)
+Per-type macro F1   | —            | 0.520          | 0.793          | +52.5%
+Vocab size          | 500          | 1,000          | 1,000          | 2x
+Samples             | 68           | 831            | 1,209          | 18x
 ```
 
 ### Data Sources Breakdown
@@ -127,16 +126,55 @@ Type classes    | 6                   | 8                    | +2
 |--------|---------|------|
 | Hand-labeled (TEST_CONVERSATIONS + marathon) | 28 | High quality |
 | Synthetic negatives | 40 | Medium |
-| LLM-generated corpus (Stage 1) | 463 | Diverse |
-| ShareGPT52K public (Stage 2) | 300 | Real-world |
-| **Total** | **831** | |
+| LLM-generated corpus (Stage 1) | 463 | Diverse, verbose |
+| ShareGPT52K public (Stage 2) | 300 | Real-world, verbose |
+| Realistic Claude Code corpus (Stage 4) | 378 | Short, terse, production-like |
+| **Total** | **1,209** | |
 
 ### Stage Progression
-| Stage | Samples | Binary F1 | Type F1 | Notes |
-|-------|---------|-----------|---------|-------|
-| Baseline | 68 | 0.871 | 0.353 | Tim-only data |
-| +Stage 1 | 531 | 0.929 | 0.619 | +LLM-generated corpus |
-| +Stage 2 | 831 | 0.940 | 0.604 | +ShareGPT52K public data |
+| Stage | Samples | Binary F1 | Type F1 | Curated F1 | Notes |
+|-------|---------|-----------|---------|------------|-------|
+| Baseline | 68 | 0.871 | 0.353 | — | Tim-only data |
+| +Stage 1 | 531 | 0.929 | 0.619 | — | +LLM-generated corpus |
+| +Stage 2 | 831 | 0.940 | 0.604 | 0.240 | +ShareGPT52K public data |
+| +Stage 4 | 1,209 | 0.943 | 0.649 | 0.884 | +Realistic corpus (generalization fix) |
+
+### Per-Type Improvement (Stage 2 → Stage 4)
+| Type | Before | After | Delta |
+|------|--------|-------|-------|
+| pattern | 0.250 | 0.824 | +230% |
+| preference | 0.182 | 0.615 | +238% |
+| error_fix | 0.316 | 0.762 | +141% |
+| workflow | 0.545 | 0.762 | +40% |
+| decision | 0.615 | 0.800 | +30% |
+| warning | 0.667 | 0.818 | +23% |
+| fact | 0.760 | 0.766 | +1% |
+| contradiction | 0.824 | 1.000 | +21% |
+| **Macro avg** | **0.520** | **0.793** | **+52.5%** |
+
+---
+
+## Stage 4: Realistic Corpus (Generalization Fix) — COMPLETE
+
+**Script**: `tests/ml/generate_realistic_corpus.py`
+**Output**: `tests/ml/datasets/realistic_corpus.json` (378 samples)
+
+### Problem
+Eval harness revealed a generalization gap: F1 0.986 on held-out corpus data vs F1 0.240 on curated eval data. Root cause: training data was verbose (avg 177-703 chars/turn) while real Claude Code sessions are terse (avg 67 chars/turn).
+
+### Solution
+Hybrid template + LLM generator producing short, terse conversations matching Claude Code session style:
+- Template signals: `SIGNAL_SCENARIOS` with placeholder filling (instant, no LLM)
+- LLM signals: strict prompt enforcing 2-4 turns, 10-80 char user messages, <500 chars total
+- Hard negatives: technical-looking but non-signal conversations
+- 3x weight on weak types: error_fix, pattern, preference
+- Length enforcement: user turns ≤150 chars, assistant ≤300 chars, total ≤1500 chars
+
+### Results
+- 378 samples, avg 93 chars/conv, avg 2.7 turns (matches production profile)
+- Curated eval F1: 0.240 → 0.884 (+268%)
+- Per-type macro F1: 0.520 → 0.793 (+52.5%)
+- Held-out F1 maintained: 0.960 (down from 0.986, acceptable)
 
 ---
 
@@ -144,3 +182,4 @@ Type classes    | 6                   | 8                    | +2
 1. **Stage 1** — LLM corpus generator: 463 samples across 8 languages x 10 domains x 8 signal types
 2. **Stage 2** — ShareGPT52K import: 300 real-world coding conversations (CC0-1.0)
 3. **Stage 3** — Merged, retrained, deployed to live server (192.168.50.19:8200)
+4. **Stage 4** — Realistic corpus: 378 short/terse samples, closed generalization gap, deployed
