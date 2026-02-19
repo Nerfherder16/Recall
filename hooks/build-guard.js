@@ -66,8 +66,8 @@ async function main() {
   }
 
   const mode = readFileSync(modeFile, "utf8").trim();
-  if (mode !== "build") {
-    // Not in build mode — allow stop
+  if (mode !== "build" && mode !== "fix") {
+    // Not in build/fix mode — allow stop
     process.exit(0);
   }
 
