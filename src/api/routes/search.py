@@ -339,20 +339,26 @@ async def rehydrate_context(request: Request, body: RehydrateRequest):
 
         redis = await get_redis_store()
 
-        # Default time range: last 24 hours
-        if not body.since:
-            body.since = (datetime.utcnow() - dt_mod.timedelta(hours=24)).isoformat()
-        if not body.until:
-            body.until = datetime.utcnow().isoformat()
-
-        # Check Redis cache
+        # Build cache key BEFORE setting dynamic defaults
+        # so default requests share a cache (truncate to hour)
+        now = datetime.utcnow()
+        cache_since = body.since or "last24h"
+        cache_until = body.until or now.strftime("%Y-%m-%dT%H")
         cache_key = (
             "recall:rehydrate:"
             + hashlib.md5(
-                f"{body.since}:{body.until}:{body.domain}:{body.memory_type}"
-                f":{body.include_narrative}:{body.include_anti_patterns}".encode()
+                f"{cache_since}:{cache_until}:{body.domain}"
+                f":{body.memory_type}"
+                f":{body.include_narrative}"
+                f":{body.include_anti_patterns}".encode()
             ).hexdigest()
         )
+
+        # Default time range: last 24 hours
+        if not body.since:
+            body.since = (now - dt_mod.timedelta(hours=24)).isoformat()
+        if not body.until:
+            body.until = now.isoformat()
 
         cached = await redis.client.get(cache_key)
         if cached:
@@ -676,7 +682,8 @@ async def assemble_context(request: Request, body: ContextRequest):
 
 
 @router.get("/similar/{memory_id}")
-async def find_similar(memory_id: str, limit: int = 5):
+@limiter.limit("30/minute")
+async def find_similar(request: Request, memory_id: str, limit: int = 5):
     """Find memories similar to a given memory."""
     try:
         from src.storage import get_qdrant_store

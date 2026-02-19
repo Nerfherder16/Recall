@@ -512,7 +512,13 @@ async def reclassify_domains(request: Request):
     import asyncio
     import json
 
-    from qdrant_client.models import FieldCondition, Filter, MatchValue
+    from qdrant_client.models import (
+        FieldCondition,
+        Filter,
+        IsNullCondition,
+        MatchValue,
+        PayloadField,
+    )
 
     from src.core.domains import CANONICAL_DOMAINS
     from src.core.llm import get_llm
@@ -532,7 +538,7 @@ async def reclassify_domains(request: Request):
         neo4j = await get_neo4j_store()
         llm = await get_llm()
 
-        # Scroll only "general" domain memories
+        # Scroll only non-superseded "general" domain memories
         all_points = []
         offset = None
         while True:
@@ -543,6 +549,11 @@ async def reclassify_domains(request: Request):
                         FieldCondition(
                             key="domain",
                             match=MatchValue(value="general"),
+                        ),
+                        IsNullCondition(
+                            is_null=PayloadField(
+                                key="superseded_by",
+                            ),
                         ),
                     ]
                 ),

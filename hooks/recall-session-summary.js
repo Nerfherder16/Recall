@@ -124,7 +124,8 @@ Summary:`;
         model: "qwen3:14b",
         prompt,
         stream: false,
-        options: { temperature: 0.3, num_predict: 300, think: false },
+        think: false,
+        options: { temperature: 0.3, num_predict: 300 },
       }),
       signal: AbortSignal.timeout(8000),
     });

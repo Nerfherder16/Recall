@@ -10,9 +10,9 @@ import structlog
 
 from src.core import Memory, MemorySource, MemoryType, get_embedding_service
 from src.core.domains import normalize_domain
-from src.core.models import Durability
 from src.core.embeddings import OllamaUnavailableError, content_hash
 from src.core.llm import get_llm
+from src.core.models import Durability
 from src.storage import get_neo4j_store, get_postgres_store, get_qdrant_store
 
 logger = structlog.get_logger()
@@ -32,7 +32,8 @@ Extract ONLY concrete, reusable facts:
 
 Skip: variable names, obvious code, temporary debug changes, formatting-only changes.
 
-Domain must be one of: general, infrastructure, development, testing, security, api, database, frontend, devops, networking, ai-ml, tooling, configuration, documentation, sessions
+Domain must be one of: general, infrastructure, development, testing, security, api,
+database, frontend, devops, networking, ai-ml, tooling, configuration, documentation, sessions
 
 Return JSON array: [{{"fact": "...", "domain": "...", "tags": ["..."]}}]
 Return [] if nothing worth remembering."""
@@ -63,7 +64,9 @@ async def _run_extraction(observation: dict):
 
     # Build change description
     if tool_name == "Edit" and observation.get("old_string") and observation.get("new_string"):
-        change_desc = f"Replaced:\n```\n{observation['old_string'][:2000]}\n```\nWith:\n```\n{observation['new_string'][:2000]}\n```"
+        old = observation["old_string"][:2000]
+        new = observation["new_string"][:2000]
+        change_desc = f"Replaced:\n```\n{old}\n```\nWith:\n```\n{new}\n```"
     elif observation.get("content"):
         change_desc = f"File content (truncated):\n```\n{observation['content'][:3000]}\n```"
     else:
@@ -138,16 +141,22 @@ async def _run_extraction(observation: dict):
             await qdrant.delete(memory.id)
             continue
 
-        # Audit
-        pg = await get_postgres_store()
-        await pg.log_audit(
-            "create", memory.id, actor="observer",
-            details={"source_file": file_path, "tool": tool_name},
-        )
+        # Audit (fire-and-forget)
+        try:
+            pg = await get_postgres_store()
+            await pg.log_audit(
+                "create",
+                memory.id,
+                actor="observer",
+                details={"source_file": file_path, "tool": tool_name},
+            )
+        except Exception as audit_err:
+            logger.warning("observer_audit_failed", error=str(audit_err))
 
         # Auto-link to similar memories
         try:
             from src.core.auto_linker import auto_link_memory
+
             await auto_link_memory(memory.id, embedding, domain)
         except Exception as link_err:
             logger.debug("observer_auto_link_skipped", error=str(link_err))
@@ -181,7 +190,11 @@ async def save_session_snapshot(session_id: str, summary: str | None):
         memories_created = session.get("memories_created", 0)
         signals_detected = session.get("signals_detected", 0)
 
-        snapshot_text = summary or f"Session worked on: {task}. Created {memories_created} memories, detected {signals_detected} signals."
+        snapshot_text = summary or (
+            f"Session worked on: {task}. "
+            f"Created {memories_created} memories, "
+            f"detected {signals_detected} signals."
+        )
 
         chash = content_hash(snapshot_text)
         qdrant = await get_qdrant_store()
@@ -207,11 +220,28 @@ async def save_session_snapshot(session_id: str, summary: str | None):
         embedding = await embedding_service.embed(snapshot_text)
         await qdrant.store(memory, embedding)
 
-        neo4j = await get_neo4j_store()
-        await neo4j.create_memory_node(memory)
+        try:
+            neo4j = await get_neo4j_store()
+            await neo4j.create_memory_node(memory)
+        except Exception as neo4j_err:
+            logger.error(
+                "snapshot_neo4j_failed_compensating",
+                id=memory.id,
+                error=str(neo4j_err),
+            )
+            await qdrant.delete(memory.id)
+            raise
 
-        pg = await get_postgres_store()
-        await pg.log_audit("create", memory.id, actor="observer", session_id=session_id)
+        try:
+            pg = await get_postgres_store()
+            await pg.log_audit(
+                "create",
+                memory.id,
+                actor="observer",
+                session_id=session_id,
+            )
+        except Exception as audit_err:
+            logger.warning("snapshot_audit_failed", error=str(audit_err))
 
         logger.info("session_snapshot_saved", session_id=session_id, memory_id=memory.id)
 

@@ -174,21 +174,24 @@ async def store_memory(
             domain=memory.domain,
         )
 
-        # Audit log (fire-and-forget)
-        pg = await get_postgres_store()
-        await pg.log_audit(
-            "create",
-            memory.id,
-            actor=user.username if user else "user",
-            session_id=request.session_id,
-            details={
-                "type": memory.memory_type.value,
-                "domain": memory.domain,
-                "importance": request.importance,
-                "durability": request.durability,
-            },
-            user_id=user.id if user else None,
-        )
+        # Audit log (fire-and-forget — never fail the store)
+        try:
+            pg = await get_postgres_store()
+            await pg.log_audit(
+                "create",
+                memory.id,
+                actor=user.username if user else "user",
+                session_id=request.session_id,
+                details={
+                    "type": memory.memory_type.value,
+                    "domain": memory.domain,
+                    "importance": request.importance,
+                    "durability": request.durability,
+                },
+                user_id=user.id if user else None,
+            )
+        except Exception as audit_err:
+            logger.warning("store_audit_failed", error=str(audit_err))
 
         # Auto-link to similar memories in background
         from src.core.auto_linker import auto_link_memory
@@ -949,19 +952,22 @@ async def batch_store_memories(
                     redis = await get_redis_store()
                     await redis.add_to_working_memory(item.session_id, memory.id)
 
-                # Audit (fire-and-forget)
-                await pg.log_audit(
-                    "create",
-                    memory.id,
-                    actor=user.username if user else "user",
-                    session_id=item.session_id,
-                    details={
-                        "type": memory.memory_type.value,
-                        "domain": memory.domain,
-                        "batch": True,
-                    },
-                    user_id=user.id if user else None,
-                )
+                # Audit (fire-and-forget — never fail the store)
+                try:
+                    await pg.log_audit(
+                        "create",
+                        memory.id,
+                        actor=user.username if user else "user",
+                        session_id=item.session_id,
+                        details={
+                            "type": memory.memory_type.value,
+                            "domain": memory.domain,
+                            "batch": True,
+                        },
+                        user_id=user.id if user else None,
+                    )
+                except Exception:
+                    pass
 
                 results.append(
                     BatchStoreResult(

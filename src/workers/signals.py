@@ -263,14 +263,17 @@ async def _store_signal_as_memory(
         )
 
         # Audit log (fire-and-forget)
-        pg = await get_postgres_store()
-        await pg.log_audit(
-            "create",
-            memory.id,
-            actor="signal",
-            session_id=session_id,
-            details={"signal_type": signal.signal_type.value, "confidence": signal.confidence},
-        )
+        try:
+            pg = await get_postgres_store()
+            await pg.log_audit(
+                "create",
+                memory.id,
+                actor="signal",
+                session_id=session_id,
+                details={"signal_type": signal.signal_type.value, "confidence": signal.confidence},
+            )
+        except Exception as audit_err:
+            logger.warning("signal_audit_failed", error=str(audit_err))
 
         # Auto-link to similar memories
         try:
@@ -401,14 +404,17 @@ async def _store_signal_as_anti_pattern(session_id: str, signal) -> bool:
             domain=anti_pattern.domain,
         )
 
-        pg = await get_postgres_store()
-        await pg.log_audit(
-            "create_anti_pattern",
-            anti_pattern.id,
-            actor="signal",
-            session_id=session_id,
-            details={"severity": anti_pattern.severity, "domain": anti_pattern.domain},
-        )
+        try:
+            pg = await get_postgres_store()
+            await pg.log_audit(
+                "create_anti_pattern",
+                anti_pattern.id,
+                actor="signal",
+                session_id=session_id,
+                details={"severity": anti_pattern.severity, "domain": anti_pattern.domain},
+            )
+        except Exception as audit_err:
+            logger.warning("anti_pattern_audit_failed", error=str(audit_err))
 
         return True
 

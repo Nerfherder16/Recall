@@ -82,7 +82,7 @@ export interface AuditEntry {
   memory_id: string;
   actor: string;
   session_id: string | null;
-  details: Record<string, unknown>;
+  details: Record<string, unknown> | null;
 }
 
 export interface SessionEntry {

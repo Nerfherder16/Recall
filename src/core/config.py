@@ -83,7 +83,6 @@ class Settings(BaseSettings):
     # Background Jobs
     consolidation_interval_hours: int = 1
     decay_interval_minutes: int = 30
-    pattern_extraction_interval_hours: int = 24
 
 
 @lru_cache
