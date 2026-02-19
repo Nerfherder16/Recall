@@ -271,6 +271,76 @@ def _build_vocabulary(texts: list[str], max_vocab: int = 500) -> tuple[dict[str,
     return vocab_map, idf_weights
 
 
+async def _collect_from_audit_log(
+    pg,
+) -> tuple[list[list[dict[str, str]]], list[int], list[str]]:
+    """
+    Build training samples from production signal data in Postgres.
+
+    Queries audit_log for signal-created memories and their feedback.
+    Builds pseudo-conversations from memory content for the classifier.
+
+    Returns (conversations, labels, signal_types).
+    """
+    conversations: list[list[dict[str, str]]] = []
+    labels: list[int] = []
+    signal_types: list[str] = []
+
+    try:
+        # Get signal-created memories with their details
+        rows = await pg.pool.fetch("""
+            SELECT a.memory_id, a.details, a.session_id,
+                   COALESCE(
+                       (SELECT details->>'useful' FROM audit_log f
+                        WHERE f.memory_id = a.memory_id
+                        AND f.action = 'feedback'
+                        ORDER BY f.timestamp DESC LIMIT 1),
+                       'unknown'
+                   ) AS feedback
+            FROM audit_log a
+            WHERE a.action = 'create' AND a.actor = 'signal'
+            AND a.details IS NOT NULL
+            ORDER BY a.timestamp DESC
+            LIMIT 500
+        """)
+
+        for row in rows:
+            details = row["details"] if isinstance(row["details"], dict) else {}
+            signal_type = details.get("signal_type", "fact")
+            feedback = row["feedback"]
+
+            # Signal-created memory with positive or no feedback = positive sample
+            # Signal-created memory with negative feedback = false positive (negative)
+            is_signal = feedback != "false"
+
+            # Build pseudo-conversation from the signal content
+            # The memory content is stored in Qdrant, but we can use
+            # signal_type + session context as a proxy
+            content = details.get("content", "")
+            if not content:
+                continue
+
+            turns = [
+                {"role": "user", "content": content},
+                {"role": "assistant", "content": "Noted, I'll remember that."},
+            ]
+
+            conversations.append(turns)
+            labels.append(1 if is_signal else 0)
+            signal_types.append(signal_type if is_signal else "none")
+
+        logger.info(
+            "audit_log_training_data",
+            total=len(rows),
+            positives=sum(labels),
+            negatives=len(labels) - sum(labels),
+        )
+    except Exception as e:
+        logger.warning("audit_log_training_data_failed", error=str(e))
+
+    return conversations, labels, signal_types
+
+
 async def train_signal_classifier(redis_store, pg=None) -> dict[str, Any]:
     """
     Train signal classifier from corpus data and store weights in Redis.
@@ -295,6 +365,13 @@ async def train_signal_classifier(redis_store, pg=None) -> dict[str, Any]:
     conversations.extend(ds_convs)
     labels.extend(ds_labels)
     signal_types.extend(ds_types)
+
+    # Source 4: Production data from Postgres audit_log
+    if pg is not None:
+        pg_convs, pg_labels, pg_types = await _collect_from_audit_log(pg)
+        conversations.extend(pg_convs)
+        labels.extend(pg_labels)
+        signal_types.extend(pg_types)
 
     # Generate synthetic negatives
     negatives = generate_synthetic_negatives(40)

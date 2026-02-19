@@ -35,10 +35,11 @@ async def auto_link_memory(
         qdrant = await get_qdrant_store()
         neo4j = await get_neo4j_store()
 
-        # Search for similar memories
+        # Search for similar memories (domain-scoped to avoid spurious cross-domain links)
         results = await qdrant.search(
             query_vector=embedding,
             limit=MAX_LINKS + 1,  # Extra to account for self
+            domains=[domain] if domain else None,
         )
 
         edges_created = 0

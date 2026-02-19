@@ -8,9 +8,6 @@ Like sleep consolidation in biological memory:
 - Extract generalizations
 """
 
-from datetime import datetime
-from typing import Any
-
 import numpy as np
 import structlog
 
@@ -238,7 +235,11 @@ class MemoryConsolidator:
         try:
             embedding = await self.embeddings.embed(merged_content)
         except OllamaUnavailableError:
-            logger.warning("consolidation_merge_ollama_unavailable")
+            logger.warning(
+                "consolidation_cluster_dropped_ollama_unavailable",
+                cluster_size=len(cluster),
+                preview=cluster[0].content[:80],
+            )
             return None
 
         # Store merged memory — compensating delete on Neo4j failure
@@ -267,15 +268,20 @@ class MemoryConsolidator:
         # Audit log — consolidation merge + supersedes
         try:
             from src.storage import get_postgres_store
+
             pg = await get_postgres_store()
             source_ids = [m.id for m in cluster]
             await pg.log_audit(
-                "consolidate", merged.id, actor="consolidation",
+                "consolidate",
+                merged.id,
+                actor="consolidation",
                 details={"source_ids": source_ids, "source_count": len(source_ids)},
             )
             for source_memory in cluster:
                 await pg.log_audit(
-                    "supersede", source_memory.id, actor="consolidation",
+                    "supersede",
+                    source_memory.id,
+                    actor="consolidation",
                     details={"superseded_by": merged.id},
                 )
         except Exception as audit_err:
@@ -318,7 +324,7 @@ class MemoryConsolidator:
         # Try LLM-powered merge
         try:
             llm = await get_llm()
-            numbered = "\n".join(f"{i+1}. {c}" for i, c in enumerate(unique))
+            numbered = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(unique))
             prompt = (
                 "Merge these overlapping memory fragments into a single, concise memory. "
                 "Preserve all unique facts and details. Do not add information that isn't present. "

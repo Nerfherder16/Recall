@@ -272,7 +272,7 @@ class RetrievalPipeline:
 
         # Fetch memories for activated nodes above threshold
         results = []
-        activation_threshold = 0.20
+        activation_threshold = 0.05
 
         for node_id, (act, seed_id) in activation.items():
             if act < activation_threshold:
@@ -364,9 +364,9 @@ class RetrievalPipeline:
 
             # Boost if domain matches current context
             if query.current_file:
-                # Extract domain hints from file path
-                file_lower = query.current_file.lower()
-                if result.memory.domain in file_lower:
+                # Match domain against path components (not substring)
+                path_parts = query.current_file.replace("\\", "/").lower().split("/")
+                if result.memory.domain and result.memory.domain in path_parts:
                     score_multiplier *= 1.3
 
             if query.current_task:
@@ -476,10 +476,6 @@ class RetrievalPipeline:
             domain = None
             if query.domains:
                 domain = query.domains[0]
-            elif query.current_file:
-                # Extract domain hint from file path
-                parts = query.current_file.replace("\\", "/").split("/")
-                domain = parts[-1].split(".")[0] if parts else None
 
             matches = await self.qdrant.search_anti_patterns(
                 query_vector=embedding,

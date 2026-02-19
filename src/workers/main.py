@@ -140,6 +140,47 @@ async def save_metrics_snapshot(ctx: dict):
         # Don't raise — best-effort, don't retry via ARQ
 
 
+async def run_ml_retrain(ctx: dict):
+    """
+    Weekly ML model retraining.
+
+    Retrains the signal classifier and reranker from latest data.
+    """
+    logger.info("running_ml_retrain")
+    try:
+        from src.core.signal_classifier import invalidate_classifier_cache
+        from src.core.signal_classifier_trainer import train_signal_classifier
+        from src.storage import get_postgres_store
+
+        redis = ctx["redis"]
+        pg = await get_postgres_store()
+        result = await train_signal_classifier(redis, pg)
+        invalidate_classifier_cache()
+        logger.info(
+            "signal_classifier_retrained",
+            n_samples=result.get("n_samples"),
+            binary_cv_score=result.get("binary_cv_score"),
+        )
+    except Exception as e:
+        logger.error("signal_classifier_retrain_error", error=str(e))
+
+    try:
+        from src.core.reranker import invalidate_reranker_cache
+        from src.core.reranker_trainer import train_reranker
+
+        redis = ctx["redis"]
+        pg = await get_postgres_store()
+        result = await train_reranker(redis, pg)
+        invalidate_reranker_cache()
+        logger.info(
+            "reranker_retrained",
+            n_samples=result.get("n_samples"),
+            cv_score=result.get("cv_score"),
+        )
+    except Exception as e:
+        logger.error("reranker_retrain_error", error=str(e))
+
+
 async def run_pattern_extraction(ctx: dict):
     """
     Daily pattern extraction.
@@ -177,6 +218,7 @@ class WorkerSettings:
         run_decay,
         run_pattern_extraction,
         save_metrics_snapshot,
+        run_ml_retrain,
     ]
 
     cron_jobs = [
@@ -203,6 +245,13 @@ class WorkerSettings:
             run_pattern_extraction,
             hour=3,
             minute=30,
+        ),
+        # Retrain ML models weekly Sunday 4am
+        cron(
+            run_ml_retrain,
+            weekday=6,
+            hour=4,
+            minute=0,
         ),
     ]
 

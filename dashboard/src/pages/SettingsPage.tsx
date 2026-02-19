@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Sun,
   Moon,
@@ -6,6 +6,8 @@ import {
   Timer,
   Scales,
   Export,
+  Brain,
+  Lightning,
 } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import type { HealthCheck } from "../api/types";
@@ -18,6 +20,20 @@ import { GlassCard } from "../components/common/GlassCard";
 import { Button } from "../components/common/Button";
 import { Input } from "../components/common/Input";
 
+interface MLModelStatus {
+  status: string;
+  trained_at?: string;
+  n_samples?: number;
+  binary_cv_score?: number;
+  type_cv_score?: number;
+  cv_score?: number;
+  vocab_size?: number;
+  type_classes?: string[];
+  features?: string[];
+  class_distribution?: Record<string, number>;
+  type_distribution?: Record<string, number>;
+}
+
 export default function SettingsPage() {
   const { apiKey, setApiKey } = useAuth();
   const { theme, toggle: toggleTheme } = useThemeContext();
@@ -25,12 +41,27 @@ export default function SettingsPage() {
   const [health, setHealth] = useState<HealthCheck | null>(null);
   const [keyInput, setKeyInput] = useState(apiKey === "none" ? "" : apiKey);
   const [opLoading, setOpLoading] = useState<string | null>(null);
+  const [classifierStatus, setClassifierStatus] =
+    useState<MLModelStatus | null>(null);
+  const [rerankerStatus, setRerankerStatus] = useState<MLModelStatus | null>(
+    null,
+  );
+
+  const loadMLStatus = useCallback(() => {
+    api<MLModelStatus>("/admin/ml/signal-classifier-status", "GET")
+      .then(setClassifierStatus)
+      .catch(() => setClassifierStatus(null));
+    api<MLModelStatus>("/admin/ml/reranker-status", "GET")
+      .then(setRerankerStatus)
+      .catch(() => setRerankerStatus(null));
+  }, []);
 
   useEffect(() => {
     api<HealthCheck>("/health")
       .then(setHealth)
       .catch(() => {});
-  }, []);
+    loadMLStatus();
+  }, [loadMLStatus]);
 
   async function runOp(name: string, endpoint: string, method = "POST") {
     setOpLoading(name);
@@ -154,6 +185,144 @@ export default function SettingsPage() {
               {op.name}
             </Button>
           ))}
+        </div>
+      </GlassCard>
+
+      {/* ML Models */}
+      <GlassCard className="p-6 mb-4">
+        <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+          ML Models
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Signal Classifier */}
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Brain size={16} className="text-violet-500" />
+                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  Signal Classifier
+                </span>
+              </div>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full ${
+                  classifierStatus?.status === "trained"
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : "bg-zinc-500/10 text-zinc-400"
+                }`}
+              >
+                {classifierStatus?.status || "unknown"}
+              </span>
+            </div>
+            {classifierStatus?.status === "trained" && (
+              <div className="text-xs space-y-1 text-zinc-500 dark:text-zinc-400 mb-3">
+                <p>
+                  Samples: {classifierStatus.n_samples} | Vocab:{" "}
+                  {classifierStatus.vocab_size}
+                </p>
+                <p>
+                  Binary F1:{" "}
+                  {((classifierStatus.binary_cv_score || 0) * 100).toFixed(1)}%
+                  | Type Acc:{" "}
+                  {((classifierStatus.type_cv_score || 0) * 100).toFixed(1)}%
+                </p>
+                <p className="font-mono text-[10px]">
+                  Trained:{" "}
+                  {classifierStatus.trained_at
+                    ? new Date(classifierStatus.trained_at).toLocaleString()
+                    : "unknown"}
+                </p>
+              </div>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                setOpLoading("retrain-classifier");
+                try {
+                  await api("/admin/ml/retrain-signal-classifier", "POST");
+                  addToast("Signal classifier retrained", "success");
+                  loadMLStatus();
+                } catch (e) {
+                  addToast(
+                    `Retrain failed: ${e instanceof Error ? e.message : "unknown"}`,
+                    "error",
+                  );
+                } finally {
+                  setOpLoading(null);
+                }
+              }}
+              disabled={!!opLoading}
+              loading={opLoading === "retrain-classifier"}
+            >
+              <Lightning size={14} />
+              Retrain
+            </Button>
+          </div>
+
+          {/* Reranker */}
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Brain size={16} className="text-blue-500" />
+                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  ML Reranker
+                </span>
+              </div>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full ${
+                  rerankerStatus?.status === "trained"
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : "bg-zinc-500/10 text-zinc-400"
+                }`}
+              >
+                {rerankerStatus?.status || "unknown"}
+              </span>
+            </div>
+            {rerankerStatus?.status === "trained" && (
+              <div className="text-xs space-y-1 text-zinc-500 dark:text-zinc-400 mb-3">
+                <p>
+                  Samples: {rerankerStatus.n_samples} | CV Score:{" "}
+                  {((rerankerStatus.cv_score || 0) * 100).toFixed(1)}%
+                </p>
+                <p>
+                  Features: {rerankerStatus.features?.length || 0} |{" "}
+                  {rerankerStatus.class_distribution
+                    ? `Useful: ${rerankerStatus.class_distribution.useful}, Not: ${rerankerStatus.class_distribution.not_useful}`
+                    : ""}
+                </p>
+                <p className="font-mono text-[10px]">
+                  Trained:{" "}
+                  {rerankerStatus.trained_at
+                    ? new Date(rerankerStatus.trained_at).toLocaleString()
+                    : "unknown"}
+                </p>
+              </div>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                setOpLoading("retrain-reranker");
+                try {
+                  await api("/admin/ml/retrain-ranker", "POST");
+                  addToast("Reranker retrained", "success");
+                  loadMLStatus();
+                } catch (e) {
+                  addToast(
+                    `Retrain failed: ${e instanceof Error ? e.message : "unknown"}`,
+                    "error",
+                  );
+                } finally {
+                  setOpLoading(null);
+                }
+              }}
+              disabled={!!opLoading}
+              loading={opLoading === "retrain-reranker"}
+            >
+              <Lightning size={14} />
+              Retrain
+            </Button>
+          </div>
         </div>
       </GlassCard>
 

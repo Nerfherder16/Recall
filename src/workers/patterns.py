@@ -87,18 +87,20 @@ class PatternExtractor:
         # Build list with embeddings already loaded from scroll
         memories_with_embeddings = []
         for memory_id, payload, embedding in results:
-            memories_with_embeddings.append({
-                "id": memory_id,
-                "content": payload.get("content", ""),
-                "embedding": embedding,
-                "domain": payload.get("domain", "general"),
-                "tags": payload.get("tags", []),
-            })
+            memories_with_embeddings.append(
+                {
+                    "id": memory_id,
+                    "content": payload.get("content", ""),
+                    "embedding": embedding,
+                    "domain": payload.get("domain", "general"),
+                    "tags": payload.get("tags", []),
+                }
+            )
 
         # Cluster by similarity
         clusters = self._cluster_by_similarity(
             memories_with_embeddings,
-            threshold=0.8,
+            threshold=0.65,
             min_size=min_occurrences,
         )
 
@@ -232,7 +234,9 @@ class PatternExtractor:
             tags=common_tags + ["extracted_pattern"],
             importance=0.7,  # Start with moderate importance
             stability=0.5,  # Patterns are moderately stable
-            confidence=min(1.0, len(cluster) / 10),  # More occurrences = more confidence, capped at 1.0
+            confidence=min(
+                1.0, len(cluster) / 10
+            ),  # More occurrences = more confidence, capped at 1.0
             parent_ids=[m["id"] for m in cluster],
         )
 
@@ -276,7 +280,7 @@ class PatternExtractor:
         # Try LLM-powered extraction
         try:
             llm = await get_llm()
-            numbered = "\n".join(f"{i+1}. {c}" for i, c in enumerate(contents))
+            numbered = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(contents))
             prompt = (
                 "These episodic memories describe similar events that happened multiple times. "
                 "Extract the recurring pattern as a single, general statement. "
@@ -287,7 +291,11 @@ class PatternExtractor:
             pattern = await llm.generate(prompt, temperature=0.1)
             pattern = pattern.strip()
             if pattern and len(pattern) > 10:
-                logger.debug("llm_pattern_extraction_success", episodes=len(contents), result_len=len(pattern))
+                logger.debug(
+                    "llm_pattern_extraction_success",
+                    episodes=len(contents),
+                    result_len=len(pattern),
+                )
                 return pattern
         except (LLMError, Exception) as e:
             logger.warning("llm_pattern_extraction_failed_using_fallback", error=str(e))

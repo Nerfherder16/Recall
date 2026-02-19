@@ -168,6 +168,7 @@ class ContextRequest(BaseModel):
     session_id: str | None = None
     current_file: str | None = None
     current_task: str | None = None
+    domain: str | None = None
     max_tokens: int = 2000
     include_working_memory: bool = True
 
@@ -596,6 +597,7 @@ async def assemble_context(request: Request, body: ContextRequest):
                 session_id=body.session_id,
                 current_file=body.current_file,
                 current_task=body.current_task,
+                domains=[body.domain] if body.domain else None,
                 limit=10,
             )
 
