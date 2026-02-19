@@ -911,3 +911,82 @@ async def signal_classifier_status(request: Request):
     except Exception as e:
         logger.error("signal_classifier_status_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================
+# STALE MEMORY MANAGEMENT (Git Invalidation)
+# =============================================================
+
+
+@router.get("/stale")
+@limiter.limit("30/minute")
+async def list_stale_memories(request: Request):
+    """List memories flagged as potentially invalidated by git commits."""
+    try:
+        from qdrant_client.models import Filter, IsNullCondition, PayloadField
+
+        from src.storage import get_qdrant_store
+
+        qdrant = await get_qdrant_store()
+
+        # Scroll for memories where invalidation_flag is NOT null
+        points, _ = await qdrant.client.scroll(
+            collection_name=qdrant.collection,
+            scroll_filter=Filter(
+                must_not=[IsNullCondition(is_null=PayloadField(key="invalidation_flag"))]
+            ),
+            limit=100,
+            with_payload=True,
+        )
+
+        stale = []
+        for point in points:
+            p = point.payload or {}
+            flag = p.get("invalidation_flag")
+            if flag:
+                stale.append(
+                    {
+                        "id": str(point.id),
+                        "content": p.get("content", "")[:120],
+                        "domain": p.get("domain", "general"),
+                        "durability": p.get("durability"),
+                        "invalidation_flag": flag,
+                    }
+                )
+
+        return {"stale_memories": stale, "total": len(stale)}
+
+    except Exception as e:
+        logger.error("list_stale_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/stale/{memory_id}/resolve")
+@limiter.limit("30/minute")
+async def resolve_stale_memory(request: Request, memory_id: str):
+    """Clear the invalidation flag on a memory (mark as reviewed/still-valid)."""
+    try:
+        from src.storage import get_postgres_store, get_qdrant_store
+
+        qdrant = await get_qdrant_store()
+
+        await qdrant.client.set_payload(
+            collection_name=qdrant.collection,
+            payload={"invalidation_flag": None},
+            points=[memory_id],
+        )
+
+        postgres = await get_postgres_store()
+        await postgres.log_audit(
+            action="memory_invalidation_resolved",
+            memory_id=memory_id,
+            actor="admin",
+            details={"resolved_by": "admin"},
+        )
+
+        logger.info("stale_memory_resolved", memory_id=memory_id)
+        return {"status": "resolved", "memory_id": memory_id}
+
+    except Exception as e:
+        logger.error("resolve_stale_error", error=str(e), memory_id=memory_id)
+        raise HTTPException(status_code=500, detail="Internal server error")

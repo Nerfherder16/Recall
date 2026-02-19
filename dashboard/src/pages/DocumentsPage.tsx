@@ -16,10 +16,13 @@ import type {
   DocumentDetail,
   IngestResponse,
 } from "../api/types";
-import { useToast } from "../hooks/useToast";
+import { useToastContext } from "../context/ToastContext";
 import PageHeader from "../components/PageHeader";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { GlassCard } from "../components/common/GlassCard";
+import { Button } from "../components/common/Button";
+import { Input, Select } from "../components/common/Input";
 
 const FILE_TYPE_ICONS: Record<string, typeof FilePdf> = {
   pdf: FilePdf,
@@ -30,13 +33,13 @@ const FILE_TYPE_ICONS: Record<string, typeof FilePdf> = {
 function DurabilityBadge({ durability }: { durability: string | null }) {
   if (durability === "permanent")
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
         <Lock size={10} /> Permanent
       </span>
     );
   if (durability === "durable")
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400">
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20">
         <ShieldCheck size={10} /> Durable
       </span>
     );
@@ -53,7 +56,7 @@ export default function DocumentsPage() {
   const [uploadDomain, setUploadDomain] = useState("general");
   const [uploadDurability, setUploadDurability] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const { addToast } = useToast();
+  const { addToast } = useToastContext();
 
   const fetchDocs = useCallback(async () => {
     try {
@@ -153,61 +156,60 @@ export default function DocumentsPage() {
       />
 
       {/* Upload bar */}
-      <div className="flex flex-wrap items-end gap-3 mb-6 p-4 rounded-xl border border-base-content/5 bg-base-200/30">
-        <div className="flex-1 min-w-[200px]">
-          <label className="text-xs text-base-content/50 mb-1 block">
-            File
-          </label>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,.md,.markdown,.txt,.text,.log,.csv,.json,.yaml,.yml"
-            className="file-input file-input-bordered file-input-sm w-full"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-base-content/50 mb-1 block">
-            Domain
-          </label>
-          <input
-            value={uploadDomain}
-            onChange={(e) => setUploadDomain(e.target.value)}
-            className="input input-bordered input-sm w-32"
-            placeholder="general"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-base-content/50 mb-1 block">
-            Durability
-          </label>
-          <select
-            value={uploadDurability}
-            onChange={(e) => setUploadDurability(e.target.value)}
-            className="select select-bordered select-sm w-36"
+      <GlassCard className="p-4 mb-6">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500 mb-1">
+              File
+            </label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.md,.markdown,.txt,.text,.log,.csv,.json,.yaml,.yml"
+              className="w-full rounded-xl border border-zinc-200 dark:border-white/[0.06] bg-zinc-100 dark:bg-zinc-900/80 px-3 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 file:mr-3 file:rounded-lg file:border-0 file:bg-violet-600 file:px-3 file:py-1 file:text-xs file:font-medium file:text-white hover:file:bg-violet-500 file:cursor-pointer focus:border-violet-500/50 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+            />
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500 mb-1">
+              Domain
+            </label>
+            <Input
+              value={uploadDomain}
+              onChange={(e) => setUploadDomain(e.target.value)}
+              containerClass="w-32"
+              placeholder="general"
+            />
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500 mb-1">
+              Durability
+            </label>
+            <Select
+              value={uploadDurability}
+              onChange={(e) => setUploadDurability(e.target.value)}
+              containerClass="w-36"
+            >
+              <option value="">Auto</option>
+              <option value="ephemeral">Ephemeral</option>
+              <option value="durable">Durable</option>
+              <option value="permanent">Permanent</option>
+            </Select>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleUpload}
+            disabled={uploading}
+            loading={uploading}
           >
-            <option value="">Auto</option>
-            <option value="ephemeral">Ephemeral</option>
-            <option value="durable">Durable</option>
-            <option value="permanent">Permanent</option>
-          </select>
+            {!uploading && <UploadSimple size={14} />}
+            {uploading ? "Ingesting..." : "Upload"}
+          </Button>
         </div>
-        <button
-          className="btn btn-primary btn-sm gap-1"
-          onClick={handleUpload}
-          disabled={uploading}
-        >
-          {uploading ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <UploadSimple size={14} />
-          )}
-          {uploading ? "Ingesting..." : "Upload"}
-        </button>
-      </div>
+      </GlassCard>
 
       {/* Document cards */}
       {docs.length === 0 ? (
-        <p className="text-sm text-base-content/40 text-center py-12">
+        <p className="text-sm text-zinc-400 dark:text-zinc-500 text-center py-12">
           No documents ingested yet. Upload a file above.
         </p>
       ) : (
@@ -216,27 +218,26 @@ export default function DocumentsPage() {
             const IconComp = FILE_TYPE_ICONS[doc.file_type] || FileText;
             const isExpanded = expandedId === doc.id;
             return (
-              <div
+              <GlassCard
                 key={doc.id}
-                className={`rounded-xl border border-base-content/5 bg-base-200/30 p-4 transition-all cursor-pointer hover:border-base-content/10 ${
-                  isExpanded ? "col-span-full" : ""
-                }`}
+                hover
+                className={`p-4 cursor-pointer ${isExpanded ? "col-span-full" : ""}`}
                 onClick={() => handleExpand(doc.id)}
               >
                 <div className="flex items-start gap-3">
                   <IconComp
                     size={28}
-                    className="text-primary shrink-0 mt-0.5"
+                    className="text-violet-600 dark:text-violet-400 shrink-0 mt-0.5"
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium truncate">
+                    <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
                       {doc.filename}
                     </h3>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-1 ring-violet-500/20">
                         {doc.domain}
                       </span>
-                      <span className="text-[10px] text-base-content/40">
+                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
                         {doc.memory_count} memories
                       </span>
                       <DurabilityBadge durability={doc.durability} />
@@ -246,7 +247,7 @@ export default function DocumentsPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-base-content/30 mt-1">
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-600 mt-1">
                       {new Date(doc.created_at).toLocaleDateString()}
                     </p>
                   </div>
@@ -254,8 +255,9 @@ export default function DocumentsPage() {
                     className="flex gap-1 shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button
-                      className="btn btn-ghost btn-xs"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handlePin(doc)}
                       title={doc.pinned ? "Unpin" : "Pin"}
                     >
@@ -264,41 +266,43 @@ export default function DocumentsPage() {
                       ) : (
                         <PushPin size={14} />
                       )}
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-xs text-error"
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 dark:text-red-400 hover:bg-red-500/10"
                       onClick={() => setDeleteTarget(doc)}
                       title="Delete"
                     >
                       <Trash size={14} />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 {/* Expanded detail */}
                 {isExpanded && detail && detail.id === doc.id && (
-                  <div className="mt-4 border-t border-base-content/5 pt-3">
-                    <p className="text-xs text-base-content/50 mb-2">
+                  <div className="mt-4 border-t border-zinc-200 dark:border-white/[0.06] pt-3">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                       {detail.child_memory_ids.length} child memories
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {detail.child_memory_ids.slice(0, 20).map((cid) => (
                         <span
                           key={cid}
-                          className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-base-300 text-base-content/40"
+                          className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
                         >
                           {cid.slice(0, 8)}...
                         </span>
                       ))}
                       {detail.child_memory_ids.length > 20 && (
-                        <span className="text-[9px] text-base-content/30">
+                        <span className="text-[9px] text-zinc-400 dark:text-zinc-500">
                           +{detail.child_memory_ids.length - 20} more
                         </span>
                       )}
                     </div>
                   </div>
                 )}
-              </div>
+              </GlassCard>
             );
           })}
         </div>
@@ -313,7 +317,6 @@ export default function DocumentsPage() {
             : ""
         }
         confirmLabel="Delete"
-        confirmClass="btn-error"
         onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
         onCancel={() => setDeleteTarget(null)}
       />

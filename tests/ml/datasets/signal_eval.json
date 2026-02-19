@@ -1,0 +1,344 @@
+[
+  {
+    "id": "sig-01",
+    "turns": [
+      {"role": "user", "content": "I'm getting a ConnectionRefusedError when trying to connect to Redis on port 6379"},
+      {"role": "assistant", "content": "That error means Redis isn't running or is bound to a different interface. Let me check."},
+      {"role": "user", "content": "It was bound to 127.0.0.1 instead of 0.0.0.0 in the config"},
+      {"role": "assistant", "content": "Fixed it by changing bind to 0.0.0.0 in redis.conf and restarting the service."}
+    ],
+    "expected_signal": true,
+    "expected_type": "error_fix"
+  },
+  {
+    "id": "sig-02",
+    "turns": [
+      {"role": "user", "content": "Should we use PostgreSQL or MongoDB for the session store?"},
+      {"role": "assistant", "content": "PostgreSQL is better here — sessions are relational with user foreign keys."},
+      {"role": "user", "content": "Good point. Let's go with PostgreSQL and use asyncpg for the driver."},
+      {"role": "assistant", "content": "Agreed. I'll set up the connection pool with asyncpg."}
+    ],
+    "expected_signal": true,
+    "expected_type": "decision"
+  },
+  {
+    "id": "sig-03",
+    "turns": [
+      {"role": "user", "content": "Every time I deploy, I forget to run the database migrations first"},
+      {"role": "assistant", "content": "That's a common issue. We should add a pre-deploy hook."},
+      {"role": "user", "content": "Yeah, let's add it to the CI pipeline as a mandatory step before the container starts"},
+      {"role": "assistant", "content": "I'll add an init container that runs alembic upgrade head before the main app starts."}
+    ],
+    "expected_signal": true,
+    "expected_type": "workflow"
+  },
+  {
+    "id": "sig-04",
+    "turns": [
+      {"role": "user", "content": "The Ollama server is at 192.168.50.62 on port 11434"},
+      {"role": "assistant", "content": "Got it. I'll configure the OLLAMA_HOST environment variable to point there."},
+      {"role": "user", "content": "It's running qwen3:14b as the primary model"},
+      {"role": "assistant", "content": "Noted. The embedding model is qwen3-embedding:0.6b on the same host."}
+    ],
+    "expected_signal": true,
+    "expected_type": "fact"
+  },
+  {
+    "id": "sig-05",
+    "turns": [
+      {"role": "user", "content": "I always prefer snake_case for Python and camelCase for TypeScript"},
+      {"role": "assistant", "content": "That follows standard conventions for both languages."},
+      {"role": "user", "content": "And for React components, PascalCase for both files and exports"},
+      {"role": "assistant", "content": "Got it. Named exports only, no default exports."}
+    ],
+    "expected_signal": true,
+    "expected_type": "preference"
+  },
+  {
+    "id": "sig-06",
+    "turns": [
+      {"role": "user", "content": "I've noticed that every time we add a new Qdrant collection, we forget to add the scroll_all pattern"},
+      {"role": "assistant", "content": "That's happened three times now — decay, consolidation, and patterns all had biased search."},
+      {"role": "user", "content": "We should document this as a recurring pattern to watch for"},
+      {"role": "assistant", "content": "Agreed. The fix is always to use scroll_all() with offset pagination instead of semantic search."}
+    ],
+    "expected_signal": true,
+    "expected_type": "pattern"
+  },
+  {
+    "id": "sig-07",
+    "turns": [
+      {"role": "user", "content": "Never use f-strings in Cypher queries — always use parameter substitution"},
+      {"role": "assistant", "content": "Right, f-strings in Cypher are a SQL injection equivalent for graph databases."},
+      {"role": "user", "content": "We've hit this bug twice already with find_path and find_related"},
+      {"role": "assistant", "content": "I'll add it to the anti-patterns collection as a warning."}
+    ],
+    "expected_signal": true,
+    "expected_type": "warning"
+  },
+  {
+    "id": "sig-08",
+    "turns": [
+      {"role": "user", "content": "Hey"},
+      {"role": "assistant", "content": "Hello! How can I help you today?"},
+      {"role": "user", "content": "Just checking in"},
+      {"role": "assistant", "content": "All good here. Let me know if you need anything."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-09",
+    "turns": [
+      {"role": "user", "content": "Can you read src/core/models.py?"},
+      {"role": "assistant", "content": "Sure, let me read that file for you."},
+      {"role": "user", "content": "Thanks, now read src/core/retrieval.py"},
+      {"role": "assistant", "content": "Here's the content of retrieval.py..."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-10",
+    "turns": [
+      {"role": "user", "content": "What's the weather like?"},
+      {"role": "assistant", "content": "I don't have access to weather data, but I can help with coding tasks."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-11",
+    "turns": [
+      {"role": "user", "content": "The Docker container keeps OOM killing at 512MB"},
+      {"role": "assistant", "content": "Qdrant and Neo4j are memory-hungry. Let me check the compose limits."},
+      {"role": "user", "content": "I bumped it to 2GB and it's stable now"},
+      {"role": "assistant", "content": "Good. I'll update the docker-compose to set mem_limit: 2g as the baseline."}
+    ],
+    "expected_signal": true,
+    "expected_type": "error_fix"
+  },
+  {
+    "id": "sig-12",
+    "turns": [
+      {"role": "user", "content": "Let's use structlog instead of the built-in logging module"},
+      {"role": "assistant", "content": "Structlog gives us structured JSON logs which are much better for parsing."},
+      {"role": "user", "content": "And it integrates well with FastAPI's request context"},
+      {"role": "assistant", "content": "I'll configure it with a JSON renderer and bind the request ID automatically."}
+    ],
+    "expected_signal": true,
+    "expected_type": "decision"
+  },
+  {
+    "id": "sig-13",
+    "turns": [
+      {"role": "user", "content": "The deploy process is: SCP files, then docker compose restart api worker"},
+      {"role": "assistant", "content": "Since the src directory is volume-mounted, a restart picks up changes without rebuilding."},
+      {"role": "user", "content": "For port binding changes though, we need down then up"},
+      {"role": "assistant", "content": "Right — docker compose down && docker compose up -d for port changes."}
+    ],
+    "expected_signal": true,
+    "expected_type": "workflow"
+  },
+  {
+    "id": "sig-14",
+    "turns": [
+      {"role": "user", "content": "The CasaOS server is at 192.168.50.19, SSH user is nerfherder"},
+      {"role": "assistant", "content": "I'll use that for SCP deployments. Public key auth is configured."},
+      {"role": "user", "content": "Home Assistant is at 192.168.50.20 and OPNsense at 192.168.50.1"},
+      {"role": "assistant", "content": "Got it — those are the other key hosts on the network."}
+    ],
+    "expected_signal": true,
+    "expected_type": "fact"
+  },
+  {
+    "id": "sig-15",
+    "turns": [
+      {"role": "user", "content": "I always want dark mode as the default for dashboards"},
+      {"role": "assistant", "content": "Makes sense for an AI dashboard aesthetic."},
+      {"role": "user", "content": "And glassmorphism cards with backdrop-blur"},
+      {"role": "assistant", "content": "I'll use the bg-gray-800/40 backdrop-blur-xl pattern."}
+    ],
+    "expected_signal": true,
+    "expected_type": "preference"
+  },
+  {
+    "id": "sig-16",
+    "turns": [
+      {"role": "user", "content": "ls"},
+      {"role": "assistant", "content": "Here are the files in the current directory..."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-17",
+    "turns": [
+      {"role": "user", "content": "Run the tests"},
+      {"role": "assistant", "content": "Running pytest tests/integration/ -v..."},
+      {"role": "user", "content": "All passing, great"},
+      {"role": "assistant", "content": "207 tests passed with 0 failures."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-18",
+    "turns": [
+      {"role": "user", "content": "The slowapi limiter requires the parameter to be named 'request: Request'"},
+      {"role": "assistant", "content": "That's a known gotcha — it inspects the function signature by name."},
+      {"role": "user", "content": "We've hit this three times now in search, ingest, and admin routes"},
+      {"role": "assistant", "content": "This is definitely a pattern to document as a recurring bug."}
+    ],
+    "expected_signal": true,
+    "expected_type": "pattern"
+  },
+  {
+    "id": "sig-19",
+    "turns": [
+      {"role": "user", "content": "Never use pickle with untrusted data in the memory system"},
+      {"role": "assistant", "content": "Absolutely — pickle deserialization is a remote code execution vector."},
+      {"role": "user", "content": "Use JSON serialization exclusively for all storage"},
+      {"role": "assistant", "content": "Agreed. Pydantic model_dump_json() for structured data, json.dumps() for dicts."}
+    ],
+    "expected_signal": true,
+    "expected_type": "warning"
+  },
+  {
+    "id": "sig-20",
+    "turns": [
+      {"role": "user", "content": "Fix the typo on line 42"},
+      {"role": "assistant", "content": "Fixed — changed 'recieve' to 'receive'."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-21",
+    "turns": [
+      {"role": "user", "content": "When Ollama returns empty JSON with think mode enabled, we need to pass think: false"},
+      {"role": "assistant", "content": "The qwen3 model with format: json and think mode produces empty {} responses."},
+      {"role": "user", "content": "Fixed by setting think: false in the API params, not the /no_think prefix"},
+      {"role": "assistant", "content": "That's the correct approach — the prefix method doesn't work with qwen3."}
+    ],
+    "expected_signal": true,
+    "expected_type": "error_fix"
+  },
+  {
+    "id": "sig-22",
+    "turns": [
+      {"role": "user", "content": "For the signal pipeline, we decided to use background ARQ workers instead of inline processing"},
+      {"role": "assistant", "content": "That decouples the API response time from LLM inference latency."},
+      {"role": "user", "content": "Each session end triggers signal detection, which queues an ARQ job"},
+      {"role": "assistant", "content": "The worker picks it up, runs LLM analysis, and stores any detected signals."}
+    ],
+    "expected_signal": true,
+    "expected_type": "decision"
+  },
+  {
+    "id": "sig-23",
+    "turns": [
+      {"role": "user", "content": "Good morning"},
+      {"role": "assistant", "content": "Good morning! What are we working on today?"},
+      {"role": "user", "content": "Nothing yet, just starting up"},
+      {"role": "assistant", "content": "Take your time. I'm here when you're ready."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-24",
+    "turns": [
+      {"role": "user", "content": "The consolidation worker should run at :00, decay at :15 and :45, metrics at :30"},
+      {"role": "assistant", "content": "Staggering the cron jobs prevents resource contention on the server."},
+      {"role": "user", "content": "Pattern extraction runs at 3:30am when usage is lowest"},
+      {"role": "assistant", "content": "Smart scheduling. That way the heavy LLM work doesn't compete with user queries."}
+    ],
+    "expected_signal": true,
+    "expected_type": "workflow"
+  },
+  {
+    "id": "sig-25",
+    "turns": [
+      {"role": "user", "content": "The RTX 3090 has 24GB VRAM, enough for qwen3:14b"},
+      {"role": "assistant", "content": "That model uses about 8-10GB VRAM, leaving headroom for concurrent requests."},
+      {"role": "user", "content": "The embedding model qwen3-embedding:0.6b barely uses any VRAM"},
+      {"role": "assistant", "content": "Right, it's tiny. Both can run simultaneously without issues."}
+    ],
+    "expected_signal": true,
+    "expected_type": "fact"
+  },
+  {
+    "id": "sig-26",
+    "turns": [
+      {"role": "user", "content": "Please add a comment to the function"},
+      {"role": "assistant", "content": "Added a docstring explaining the function's purpose and parameters."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-27",
+    "turns": [
+      {"role": "user", "content": "We keep hitting issues where background tasks saturate the Ollama server"},
+      {"role": "assistant", "content": "The fact extraction and signal detection both call Ollama concurrently."},
+      {"role": "user", "content": "The fix is to use asyncio.Semaphore(1) with a 2-second delay before acquiring"},
+      {"role": "assistant", "content": "That serializes LLM calls and prevents Ollama from being overwhelmed."}
+    ],
+    "expected_signal": true,
+    "expected_type": "pattern"
+  },
+  {
+    "id": "sig-28",
+    "turns": [
+      {"role": "user", "content": "Don't use docker-compose (with hyphen), always use docker compose (space)"},
+      {"role": "assistant", "content": "The hyphenated version is the legacy Python-based tool."},
+      {"role": "user", "content": "CasaOS uses the newer Go-based plugin which is docker compose"},
+      {"role": "assistant", "content": "I'll make sure to use the space version consistently."}
+    ],
+    "expected_signal": true,
+    "expected_type": "preference"
+  },
+  {
+    "id": "sig-29",
+    "turns": [
+      {"role": "user", "content": "Never commit .env files or API keys to the repository"},
+      {"role": "assistant", "content": "Those should always be in .gitignore and managed via environment variables."},
+      {"role": "user", "content": "The RECALL_API_KEY and database credentials are especially sensitive"},
+      {"role": "assistant", "content": "I'll verify .gitignore covers .env and any credential files."}
+    ],
+    "expected_signal": true,
+    "expected_type": "warning"
+  },
+  {
+    "id": "sig-30",
+    "turns": [
+      {"role": "user", "content": "What does this function do?"},
+      {"role": "assistant", "content": "It calculates the decay rate based on memory durability and time since last access."},
+      {"role": "user", "content": "OK thanks"},
+      {"role": "assistant", "content": "You're welcome. Let me know if you have more questions."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  },
+  {
+    "id": "sig-31",
+    "turns": [
+      {"role": "user", "content": "The CORS middleware should allow all origins in dev but restrict in production"},
+      {"role": "assistant", "content": "I'll use RECALL_CORS_ORIGINS env var with a default of * for development."},
+      {"role": "user", "content": "In production, restrict to the dashboard URL only"},
+      {"role": "assistant", "content": "That prevents cross-origin attacks while keeping dev flexible."}
+    ],
+    "expected_signal": true,
+    "expected_type": "decision"
+  },
+  {
+    "id": "sig-32",
+    "turns": [
+      {"role": "user", "content": "git status"},
+      {"role": "assistant", "content": "On branch main, nothing to commit, working tree clean."}
+    ],
+    "expected_signal": false,
+    "expected_type": null
+  }
+]

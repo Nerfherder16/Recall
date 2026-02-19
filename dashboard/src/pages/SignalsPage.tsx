@@ -7,6 +7,9 @@ import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useToastContext } from "../context/ToastContext";
+import { GlassCard } from "../components/common/GlassCard";
+import { Button } from "../components/common/Button";
+import { Select } from "../components/common/Input";
 
 interface Signal {
   signal_type: string;
@@ -23,14 +26,12 @@ export default function SignalsPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Load recent sessions for dropdown
   useEffect(() => {
     api<{ sessions: SessionEntry[] }>("/admin/sessions")
       .then((d) => setSessions(d.sessions || []))
       .catch(() => {});
   }, []);
 
-  // Auto-load signals when session changes
   useEffect(() => {
     if (!sessionId) {
       setSignals([]);
@@ -73,8 +74,8 @@ export default function SignalsPage() {
       />
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <select
-          className="flex-1 min-w-48 rounded-lg border border-base-content/10 bg-base-200 px-3 py-2 text-sm focus:border-primary/50 focus:outline-none"
+        <Select
+          containerClass="flex-1 min-w-48"
           value={sessionId}
           onChange={(e) => setSessionId(e.target.value)}
         >
@@ -86,15 +87,12 @@ export default function SignalsPage() {
               {!s.ended_at ? "(active)" : ""}
             </option>
           ))}
-        </select>
+        </Select>
         {signals.length > 0 && (
-          <button
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-content hover:bg-accent/90 transition-colors"
-            onClick={approveAll}
-          >
+          <Button onClick={approveAll}>
             <Check size={16} weight="bold" />
             Approve All ({signals.length})
-          </button>
+          </Button>
         )}
       </div>
 
@@ -110,32 +108,33 @@ export default function SignalsPage() {
 
       <div className="flex flex-col gap-2">
         {signals.map((s, i) => (
-          <div
-            key={i}
-            className="rounded-xl bg-base-100 border border-base-content/5 p-4 hover:border-base-content/10 transition-colors"
-          >
+          <GlassCard key={i} hover className="p-4">
             <div className="flex gap-2 items-center mb-1">
               <Badge text={s.signal_type} />
-              <span className="text-xs text-base-content/40">{s.domain}</span>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                {s.domain}
+              </span>
               <div className="flex-1" />
-              <span className="text-xs text-base-content/40 tabular-nums">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500 tabular-nums">
                 Confidence: {(s.confidence * 100).toFixed(0)}%
               </span>
             </div>
-            <p className="text-sm">{s.content}</p>
+            <p className="text-sm text-zinc-900 dark:text-zinc-100">
+              {s.content}
+            </p>
             {s.tags.length > 0 && (
               <div className="flex gap-1 mt-1">
                 {s.tags.map((t) => (
                   <span
                     key={t}
-                    className="inline-flex items-center rounded-md bg-zinc-500/10 text-zinc-400 px-1.5 py-0.5 text-[10px] font-medium"
+                    className="inline-flex items-center rounded-full bg-zinc-500/10 text-zinc-400 px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-zinc-500/20"
                   >
                     {t}
                   </span>
                 ))}
               </div>
             )}
-          </div>
+          </GlassCard>
         ))}
       </div>
     </div>

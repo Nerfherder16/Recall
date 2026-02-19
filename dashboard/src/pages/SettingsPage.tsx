@@ -14,6 +14,9 @@ import { useThemeContext } from "../context/ThemeContext";
 import { useToastContext } from "../context/ToastContext";
 import PageHeader from "../components/PageHeader";
 import StatCard from "../components/StatCard";
+import { GlassCard } from "../components/common/GlassCard";
+import { Button } from "../components/common/Button";
+import { Input } from "../components/common/Input";
 
 export default function SettingsPage() {
   const { apiKey, setApiKey } = useAuth();
@@ -74,27 +77,28 @@ export default function SettingsPage() {
       <PageHeader title="Settings" subtitle="Configuration and maintenance" />
 
       {/* API Key */}
-      <div className="rounded-xl bg-base-100 border border-base-content/5 p-5 mb-4">
-        <h3 className="text-sm font-medium mb-3">API Key</h3>
+      <GlassCard className="p-6 mb-4">
+        <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+          API Key
+        </h3>
         <div className="flex gap-2">
-          <input
-            className="flex-1 rounded-lg border border-base-content/10 bg-base-200 px-3 py-2 text-sm focus:border-primary/50 focus:outline-none"
+          <Input
             type="password"
             value={keyInput}
             onChange={(e) => setKeyInput(e.target.value)}
             placeholder="API Key"
+            containerClass="flex-1"
           />
-          <button
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-content hover:bg-primary/90 transition-colors"
+          <Button
             onClick={() => {
               setApiKey(keyInput || "none");
               addToast("API key saved", "success");
             }}
           >
             Save
-          </button>
-          <button
-            className="rounded-lg px-4 py-2 text-sm hover:bg-base-content/5 transition-colors"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => {
               setApiKey("");
               setKeyInput("");
@@ -102,20 +106,21 @@ export default function SettingsPage() {
             }}
           >
             Clear
-          </button>
+          </Button>
         </div>
-      </div>
+      </GlassCard>
 
       {/* Theme */}
-      <div className="rounded-xl bg-base-100 border border-base-content/5 p-5 mb-4">
-        <h3 className="text-sm font-medium mb-3">Appearance</h3>
+      <GlassCard className="p-6 mb-4">
+        <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+          Appearance
+        </h3>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-base-content/60">Theme:</span>
-          <button
-            className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-base-content/5 transition-colors"
-            onClick={toggleTheme}
-          >
-            {theme === "recall-dark" ? (
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            Theme:
+          </span>
+          <Button variant="ghost" size="sm" onClick={toggleTheme}>
+            {theme === "dark" ? (
               <>
                 <Sun size={16} />
                 Switch to Light
@@ -126,36 +131,38 @@ export default function SettingsPage() {
                 Switch to Dark
               </>
             )}
-          </button>
+          </Button>
         </div>
-      </div>
+      </GlassCard>
 
       {/* Maintenance */}
-      <div className="rounded-xl bg-base-100 border border-base-content/5 p-5 mb-4">
-        <h3 className="text-sm font-medium mb-3">Maintenance Operations</h3>
+      <GlassCard className="p-6 mb-4">
+        <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+          Maintenance Operations
+        </h3>
         <div className="flex flex-wrap gap-2">
           {opButtons.map((op) => (
-            <button
+            <Button
               key={op.name}
-              className="flex items-center gap-1.5 rounded-lg border border-base-content/10 px-3 py-1.5 text-sm hover:bg-base-content/5 transition-colors disabled:opacity-50"
+              variant="secondary"
+              size="sm"
               onClick={() => runOp(op.name, op.endpoint, op.method || "POST")}
               disabled={!!opLoading}
+              loading={opLoading === op.name}
             >
-              {opLoading === op.name ? (
-                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-base-content/10 border-t-primary" />
-              ) : (
-                op.icon
-              )}
+              {opLoading !== op.name && op.icon}
               {op.name}
-            </button>
+            </Button>
           ))}
         </div>
-      </div>
+      </GlassCard>
 
       {/* Connection Status */}
       {health && (
-        <div className="rounded-xl bg-base-100 border border-base-content/5 p-5 mb-4">
-          <h3 className="text-sm font-medium mb-3">Connection Status</h3>
+        <GlassCard className="p-6 mb-4">
+          <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+            Connection Status
+          </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {Object.entries(health.checks).map(([name, val]) => (
               <StatCard
@@ -167,27 +174,35 @@ export default function SettingsPage() {
               />
             ))}
           </div>
-        </div>
+        </GlassCard>
       )}
 
       {/* System Info */}
-      <div className="rounded-xl bg-base-100 border border-base-content/5 p-5">
-        <h3 className="text-sm font-medium mb-3">System Info</h3>
+      <GlassCard className="p-6">
+        <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+          System Info
+        </h3>
         <div className="text-sm space-y-1.5">
           <p>
-            <span className="text-base-content/40">Status:</span>{" "}
-            {health?.status || "unknown"}
+            <span className="text-zinc-400 dark:text-zinc-500">Status:</span>{" "}
+            <span className="text-zinc-700 dark:text-zinc-300">
+              {health?.status || "unknown"}
+            </span>
           </p>
           <p>
-            <span className="text-base-content/40">Timestamp:</span>{" "}
-            {health?.timestamp || "unknown"}
+            <span className="text-zinc-400 dark:text-zinc-500">Timestamp:</span>{" "}
+            <span className="font-mono text-zinc-700 dark:text-zinc-300">
+              {health?.timestamp || "unknown"}
+            </span>
           </p>
           <p>
-            <span className="text-base-content/40">Dashboard:</span> Recall
-            v0.3.0 (Phase 14)
+            <span className="text-zinc-400 dark:text-zinc-500">Dashboard:</span>{" "}
+            <span className="text-zinc-700 dark:text-zinc-300">
+              Recall v0.3.0
+            </span>
           </p>
         </div>
-      </div>
+      </GlassCard>
     </div>
   );
 }

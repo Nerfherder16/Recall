@@ -301,6 +301,46 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "recall_rehydrate",
+        description:
+          "Reconstruct temporal context from a time window. Assembles a chronological briefing from memories in a date range, optionally with LLM narrative summary and anti-patterns. Use for 'what happened last week in infra?' type queries.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            domain: {
+              type: "string",
+              description:
+                "Optional domain filter (e.g., 'infrastructure', 'development')",
+            },
+            since: {
+              type: "string",
+              description:
+                "Start of time window (ISO 8601). Defaults to 24 hours ago.",
+            },
+            until: {
+              type: "string",
+              description: "End of time window (ISO 8601). Defaults to now.",
+            },
+            include_narrative: {
+              type: "boolean",
+              description:
+                "Include LLM-generated narrative summary (default false)",
+            },
+            include_anti_patterns: {
+              type: "boolean",
+              description:
+                "Include anti-pattern warnings from the time window (default false)",
+            },
+            max_entries: {
+              type: "integer",
+              minimum: 1,
+              maximum: 200,
+              description: "Maximum entries to return (default 50)",
+            },
+          },
+        },
+      },
+      {
         name: "recall_session_start",
         description:
           "Start a new Recall session. Call this at the beginning of a conversation or work session. Returns a session ID for use with recall_ingest and recall_session_end.",
@@ -593,6 +633,51 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: `Similar memories:\n\n${formatted}`,
             },
           ],
+        };
+      }
+
+      case "recall_rehydrate": {
+        const body = {};
+        if (args.domain) body.domain = args.domain;
+        if (args.since) body.since = args.since;
+        if (args.until) body.until = args.until;
+        if (args.include_narrative)
+          body.include_narrative = args.include_narrative;
+        if (args.include_anti_patterns)
+          body.include_anti_patterns = args.include_anti_patterns;
+        if (args.max_entries) body.max_entries = args.max_entries;
+
+        const result = await recallAPI("/search/rehydrate", "POST", body);
+
+        if (result.entries.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "No memories found in the specified time window.",
+              },
+            ],
+          };
+        }
+
+        let text = `Context briefing (${result.total} entries, ${result.window_start} → ${result.window_end}):\n\n`;
+
+        if (result.narrative) {
+          text += `## Narrative\n${result.narrative}\n\n## Entries\n`;
+        }
+
+        text += result.entries
+          .map((e) => {
+            const flags = [];
+            if (e.is_anti_pattern) flags.push("⚠️ ANTI-PATTERN");
+            if (e.pinned) flags.push("📌");
+            const prefix = flags.length ? `${flags.join(" ")} ` : "";
+            return `- [${e.created_at}] (${e.memory_type}) ${prefix}${e.summary}`;
+          })
+          .join("\n");
+
+        return {
+          content: [{ type: "text", text }],
         };
       }
 

@@ -8,7 +8,6 @@ StandardScaler into weights, and stores to Redis.
 
 import json
 import math
-import re
 from datetime import datetime
 from typing import Any
 
@@ -17,7 +16,6 @@ import structlog
 from .signal_classifier import (
     CONV_FEATURE_NAMES,
     REDIS_KEY,
-    SIGNAL_TYPES,
     _tokenize,
     extract_conversation_features,
 )
@@ -59,6 +57,53 @@ _TASK_TO_SIGNAL_TYPE: dict[str, str] = {
 }
 
 
+def load_dataset_files() -> tuple[list[list[dict[str, str]]], list[int], list[str]]:
+    """
+    Load labeled conversations from JSON dataset files.
+
+    Reads tests/ml/datasets/generated_corpus.json and any other
+    *_corpus.json files. Each sample needs: turns, is_signal,
+    signal_type.
+
+    Returns (conversations, labels, signal_types).
+    """
+    from pathlib import Path
+
+    conversations: list[list[dict[str, str]]] = []
+    labels: list[int] = []
+    signal_types: list[str] = []
+
+    datasets_dir = Path(__file__).parent.parent.parent / "tests" / "ml" / "datasets"
+    if not datasets_dir.exists():
+        logger.info("dataset_dir_not_found", path=str(datasets_dir))
+        return conversations, labels, signal_types
+
+    for path in sorted(datasets_dir.glob("*_corpus.json")):
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            count = 0
+            for sample in data:
+                turns = sample.get("turns", [])
+                if len(turns) < 2:
+                    continue
+                is_signal = sample.get("is_signal", False)
+                sig_type = sample.get("signal_type", "none")
+                conversations.append(turns)
+                labels.append(1 if is_signal else 0)
+                signal_types.append(sig_type if is_signal else "none")
+                count += 1
+            logger.info(
+                "dataset_loaded",
+                path=path.name,
+                samples=count,
+            )
+        except Exception as e:
+            logger.warning("dataset_load_failed", path=str(path), error=str(e))
+
+    return conversations, labels, signal_types
+
+
 def _infer_signal_type(task_name: str) -> str:
     """Infer signal type from a conversation task name."""
     task_lower = task_name.lower()
@@ -68,9 +113,7 @@ def _infer_signal_type(task_name: str) -> str:
     return "fact"
 
 
-def collect_training_data_from_corpus() -> tuple[
-    list[list[dict[str, str]]], list[int], list[str]
-]:
+def collect_training_data_from_corpus() -> tuple[list[list[dict[str, str]]], list[int], list[str]]:
     """
     Load labeled conversations from test corpus files.
 
@@ -88,10 +131,7 @@ def collect_training_data_from_corpus() -> tuple[
         from tests.simulation.data.conversation_turns import TEST_CONVERSATIONS
 
         for conv in TEST_CONVERSATIONS:
-            turns = [
-                {"role": role, "content": content}
-                for role, content in conv["turns"]
-            ]
+            turns = [{"role": role, "content": content} for role, content in conv["turns"]]
             expected = conv.get("expected_signals", [])
             is_signal = len(expected) > 0
             conversations.append(turns)
@@ -105,10 +145,7 @@ def collect_training_data_from_corpus() -> tuple[
         from tests.simulation.marathon.corpus import CONVERSATIONS
 
         for conv in CONVERSATIONS:
-            turns = [
-                {"role": role, "content": content}
-                for role, content in conv["turns"]
-            ]
+            turns = [{"role": role, "content": content} for role, content in conv["turns"]]
             signal_type = _infer_signal_type(conv.get("task", ""))
             conversations.append(turns)
             labels.append(1)
@@ -142,7 +179,10 @@ def generate_synthetic_negatives(
         ],
         [
             {"role": "user", "content": "Thanks for your help"},
-            {"role": "assistant", "content": "You're welcome! Let me know if you need anything else."},
+            {
+                "role": "assistant",
+                "content": "You're welcome! Let me know if you need anything else.",
+            },
         ],
         # Short status checks
         [
@@ -189,10 +229,12 @@ def generate_synthetic_negatives(
         # Create fake "conversations" from individual memory texts
         for i in range(min(n_samples - len(templates), len(memory_texts))):
             text = memory_texts[i % len(memory_texts)]
-            negatives.append([
-                {"role": "user", "content": text},
-                {"role": "assistant", "content": "Noted."},
-            ])
+            negatives.append(
+                [
+                    {"role": "user", "content": text},
+                    {"role": "assistant", "content": "Noted."},
+                ]
+            )
     except ImportError:
         pass
 
@@ -202,9 +244,7 @@ def generate_synthetic_negatives(
     return negatives[:n_samples]
 
 
-def _build_vocabulary(
-    texts: list[str], max_vocab: int = 500
-) -> tuple[dict[str, int], list[float]]:
+def _build_vocabulary(texts: list[str], max_vocab: int = 500) -> tuple[dict[str, int], list[float]]:
     """
     Build TF-IDF vocabulary and IDF weights from a corpus of texts.
 
@@ -226,10 +266,7 @@ def _build_vocabulary(
     top_terms = sorted_terms[:max_vocab]
 
     vocab_map = {term: i for i, (term, _) in enumerate(top_terms)}
-    idf_weights = [
-        math.log(total_docs / (1 + df))
-        for _, df in top_terms
-    ]
+    idf_weights = [math.log(total_docs / (1 + df)) for _, df in top_terms]
 
     return vocab_map, idf_weights
 
@@ -245,13 +282,19 @@ async def train_signal_classifier(redis_store, pg=None) -> dict[str, Any]:
     Returns metadata dict with training metrics.
     Raises ValueError if insufficient training data.
     """
+    import numpy as np
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import cross_val_score
     from sklearn.preprocessing import StandardScaler
-    import numpy as np
 
-    # Collect labeled data
+    # Collect labeled data from all sources
     conversations, labels, signal_types = collect_training_data_from_corpus()
+
+    # Source 3: JSON dataset files (generated_corpus.json, etc.)
+    ds_convs, ds_labels, ds_types = load_dataset_files()
+    conversations.extend(ds_convs)
+    labels.extend(ds_labels)
+    signal_types.extend(ds_types)
 
     # Generate synthetic negatives
     negatives = generate_synthetic_negatives(40)
@@ -267,28 +310,26 @@ async def train_signal_classifier(redis_store, pg=None) -> dict[str, Any]:
         )
 
     # Build TF-IDF vocabulary from all conversation text
-    all_texts = [
-        " ".join(t.get("content", "") for t in conv)
-        for conv in conversations
-    ]
-    vocab, idf_weights = _build_vocabulary(all_texts, max_vocab=500)
+    max_vocab = 1000 if len(conversations) > 200 else 500
+    all_texts = [" ".join(t.get("content", "") for t in conv) for conv in conversations]
+    vocab, idf_weights = _build_vocabulary(all_texts, max_vocab=max_vocab)
 
     # Build feature matrix
     from .signal_classifier import tfidf_transform
 
-    X_list: list[list[float]] = []
+    feat_rows: list[list[float]] = []
     for i, conv in enumerate(conversations):
         text = all_texts[i]
         tfidf_vec = tfidf_transform(text, vocab, idf_weights)
         conv_features = extract_conversation_features(conv)
-        X_list.append(tfidf_vec + conv_features)
+        feat_rows.append(tfidf_vec + conv_features)
 
-    X = np.array(X_list, dtype=np.float64)
+    features = np.array(feat_rows, dtype=np.float64)
     y_binary = np.array(labels, dtype=np.int32)
 
     # Scale features
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    feat_scaled = scaler.fit_transform(features)
 
     # Train binary classifier
     binary_model = LogisticRegression(
@@ -296,12 +337,16 @@ async def train_signal_classifier(redis_store, pg=None) -> dict[str, Any]:
         max_iter=1000,
         random_state=42,
     )
-    binary_model.fit(X_scaled, y_binary)
+    binary_model.fit(feat_scaled, y_binary)
 
     # Cross-validation for binary
-    n_folds = 5 if len(X_list) >= 50 else 3
+    n_folds = 5 if len(feat_rows) >= 50 else 3
     binary_cv = cross_val_score(
-        binary_model, X_scaled, y_binary, cv=n_folds, scoring="f1"
+        binary_model,
+        feat_scaled,
+        y_binary,
+        cv=n_folds,
+        scoring="f1",
     )
     binary_cv_score = float(binary_cv.mean())
 
@@ -316,7 +361,7 @@ async def train_signal_classifier(redis_store, pg=None) -> dict[str, Any]:
 
     # Train type classifier (one-vs-rest) on positives only
     positive_mask = y_binary == 1
-    X_pos = X_scaled[positive_mask]
+    feat_pos = feat_scaled[positive_mask]
     types_pos = [signal_types[i] for i in range(len(signal_types)) if labels[i] == 1]
 
     type_cv_score = 0.0
@@ -335,13 +380,13 @@ async def train_signal_classifier(redis_store, pg=None) -> dict[str, Any]:
             max_iter=1000,
             random_state=42,
         )
-        type_model.fit(X_pos, y_type)
+        type_model.fit(feat_pos, y_type)
 
         # Cross-validate type classifier
         type_n_folds = min(n_folds, len(set(y_type)))
         if type_n_folds >= 2:
             type_cv = cross_val_score(
-                type_model, X_pos, y_type, cv=type_n_folds, scoring="accuracy"
+                type_model, feat_pos, y_type, cv=type_n_folds, scoring="accuracy"
             )
             type_cv_score = float(type_cv.mean())
 
@@ -379,9 +424,7 @@ async def train_signal_classifier(redis_store, pg=None) -> dict[str, Any]:
             "signal": int(np.sum(y_binary == 1)),
             "no_signal": int(np.sum(y_binary == 0)),
         },
-        "type_distribution": {
-            t: types_pos.count(t) for t in set(types_pos)
-        } if types_pos else {},
+        "type_distribution": {t: types_pos.count(t) for t in set(types_pos)} if types_pos else {},
     }
 
     await redis_store.client.set(REDIS_KEY, json.dumps(payload))

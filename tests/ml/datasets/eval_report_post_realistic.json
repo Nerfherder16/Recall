@@ -1,0 +1,214 @@
+{
+  "corpus_size": 1141,
+  "train_size": 913,
+  "test_size": 228,
+  "split_ratio": 0.2,
+  "train_time_s": 1.9,
+  "held_out": {
+    "ml_binary": {
+      "precision": 0.9474,
+      "recall": 0.973,
+      "f1": 0.96,
+      "accuracy": 0.9605,
+      "tp": 108,
+      "fp": 6,
+      "fn": 3,
+      "tn": 111,
+      "total": 228,
+      "model": "ml_classifier",
+      "avg_latency_ms": 0.348,
+      "p95_latency_ms": 0.86
+    },
+    "ml_per_type": {
+      "contradiction": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 12
+      },
+      "decision": {
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1": 0.8,
+        "support": 10
+      },
+      "error_fix": {
+        "precision": 0.8421,
+        "recall": 0.6957,
+        "f1": 0.7619,
+        "support": 23
+      },
+      "fact": {
+        "precision": 0.72,
+        "recall": 0.8182,
+        "f1": 0.766,
+        "support": 22
+      },
+      "pattern": {
+        "precision": 0.7778,
+        "recall": 0.875,
+        "f1": 0.8235,
+        "support": 8
+      },
+      "preference": {
+        "precision": 0.7273,
+        "recall": 0.5333,
+        "f1": 0.6154,
+        "support": 15
+      },
+      "warning": {
+        "precision": 0.75,
+        "recall": 0.9,
+        "f1": 0.8182,
+        "support": 10
+      },
+      "workflow": {
+        "precision": 0.8,
+        "recall": 0.7273,
+        "f1": 0.7619,
+        "support": 11
+      },
+      "_macro_avg": {
+        "precision": 0.8022,
+        "recall": 0.7937,
+        "f1": 0.7934,
+        "support": 111
+      }
+    },
+    "baseline_binary": {
+      "precision": 0.878,
+      "recall": 0.6486,
+      "f1": 0.7461,
+      "accuracy": 0.7851,
+      "tp": 72,
+      "fp": 10,
+      "fn": 39,
+      "tn": 107,
+      "total": 228,
+      "model": "baseline_heuristic"
+    },
+    "baseline_per_type": {
+      "contradiction": {
+        "precision": 1.0,
+        "recall": 0.0833,
+        "f1": 0.1538,
+        "support": 12
+      },
+      "decision": {
+        "precision": 1.0,
+        "recall": 0.3,
+        "f1": 0.4615,
+        "support": 10
+      },
+      "error_fix": {
+        "precision": 0.5152,
+        "recall": 0.7391,
+        "f1": 0.6071,
+        "support": 23
+      },
+      "fact": {
+        "precision": 0.8235,
+        "recall": 0.6364,
+        "f1": 0.7179,
+        "support": 22
+      },
+      "pattern": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 8
+      },
+      "preference": {
+        "precision": 0.1667,
+        "recall": 0.0667,
+        "f1": 0.0952,
+        "support": 15
+      },
+      "warning": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 10
+      },
+      "workflow": {
+        "precision": 0.3,
+        "recall": 0.2727,
+        "f1": 0.2857,
+        "support": 11
+      },
+      "_macro_avg": {
+        "precision": 0.4757,
+        "recall": 0.2623,
+        "f1": 0.2902,
+        "support": 111
+      }
+    }
+  },
+  "reranker": {
+    "precision": 0.9412,
+    "recall": 1.0,
+    "f1": 0.9697,
+    "accuracy": 0.9688,
+    "tp": 16,
+    "fp": 1,
+    "fn": 0,
+    "tn": 15,
+    "total": 32,
+    "model": "reranker",
+    "n_features": 11
+  },
+  "curated": [
+    {
+      "precision": 0.9048,
+      "recall": 0.8636,
+      "f1": 0.8837,
+      "accuracy": 0.8438,
+      "tp": 19,
+      "fp": 2,
+      "fn": 3,
+      "tn": 8,
+      "total": 32,
+      "model": "ml_signal_eval.json",
+      "avg_latency_ms": 0.299,
+      "p95_latency_ms": 0.412
+    },
+    {
+      "precision": 1.0,
+      "recall": 0.7727,
+      "f1": 0.8718,
+      "accuracy": 0.8438,
+      "tp": 17,
+      "fp": 0,
+      "fn": 5,
+      "tn": 10,
+      "total": 32,
+      "model": "bl_signal_eval.json"
+    },
+    {
+      "precision": 1.0,
+      "recall": 0.5652,
+      "f1": 0.7222,
+      "accuracy": 0.6875,
+      "tp": 13,
+      "fp": 0,
+      "fn": 10,
+      "tn": 9,
+      "total": 32,
+      "model": "ml_classifier_eval.json",
+      "avg_latency_ms": 0.24,
+      "p95_latency_ms": 0.408
+    },
+    {
+      "precision": 1.0,
+      "recall": 0.5652,
+      "f1": 0.7222,
+      "accuracy": 0.6875,
+      "tp": 13,
+      "fp": 0,
+      "fn": 10,
+      "tn": 9,
+      "total": 32,
+      "model": "bl_classifier_eval.json"
+    }
+  ]
+}

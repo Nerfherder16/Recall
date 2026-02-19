@@ -5,6 +5,10 @@ import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { GlassCard } from "../components/common/GlassCard";
+import { Button } from "../components/common/Button";
+import { Input, Select } from "../components/common/Input";
+import { timeAgo } from "../lib/utils";
 
 interface AuditEntry {
   id: number;
@@ -16,44 +20,30 @@ interface AuditEntry {
   details: Record<string, unknown>;
 }
 
-function timeAgo(iso: string): string {
-  try {
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    return `${days}d ago`;
-  } catch {
-    return iso;
-  }
-}
-
 function DetailBadges({
   details,
 }: {
   details: Record<string, unknown> | null;
 }) {
-  if (!details) return <span className="text-xs text-base-content/30">-</span>;
+  if (!details)
+    return <span className="text-xs text-zinc-400 dark:text-zinc-600">-</span>;
   const entries = Object.entries(details).filter(
     ([, v]) => v !== null && v !== undefined && v !== "",
   );
   if (entries.length === 0)
-    return <span className="text-xs text-base-content/30">-</span>;
+    return <span className="text-xs text-zinc-400 dark:text-zinc-600">-</span>;
   return (
     <div className="flex flex-wrap gap-1">
       {entries.slice(0, 4).map(([k, v]) => (
         <span
           key={k}
-          className="inline-flex items-center rounded-md bg-zinc-500/10 text-zinc-400 px-1.5 py-0.5 text-[10px] font-medium"
+          className="inline-flex items-center rounded-full bg-zinc-500/10 text-zinc-400 px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-zinc-500/20"
         >
           {k}: {typeof v === "object" ? JSON.stringify(v) : String(v)}
         </span>
       ))}
       {entries.length > 4 && (
-        <span className="inline-flex items-center rounded-md bg-zinc-500/10 text-zinc-400 px-1.5 py-0.5 text-[10px] font-medium">
+        <span className="inline-flex items-center rounded-full bg-zinc-500/10 text-zinc-400 px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-zinc-500/20">
           +{entries.length - 4}
         </span>
       )}
@@ -67,7 +57,6 @@ export default function AuditPage() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Auto-load on mount
   useEffect(() => {
     loadAudit();
   }, []);
@@ -95,8 +84,8 @@ export default function AuditPage() {
       <PageHeader title="Audit Log" subtitle="Memory mutation history" />
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <select
-          className="rounded-lg border border-base-content/10 bg-base-200 px-3 py-2 text-sm focus:border-primary/50 focus:outline-none w-40"
+        <Select
+          containerClass="w-40"
           value={action}
           onChange={(e) => setAction(e.target.value)}
         >
@@ -106,21 +95,18 @@ export default function AuditPage() {
           <option value="update">Update</option>
           <option value="consolidation">Consolidation</option>
           <option value="decay">Decay</option>
-        </select>
-        <input
-          className="flex-1 min-w-48 rounded-lg border border-base-content/10 bg-base-200 px-3 py-2 text-sm focus:border-primary/50 focus:outline-none"
+        </Select>
+        <Input
+          containerClass="flex-1 min-w-48"
           placeholder="Memory ID filter"
           value={memoryId}
           onChange={(e) => setMemoryId(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && loadAudit()}
         />
-        <button
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-content hover:bg-primary/90 transition-colors"
-          onClick={loadAudit}
-        >
+        <Button onClick={loadAudit}>
           <Funnel size={16} />
           Filter
-        </button>
+        </Button>
       </div>
 
       {loading && <LoadingSpinner />}
@@ -130,36 +116,29 @@ export default function AuditPage() {
       )}
 
       {!loading && entries.length > 0 && (
-        <div className="rounded-xl bg-base-100 border border-base-content/5 overflow-hidden">
+        <GlassCard className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-base-content/5">
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Time
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Action
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Memory
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Actor
-                  </th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-base-content/40">
-                    Details
-                  </th>
+                <tr className="border-b border-zinc-200 dark:border-white/[0.06]">
+                  {["Time", "Action", "Memory", "Actor", "Details"].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left px-4 py-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {entries.map((e) => (
                   <tr
                     key={e.id}
-                    className="border-b border-base-content/5 last:border-0"
+                    className="border-b border-zinc-100 dark:border-white/[0.03] last:border-0"
                   >
                     <td
-                      className="px-4 py-2.5 text-xs whitespace-nowrap text-base-content/50"
+                      className="px-4 py-2.5 text-xs whitespace-nowrap text-zinc-500 dark:text-zinc-400"
                       title={e.timestamp}
                     >
                       {timeAgo(e.timestamp)}
@@ -167,7 +146,7 @@ export default function AuditPage() {
                     <td className="px-4 py-2.5">
                       <Badge text={e.action} />
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-base-content/50">
+                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 dark:text-zinc-400">
                       {e.memory_id ? `${e.memory_id.slice(0, 8)}...` : "-"}
                     </td>
                     <td className="px-4 py-2.5">
@@ -181,7 +160,7 @@ export default function AuditPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </GlassCard>
       )}
     </div>
   );

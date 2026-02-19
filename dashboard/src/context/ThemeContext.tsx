@@ -6,7 +6,7 @@ interface ThemeCtx {
   toggle: () => void;
 }
 
-const Ctx = createContext<ThemeCtx>({ theme: "recall-dark", toggle: () => {} });
+const Ctx = createContext<ThemeCtx>({ theme: "dark", toggle: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const value = useTheme();

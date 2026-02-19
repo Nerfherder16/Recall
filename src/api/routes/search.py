@@ -125,6 +125,42 @@ class TimelineResponse(BaseModel):
     anchor_id: str | None
 
 
+class RehydrateRequest(BaseModel):
+    """Request for temporal context reconstruction."""
+
+    since: str | None = None
+    until: str | None = None
+    domain: str | None = None
+    memory_type: str | None = None
+    max_entries: int = Field(default=50, ge=1, le=200)
+    include_narrative: bool = False
+    include_anti_patterns: bool = False
+
+
+class RehydrateEntry(BaseModel):
+    """A single entry in the rehydrated context."""
+
+    id: str
+    summary: str
+    memory_type: str
+    domain: str
+    created_at: str
+    importance: float
+    durability: str | None = None
+    pinned: bool = False
+    is_anti_pattern: bool = False
+
+
+class RehydrateResponse(BaseModel):
+    """Response from temporal context reconstruction."""
+
+    entries: list[RehydrateEntry]
+    total: int
+    window_start: str
+    window_end: str
+    narrative: str | None = None
+
+
 class ContextRequest(BaseModel):
     """Request for context assembly."""
 
@@ -281,6 +317,158 @@ async def timeline_view(request: Request, body: TimelineRequest):
         raise
     except Exception as e:
         logger.error("timeline_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/rehydrate", response_model=RehydrateResponse)
+@limiter.limit("10/minute")
+async def rehydrate_context(request: Request, body: RehydrateRequest):
+    """
+    Temporal context reconstruction.
+
+    Assembles a chronological briefing from memories in a time window.
+    Optionally includes LLM-generated narrative summary and anti-patterns.
+    """
+    try:
+        import datetime as dt_mod
+        import hashlib
+        import json
+
+        from src.storage import get_qdrant_store, get_redis_store
+
+        redis = await get_redis_store()
+
+        # Default time range: last 24 hours
+        if not body.since:
+            body.since = (datetime.utcnow() - dt_mod.timedelta(hours=24)).isoformat()
+        if not body.until:
+            body.until = datetime.utcnow().isoformat()
+
+        # Check Redis cache
+        cache_key = (
+            "recall:rehydrate:"
+            + hashlib.md5(
+                f"{body.since}:{body.until}:{body.domain}:{body.memory_type}"
+                f":{body.include_narrative}:{body.include_anti_patterns}".encode()
+            ).hexdigest()
+        )
+
+        cached = await redis.client.get(cache_key)
+        if cached:
+            return RehydrateResponse(**json.loads(cached))
+
+        qdrant = await get_qdrant_store()
+
+        # Scroll memories in time range
+        points = await qdrant.scroll_time_range(
+            since=body.since,
+            until=body.until,
+            domain=body.domain,
+            memory_type=body.memory_type,
+            limit=body.max_entries,
+        )
+
+        entries = [
+            RehydrateEntry(
+                id=mid,
+                summary=payload.get("content", "")[:120],
+                memory_type=payload.get("memory_type", "semantic"),
+                domain=payload.get("domain", "general"),
+                created_at=payload.get("created_at", ""),
+                importance=payload.get("importance", 0.5),
+                durability=payload.get("durability"),
+                pinned=payload.get("pinned") == "true",
+            )
+            for mid, payload in points
+        ]
+
+        # Optional anti-pattern inclusion
+        if body.include_anti_patterns:
+            try:
+                from qdrant_client.models import (
+                    DatetimeRange,
+                    FieldCondition,
+                    Filter,
+                    MatchValue,
+                )
+
+                ap_conditions = [
+                    FieldCondition(key="created_at", range=DatetimeRange(gte=body.since)),
+                    FieldCondition(key="created_at", range=DatetimeRange(lte=body.until)),
+                ]
+                if body.domain:
+                    ap_conditions.append(
+                        FieldCondition(key="domain", match=MatchValue(value=body.domain))
+                    )
+
+                ap_points, _ = await qdrant.client.scroll(
+                    collection_name=qdrant.anti_patterns_collection,
+                    scroll_filter=Filter(must=ap_conditions),
+                    limit=body.max_entries,
+                    with_payload=True,
+                )
+                for point in ap_points:
+                    p = point.payload or {}
+                    entries.append(
+                        RehydrateEntry(
+                            id=str(point.id),
+                            summary=p.get("content", "")[:120],
+                            memory_type=p.get("memory_type", "warning"),
+                            domain=p.get("domain", "general"),
+                            created_at=p.get("created_at", ""),
+                            importance=p.get("importance", 0.5),
+                            durability=p.get("durability"),
+                            pinned=p.get("pinned") == "true",
+                            is_anti_pattern=True,
+                        )
+                    )
+                # Re-sort chronologically after merging
+                entries.sort(key=lambda e: e.created_at)
+            except Exception as ap_err:
+                logger.warning("rehydrate_anti_patterns_failed", error=str(ap_err))
+
+        window_start = entries[0].created_at if entries else body.since
+        window_end = entries[-1].created_at if entries else body.until
+
+        # Optional LLM narrative
+        narrative = None
+        if body.include_narrative and entries:
+            try:
+                from src.core.llm import get_llm
+
+                llm = await get_llm()
+                summaries = "\n".join(
+                    f"- [{e.created_at}] ({e.memory_type}) {e.summary}" for e in entries
+                )
+                prompt = (
+                    "You are summarizing a developer's session memories. "
+                    "Write a 2-3 paragraph narrative briefing from these memories:\n\n"
+                    f"{summaries}\n\n"
+                    "Focus on what was accomplished, key decisions, and anything noteworthy."
+                )
+                narrative = await llm.generate(prompt, temperature=0.3)
+            except Exception as llm_err:
+                logger.warning("rehydrate_llm_failed", error=str(llm_err))
+
+        response = RehydrateResponse(
+            entries=entries,
+            total=len(entries),
+            window_start=window_start,
+            window_end=window_end,
+            narrative=narrative,
+        )
+
+        # Cache for 2 minutes
+        await redis.client.setex(cache_key, 120, json.dumps(response.model_dump(), default=str))
+
+        logger.info("rehydrate_completed", entries=len(entries), domain=body.domain)
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("rehydrate_error", error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

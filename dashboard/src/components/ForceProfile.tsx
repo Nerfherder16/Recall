@@ -60,9 +60,9 @@ export function ForceProfile({ memoryId }: Props) {
     : [];
 
   return (
-    <div className="mt-4 border border-base-content/5 rounded-lg">
+    <div className="mt-4 border border-zinc-200 dark:border-white/[0.06] rounded-xl">
       <button
-        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-base-content/60 hover:text-base-content transition-colors"
+        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <Lightning size={14} className="text-violet-400" />
@@ -72,32 +72,31 @@ export function ForceProfile({ memoryId }: Props) {
 
       {expanded && (
         <div className="px-4 pb-4">
-          {loading && (
-            <p className="text-xs text-base-content/40 py-2">Loading...</p>
-          )}
+          {loading && <p className="text-xs text-zinc-400 py-2">Loading...</p>}
           {data && (
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={chartData} layout="vertical">
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="oklch(var(--bc) / 0.1)"
+                  stroke="var(--chart-grid)"
                 />
                 <XAxis
                   type="number"
-                  tick={{ fontSize: 10, fill: "oklch(var(--bc) / 0.4)" }}
+                  tick={{ fontSize: 10, fill: "var(--chart-text)" }}
                 />
                 <YAxis
                   type="category"
                   dataKey="name"
                   width={110}
-                  tick={{ fontSize: 10, fill: "oklch(var(--bc) / 0.4)" }}
+                  tick={{ fontSize: 10, fill: "var(--chart-text)" }}
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "oklch(var(--b1))",
-                    border: "1px solid oklch(var(--bc) / 0.1)",
+                    background: "var(--chart-tooltip-bg)",
+                    border: "1px solid var(--chart-tooltip-border)",
                     borderRadius: "8px",
                     fontSize: "11px",
+                    color: "var(--content-primary)",
                   }}
                   formatter={(v: number | undefined) => (v ?? 0).toFixed(4)}
                 />

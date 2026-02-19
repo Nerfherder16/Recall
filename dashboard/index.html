@@ -10,19 +10,20 @@
     <title>Recall Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet" />
     <script>
-      // Prevent flash: apply theme before render
+      // Prevent flash: apply dark class before render
       (function() {
         try {
           var t = JSON.parse(localStorage.getItem("recall_theme"));
-          if (t === "recall-light" || t === "recall-dark") {
-            document.documentElement.setAttribute("data-theme", t);
+          if (t === "light") {
+            // light mode — no class needed
           } else {
-            document.documentElement.setAttribute("data-theme", "recall-dark");
+            document.documentElement.classList.add("dark");
           }
         } catch(e) {
-          document.documentElement.setAttribute("data-theme", "recall-dark");
+          document.documentElement.classList.add("dark");
         }
       })();
     </script>
