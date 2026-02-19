@@ -131,6 +131,15 @@ async def _run_extraction(observation: dict):
             logger.warning("observer_embedding_unavailable")
             return
 
+        # Semantic dedup: skip if near-identical memory exists
+        similar = await qdrant.search(
+            query_vector=embedding,
+            limit=1,
+            include_superseded=False,
+        )
+        if similar and similar[0][1] > 0.95:
+            continue
+
         await qdrant.store(memory, embedding)
 
         try:
@@ -218,6 +227,16 @@ async def save_session_snapshot(session_id: str, summary: str | None):
 
         embedding_service = await get_embedding_service()
         embedding = await embedding_service.embed(snapshot_text)
+
+        # Semantic dedup for snapshots
+        similar = await qdrant.search(
+            query_vector=embedding,
+            limit=1,
+            include_superseded=False,
+        )
+        if similar and similar[0][1] > 0.95:
+            return
+
         await qdrant.store(memory, embedding)
 
         try:

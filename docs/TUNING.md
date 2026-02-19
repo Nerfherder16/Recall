@@ -43,6 +43,15 @@ Read this before adjusting any threshold, rate, or weight.
 | Contradiction inhibition | 0.7x penalty | `retrieval.py` | Phase 12B |
 | Anti-pattern boost | `1.0 + 0.1 * log2(1 + triggers)` | `retrieval.py` | v2.1 |
 | Track access boost | +0.02 (1hr cooldown) | `retrieval.py:563-577` | Original |
+| Near-duplicate suppression | content_hash dedup in `_inhibit()` | `retrieval.py:462-471` | 2026-02-19 (fixed) |
+
+### Deduplication
+
+| Parameter | Value | File:Line | Last Changed |
+|-----------|-------|-----------|--------------|
+| Exact dedup (content_hash) | SHA-256 first 16 chars, normalized | All ingest paths | Original |
+| Semantic dedup threshold | **0.95** cosine similarity | `memory.py`, `signals.py`, `observer.py` | 2026-02-19 |
+| Admin batch dedup | `POST /admin/dedup` (2/hr rate limit) | `admin.py` | 2026-02-19 |
 
 ### Retrieval Hook (`hooks/recall-retrieve.js`)
 
@@ -93,6 +102,22 @@ Read this before adjusting any threshold, rate, or weight.
 ---
 
 ## Change History
+
+### 2026-02-19: Deduplication system
+
+**Problem:** 129 near-duplicate memories (18% of corpus). Signal detection LLM phrased the same fact differently across sessions. Exact-match content_hash dedup didn't catch paraphrases. Retrieval-time dedup was broken (content_hash not propagated to Memory objects).
+
+**Changes:**
+1. `retrieval.py:_payload_to_memory()` — added `content_hash=payload.get("content_hash", "")` (fixes broken retrieval dedup)
+2. `memory.py`, `signals.py`, `observer.py` — added semantic dedup at ingest (cosine > 0.95 = reject)
+3. `admin.py` — new `POST /admin/dedup` endpoint for batch cleanup (2/hr rate limit)
+4. Ran batch dedup: 69 groups found, 129 duplicates superseded, 46 content_hashes backfilled
+
+**Result:** Corpus reduced from 701 active → 572 active memories. All production searches work correctly.
+
+**What to watch:** The 0.95 threshold is conservative — a few semantically similar (0.90-0.94) memories may survive. Consolidation's hourly merge should handle these naturally. If duplicates reappear, consider lowering to 0.93.
+
+---
 
 ### 2026-02-19: Reduce decay frequency from 48x/day to 4x/day
 

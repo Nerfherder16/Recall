@@ -607,6 +607,7 @@ class RetrievalPipeline:
             if payload.get("durability")
             else Durability.DURABLE,
             initial_importance=payload.get("initial_importance"),
+            content_hash=payload.get("content_hash", ""),
         )
 
 

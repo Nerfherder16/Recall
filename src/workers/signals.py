@@ -243,6 +243,23 @@ async def _store_signal_as_memory(
             logger.warning("signal_store_ollama_unavailable", signal_type=signal.signal_type.value)
             return None, None
 
+        # Semantic dedup: skip if near-identical memory exists (cosine > 0.95)
+        similar = await qdrant.search(
+            query_vector=embedding,
+            limit=1,
+            include_superseded=False,
+        )
+        if similar:
+            _, sim_score, _ = similar[0]
+            if sim_score > 0.95:
+                logger.debug(
+                    "signal_semantic_dedup_hit",
+                    signal_type=signal.signal_type.value,
+                    existing_id=similar[0][0],
+                    similarity=round(sim_score, 4),
+                )
+                return None, None
+
         # Store in Qdrant
         await qdrant.store(memory, embedding)
 

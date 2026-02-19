@@ -150,6 +150,25 @@ async def store_memory(
         embedding_service = await get_embedding_service()
         embedding = await embedding_service.embed(request.content)
 
+        # Semantic dedup: reject if a near-identical memory exists (cosine > 0.95)
+        similar = await qdrant.search(
+            query_vector=embedding,
+            limit=1,
+            include_superseded=False,
+        )
+        if similar:
+            _, sim_score, _ = similar[0]
+            if sim_score > 0.95:
+                existing_id = similar[0][0]
+                return StoreMemoryResponse(
+                    id=existing_id,
+                    content_hash=memory.content_hash,
+                    created=False,
+                    message="Near-duplicate memory — semantically identical content already stored",
+                    durability=request.durability,
+                    initial_importance=request.importance,
+                )
+
         # Store in Qdrant
         await qdrant.store(memory, embedding)
 

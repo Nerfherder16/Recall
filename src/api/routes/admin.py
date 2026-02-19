@@ -794,6 +794,157 @@ async def rehabilitate_importance(request: Request):
 
 
 # =============================================================
+# DEDUPLICATION
+# =============================================================
+
+
+class DedupResponse(BaseModel):
+    total_memories: int
+    groups_found: int
+    duplicates_removed: int
+    content_hashes_backfilled: int
+
+
+@router.post("/dedup", response_model=DedupResponse)
+@limiter.limit("2/hour")
+async def deduplicate_memories(
+    request: Request,
+    similarity_threshold: float = 0.95,
+    dry_run: bool = False,
+):
+    """
+    Scan all memories for near-duplicates and remove excess copies.
+
+    For each duplicate group, keeps the memory with the highest importance
+    (or oldest if tied) and supersedes the rest.
+
+    Also backfills content_hash for memories missing it.
+
+    Args:
+        similarity_threshold: Cosine similarity above which two memories
+            are considered duplicates (default 0.95).
+        dry_run: If True, report findings without deleting anything.
+    """
+    from src.core.embeddings import content_hash as compute_hash
+    from src.core.retrieval import cosine_similarity
+
+    qdrant = await get_qdrant_store()
+    neo4j = await get_neo4j_store()
+
+    # Load all memories with vectors
+    all_memories = await qdrant.scroll_all(
+        include_superseded=False,
+        with_vectors=True,
+    )
+
+    total = len(all_memories)
+    hashes_backfilled = 0
+
+    # Step 1: Backfill missing content_hash
+    for memory_id, payload, _vector in all_memories:
+        if not payload.get("content_hash"):
+            content = payload.get("content", "")
+            if content:
+                chash = compute_hash(content)
+                if not dry_run:
+                    await qdrant.client.set_payload(
+                        collection_name=qdrant.collection,
+                        payload={"content_hash": chash},
+                        points=[memory_id],
+                    )
+                hashes_backfilled += 1
+
+    # Step 2: Find duplicate groups by embedding similarity
+    # Build clusters: greedy — assign each memory to first matching group
+    assigned = set()
+    groups: list[list[int]] = []  # list of index groups
+
+    for i in range(len(all_memories)):
+        if i in assigned:
+            continue
+
+        mid_i, pay_i, vec_i = all_memories[i]
+        group = [i]
+        assigned.add(i)
+
+        for j in range(i + 1, len(all_memories)):
+            if j in assigned:
+                continue
+
+            _mid_j, _pay_j, vec_j = all_memories[j]
+            sim = cosine_similarity(vec_i, vec_j)
+            if sim > similarity_threshold:
+                group.append(j)
+                assigned.add(j)
+
+        if len(group) > 1:
+            groups.append(group)
+
+    # Step 3: For each group, keep the best, supersede the rest
+    duplicates_removed = 0
+    for group in groups:
+        # Sort by importance desc, then by created_at asc (oldest first)
+        members = []
+        for idx in group:
+            mid, pay, _vec = all_memories[idx]
+            members.append(
+                (
+                    mid,
+                    pay.get("importance", 0.0),
+                    pay.get("created_at", ""),
+                )
+            )
+        members.sort(key=lambda m: (-m[1], m[2]))
+        keeper_id = members[0][0]
+
+        for mid, _imp, _created in members[1:]:
+            if not dry_run:
+                # Mark as superseded by the keeper
+                await qdrant.client.set_payload(
+                    collection_name=qdrant.collection,
+                    payload={"superseded_by": keeper_id},
+                    points=[mid],
+                )
+                # Delete from Neo4j graph
+                await neo4j.delete_memory(mid)
+
+                # Audit log
+                try:
+                    from src.storage import get_postgres_store
+
+                    pg = await get_postgres_store()
+                    await pg.log_audit(
+                        "dedup",
+                        mid,
+                        actor="admin",
+                        details={
+                            "keeper_id": keeper_id,
+                            "action": "superseded",
+                        },
+                    )
+                except Exception:
+                    pass
+
+            duplicates_removed += 1
+
+    logger.info(
+        "dedup_complete",
+        total=total,
+        groups=len(groups),
+        removed=duplicates_removed,
+        backfilled=hashes_backfilled,
+        dry_run=dry_run,
+    )
+
+    return DedupResponse(
+        total_memories=total,
+        groups_found=len(groups),
+        duplicates_removed=duplicates_removed,
+        content_hashes_backfilled=hashes_backfilled,
+    )
+
+
+# =============================================================
 # ML RERANKER
 # =============================================================
 
