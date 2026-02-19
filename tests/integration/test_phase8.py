@@ -5,13 +5,12 @@ Covers: date-range search (N3), per-domain stats (N7), batch ops (N2),
 OllamaUnavailableError handling (N9), rate limiting (N5), dashboard.
 """
 
-import asyncio
 import uuid
 
 import httpx
 import pytest
 
-from .conftest import API_BASE
+from .conftest import API_BASE, request_with_retry
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,7 +25,9 @@ async def test_search_with_since_filter(api_client: httpx.AsyncClient, stored_me
     mem = await stored_memory("Date range test memory", domain=test_domain)
 
     # Search with since far in the past — should find the memory
-    r = await api_client.post(
+    r = await request_with_retry(
+        api_client,
+        "post",
         f"{API_BASE}/search/query",
         json={"query": "Date range test", "domains": [test_domain], "since": "2020-01-01T00:00:00"},
     )
@@ -39,21 +40,31 @@ async def test_search_with_until_filter(api_client: httpx.AsyncClient, stored_me
     """Search with until far in the past returns no results."""
     await stored_memory("Until filter test memory", domain=test_domain)
 
-    r = await api_client.post(
+    r = await request_with_retry(
+        api_client,
+        "post",
         f"{API_BASE}/search/query",
-        json={"query": "Until filter test", "domains": [test_domain], "until": "2020-01-01T00:00:00"},
+        json={
+            "query": "Until filter test",
+            "domains": [test_domain],
+            "until": "2020-01-01T00:00:00",
+        },
     )
     assert r.status_code == 200
     results = r.json()["results"]
     assert len(results) == 0
 
 
-async def test_search_with_since_and_until(api_client: httpx.AsyncClient, stored_memory, test_domain):
+async def test_search_with_since_and_until(
+    api_client: httpx.AsyncClient, stored_memory, test_domain
+):
     """Search with both since and until narrows the window."""
     await stored_memory("Window test memory", domain=test_domain)
 
     # Window that includes now
-    r = await api_client.post(
+    r = await request_with_retry(
+        api_client,
+        "post",
         f"{API_BASE}/search/query",
         json={
             "query": "Window test",
@@ -73,8 +84,14 @@ async def test_search_with_since_and_until(api_client: httpx.AsyncClient, stored
 
 async def test_domain_stats_endpoint(api_client: httpx.AsyncClient, stored_memory, test_domain):
     """GET /stats/domains returns per-domain count and avg_importance."""
-    await stored_memory("Domain stats test A", domain=test_domain, importance=0.6)
-    await stored_memory("Domain stats test B", domain=test_domain, importance=0.8)
+    await stored_memory(
+        "PostgreSQL MVCC allows concurrent reads during writes", domain=test_domain, importance=0.6
+    )
+    await stored_memory(
+        "Nginx reverse proxy load balances across upstream servers",
+        domain=test_domain,
+        importance=0.8,
+    )
 
     r = await api_client.get(f"{API_BASE}/stats/domains")
     assert r.status_code == 200

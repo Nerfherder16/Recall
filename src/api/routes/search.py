@@ -277,12 +277,16 @@ async def timeline_view(request: Request, body: TimelineRequest):
             _, payload = result
             anchor_date = payload.get("created_at")
 
+        from src.core.domains import normalize_domain
+
+        normalized_domain = normalize_domain(body.domain) if body.domain else None
+
         if anchor_date:
             points = await qdrant.scroll_around(
                 anchor_date=anchor_date,
                 before=body.before,
                 after=body.after,
-                domain=body.domain,
+                domain=normalized_domain,
                 memory_type=body.memory_type,
             )
         else:
@@ -291,7 +295,7 @@ async def timeline_view(request: Request, body: TimelineRequest):
                 anchor_date=datetime.utcnow().isoformat(),
                 before=body.limit,
                 after=0,
-                domain=body.domain,
+                domain=normalized_domain,
                 memory_type=body.memory_type,
             )
 

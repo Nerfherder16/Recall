@@ -28,19 +28,22 @@ class TestConsolidation:
         cleanup.track_memory(data["id"])
         return data
 
-    async def test_similar_memories_consolidate(
-        self, api_client, test_domain, cleanup
-    ):
+    async def test_similar_memories_consolidate(self, api_client, test_domain, cleanup):
         """Store 3 paraphrases → consolidate → a merged memory exists."""
+        # Content must be similar enough for consolidation (cosine > 0.8)
+        # but distinct enough to pass semantic dedup (cosine < 0.95)
         paraphrases = [
-            "Python is a programming language known for readability",
-            "Python is a coding language famous for being readable",
-            "Python is a well-known programming language valued for readable code",
+            "Python enforces readable code through mandatory indentation rules",
+            "Python requires indentation to enforce code readability",
+            "Indentation in Python enforces readable and consistent code style",
         ]
         source_ids = []
         for text in paraphrases:
             data = await self._store_and_track(
-                api_client, cleanup, text, test_domain,
+                api_client,
+                cleanup,
+                text,
+                test_domain,
                 tags=["python", "language"],
             )
             source_ids.append(data["id"])
@@ -60,9 +63,7 @@ class TestConsolidation:
         for result in body["results"]:
             cleanup.track_memory(result["merged_id"])
 
-    async def test_source_memories_marked_superseded(
-        self, api_client, test_domain, cleanup
-    ):
+    async def test_source_memories_marked_superseded(self, api_client, test_domain, cleanup):
         """After consolidation, source memories have superseded_by set."""
         texts = [
             "Docker containers provide lightweight process isolation",
@@ -71,7 +72,10 @@ class TestConsolidation:
         source_ids = []
         for text in texts:
             data = await self._store_and_track(
-                api_client, cleanup, text, test_domain,
+                api_client,
+                cleanup,
+                text,
+                test_domain,
             )
             source_ids.append(data["id"])
 
@@ -99,9 +103,7 @@ class TestConsolidation:
                 # but the memory should still be retrievable
                 pass
 
-    async def test_derived_from_relationships_created(
-        self, api_client, test_domain, cleanup
-    ):
+    async def test_derived_from_relationships_created(self, api_client, test_domain, cleanup):
         """After consolidation, merged memory has DERIVED_FROM relationships to sources."""
         texts = [
             "Kubernetes orchestrates container workloads across clusters",
@@ -110,7 +112,10 @@ class TestConsolidation:
         source_ids = []
         for text in texts:
             data = await self._store_and_track(
-                api_client, cleanup, text, test_domain,
+                api_client,
+                cleanup,
+                text,
+                test_domain,
             )
             source_ids.append(data["id"])
 
@@ -141,13 +146,9 @@ class TestConsolidation:
         assert rel_r.status_code == 200
         related = rel_r.json().get("related", [])
         related_ids = [r.get("id", r.get("memory_id", "")) for r in related]
-        assert merged_id in related_ids, (
-            f"Expected merged ID {merged_id} in related {related_ids}"
-        )
+        assert merged_id in related_ids, f"Expected merged ID {merged_id} in related {related_ids}"
 
-    async def test_merged_memory_has_boosted_stability(
-        self, api_client, test_domain, cleanup
-    ):
+    async def test_merged_memory_has_boosted_stability(self, api_client, test_domain, cleanup):
         """The merged memory's stability should be higher than any individual source."""
         texts = [
             "Redis is an in-memory data structure store",
@@ -156,7 +157,10 @@ class TestConsolidation:
         source_data = []
         for text in texts:
             data = await self._store_and_track(
-                api_client, cleanup, text, test_domain,
+                api_client,
+                cleanup,
+                text,
+                test_domain,
                 importance=0.5,
             )
             source_data.append(data)
@@ -192,18 +196,18 @@ class TestConsolidation:
             f"Merged stability {merged_stability} should exceed max source {max_source}"
         )
 
-    async def test_merged_memory_inherits_all_tags(
-        self, api_client, test_domain, cleanup
-    ):
+    async def test_merged_memory_inherits_all_tags(self, api_client, test_domain, cleanup):
         """Union of source tags should appear on the merged memory."""
-        m1 = await self._store_and_track(
-            api_client, cleanup,
+        await self._store_and_track(
+            api_client,
+            cleanup,
             "Git branching strategies for team collaboration",
             test_domain,
             tags=["git", "branching"],
         )
-        m2 = await self._store_and_track(
-            api_client, cleanup,
+        await self._store_and_track(
+            api_client,
+            cleanup,
             "Git branch strategies help teams collaborate on code",
             test_domain,
             tags=["git", "teamwork"],
@@ -233,9 +237,7 @@ class TestConsolidation:
             f"Expected tags {expected_tags} to be subset of {merged_tags}"
         )
 
-    async def test_dry_run_returns_clusters_but_no_merge(
-        self, api_client, test_domain, cleanup
-    ):
+    async def test_dry_run_returns_clusters_but_no_merge(self, api_client, test_domain, cleanup):
         """dry_run=true should not create any new memories."""
         texts = [
             "Nginx is a high-performance web server and reverse proxy",
@@ -244,7 +246,10 @@ class TestConsolidation:
         source_ids = []
         for text in texts:
             data = await self._store_and_track(
-                api_client, cleanup, text, test_domain,
+                api_client,
+                cleanup,
+                text,
+                test_domain,
             )
             source_ids.append(data["id"])
 

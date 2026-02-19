@@ -3,10 +3,7 @@ Tests for session management: /session/start, /session/end,
 /session/{id}, /session/{id}/working-memory, /session/{id}/context.
 """
 
-import asyncio
 import uuid
-
-import pytest
 
 from tests.integration.conftest import API_BASE
 
@@ -85,15 +82,19 @@ class TestEndSession:
 class TestWorkingMemory:
     """GET /session/{id}/working-memory"""
 
-    async def test_working_memory_accumulation(
-        self, active_session, stored_memory, api_client
-    ):
+    async def test_working_memory_accumulation(self, active_session, stored_memory, api_client):
         """Storing memories with a session_id should add them to working memory."""
         session = await active_session()
         sid = session["session_id"]
 
-        m1 = await stored_memory("working mem item 1", session_id=sid)
-        m2 = await stored_memory("working mem item 2", session_id=sid)
+        m1 = await stored_memory(
+            "FastAPI dependency injection resolves request-scoped instances",
+            session_id=sid,
+        )
+        m2 = await stored_memory(
+            "Docker containers isolate processes using Linux namespaces and cgroups",
+            session_id=sid,
+        )
 
         r = await api_client.get(f"{API_BASE}/session/{sid}/working-memory")
         assert r.status_code == 200
@@ -105,16 +106,19 @@ class TestWorkingMemory:
         assert m1["id"] in mem_ids
         assert m2["id"] in mem_ids
 
-    async def test_working_memory_order(
-        self, active_session, stored_memory, api_client
-    ):
+    async def test_working_memory_order(self, active_session, stored_memory, api_client):
         """Working memory should contain items in stored order (LIFO or FIFO)."""
         session = await active_session()
         sid = session["session_id"]
 
+        ordered_content = [
+            "Git three-way merge finds common ancestor then applies diffs",
+            "Kubernetes horizontal pod autoscaler adjusts replicas on CPU",
+            "TLS 1.3 handshake completes in one round trip with forward secrecy",
+        ]
         ids = []
-        for i in range(3):
-            m = await stored_memory(f"ordered item {i}", session_id=sid)
+        for text in ordered_content:
+            m = await stored_memory(text, session_id=sid)
             ids.append(m["id"])
 
         r = await api_client.get(f"{API_BASE}/session/{sid}/working-memory")
@@ -159,14 +163,18 @@ class TestUpdateSessionContext:
 class TestEndSessionConsolidation:
     """End session with consolidation event."""
 
-    async def test_end_with_consolidation(
-        self, active_session, stored_memory, api_client
-    ):
+    async def test_end_with_consolidation(self, active_session, stored_memory, api_client):
         session = await active_session()
         sid = session["session_id"]
 
-        await stored_memory("consolidation candidate 1", session_id=sid)
-        await stored_memory("consolidation candidate 2", session_id=sid)
+        await stored_memory(
+            "PostgreSQL MVCC enables non-blocking concurrent reads during writes",
+            session_id=sid,
+        )
+        await stored_memory(
+            "Redis sorted sets maintain elements ordered by floating-point scores",
+            session_id=sid,
+        )
 
         r = await api_client.post(
             f"{API_BASE}/session/end",

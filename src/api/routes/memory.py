@@ -137,6 +137,10 @@ async def store_memory(
         qdrant = await get_qdrant_store()
         existing_id = await qdrant.find_by_content_hash(memory.content_hash)
         if existing_id:
+            # Still track in working memory for session continuity
+            if request.session_id:
+                redis = await get_redis_store()
+                await redis.add_to_working_memory(request.session_id, existing_id)
             return StoreMemoryResponse(
                 id=existing_id,
                 content_hash=memory.content_hash,
@@ -160,6 +164,10 @@ async def store_memory(
             _, sim_score, _ = similar[0]
             if sim_score > 0.95:
                 existing_id = similar[0][0]
+                # Still track in working memory for session continuity
+                if request.session_id:
+                    redis = await get_redis_store()
+                    await redis.add_to_working_memory(request.session_id, existing_id)
                 return StoreMemoryResponse(
                     id=existing_id,
                     content_hash=memory.content_hash,

@@ -8,8 +8,6 @@ Tests the one-time migration that classifies pre-v2.2 memories
 import os
 import uuid
 
-import pytest
-
 from tests.integration.conftest import request_with_retry
 
 API_BASE = os.environ.get("RECALL_API_URL", "http://localhost:8200")
@@ -38,16 +36,25 @@ class TestDurabilityMigration:
 
     async def test_dry_run_does_not_modify(self, api_client, test_domain, cleanup):
         """Dry run should classify but NOT update durability in storage."""
+        uid = uuid.uuid4().hex[:8]
+        distinct_content = [
+            f"TCP three-way handshake establishes connections {uid}",
+            f"B-tree indexes accelerate range queries in databases {uid}a",
+            f"OAuth2 authorization code flow prevents exposure {uid}b",
+        ]
         mems = []
-        for i in range(3):
+        for content in distinct_content:
             m = await self._store_null_durability(
-                api_client, cleanup, test_domain,
-                content=f"Dry run test memory {i} {uuid.uuid4().hex[:8]}",
+                api_client,
+                cleanup,
+                test_domain,
+                content=content,
             )
             mems.append(m)
 
         r = await request_with_retry(
-            api_client, "post",
+            api_client,
+            "post",
             f"{API_BASE}/admin/migrate/durability",
             json={"dry_run": True},
         )
@@ -66,13 +73,16 @@ class TestDurabilityMigration:
     async def test_wet_run_classifies_signal_tagged(self, api_client, test_domain, cleanup):
         """Memory with signal:fact tag should be classified as durable."""
         m = await self._store_null_durability(
-            api_client, cleanup, test_domain,
+            api_client,
+            cleanup,
+            test_domain,
             content=f"Redis uses port 6379 {uuid.uuid4().hex[:8]}",
             tags=["signal:fact"],
         )
 
         r = await request_with_retry(
-            api_client, "post",
+            api_client,
+            "post",
             f"{API_BASE}/admin/migrate/durability",
             json={"dry_run": False},
         )
@@ -86,18 +96,23 @@ class TestDurabilityMigration:
     async def test_wet_run_classifies_by_memory_type(self, api_client, test_domain, cleanup):
         """Episodic → ephemeral, procedural → durable."""
         ep = await self._store_null_durability(
-            api_client, cleanup, test_domain,
+            api_client,
+            cleanup,
+            test_domain,
             content=f"Session summary for today {uuid.uuid4().hex[:8]}",
             memory_type="episodic",
         )
         proc = await self._store_null_durability(
-            api_client, cleanup, test_domain,
+            api_client,
+            cleanup,
+            test_domain,
             content=f"Deploy by running docker compose up {uuid.uuid4().hex[:8]}",
             memory_type="procedural",
         )
 
         r = await request_with_retry(
-            api_client, "post",
+            api_client,
+            "post",
             f"{API_BASE}/admin/migrate/durability",
             json={"dry_run": False},
         )
@@ -112,13 +127,19 @@ class TestDurabilityMigration:
     async def test_permanent_regex_detection(self, api_client, test_domain, cleanup):
         """Content with IP + URL and importance >= 0.4 → permanent."""
         m = await self._store_null_durability(
-            api_client, cleanup, test_domain,
-            content=f"CasaOS at 192.168.50.19 dashboard http://192.168.50.19:8200 {uuid.uuid4().hex[:8]}",
+            api_client,
+            cleanup,
+            test_domain,
+            content=(
+                "CasaOS at 192.168.50.19 dashboard "
+                f"http://192.168.50.19:8200 {uuid.uuid4().hex[:8]}"
+            ),
             importance=0.7,
         )
 
         r = await request_with_retry(
-            api_client, "post",
+            api_client,
+            "post",
             f"{API_BASE}/admin/migrate/durability",
             json={"dry_run": False},
         )
@@ -130,13 +151,16 @@ class TestDurabilityMigration:
     async def test_idempotent_second_run(self, api_client, test_domain, cleanup):
         """Second run should find total_null=0 for already-classified memories."""
         await self._store_null_durability(
-            api_client, cleanup, test_domain,
+            api_client,
+            cleanup,
+            test_domain,
             content=f"Idempotent test {uuid.uuid4().hex[:8]}",
         )
 
         # First wet run
         r1 = await request_with_retry(
-            api_client, "post",
+            api_client,
+            "post",
             f"{API_BASE}/admin/migrate/durability",
             json={"dry_run": False},
         )
@@ -146,7 +170,8 @@ class TestDurabilityMigration:
 
         # Second dry run — our memory should no longer show as null
         r2 = await request_with_retry(
-            api_client, "post",
+            api_client,
+            "post",
             f"{API_BASE}/admin/migrate/durability",
             json={"dry_run": True},
         )
@@ -156,12 +181,15 @@ class TestDurabilityMigration:
     async def test_response_sample_format(self, api_client, test_domain, cleanup):
         """Sample entries should have the expected keys."""
         await self._store_null_durability(
-            api_client, cleanup, test_domain,
+            api_client,
+            cleanup,
+            test_domain,
             content=f"Sample format test {uuid.uuid4().hex[:8]}",
         )
 
         r = await request_with_retry(
-            api_client, "post",
+            api_client,
+            "post",
             f"{API_BASE}/admin/migrate/durability",
             json={"dry_run": True},
         )

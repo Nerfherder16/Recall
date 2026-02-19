@@ -4,8 +4,6 @@ Tests for search endpoints: POST /search/query, GET /search/similar/{id}.
 
 import asyncio
 
-import pytest
-
 from tests.integration.conftest import API_BASE
 
 # Short pause to let embeddings index before searching
@@ -66,25 +64,30 @@ class TestSearchQuery:
         assert len(results) >= 2
 
         # The Docker result should be more relevant than the pizza result
-        docker_score = next(
-            (x["score"] for x in results if "Docker" in x["content"]), 0
-        )
-        pizza_score = next(
-            (x["score"] for x in results if "pizza" in x["content"]), 0
-        )
+        docker_score = next((x["score"] for x in results if "Docker" in x["content"]), 0)
+        pizza_score = next((x["score"] for x in results if "pizza" in x["content"]), 0)
         assert docker_score > pizza_score
 
     async def test_filter_by_memory_type(self, stored_memory, api_client, test_domain):
-        await stored_memory("semantic fact about caching", memory_type="semantic", domain=test_domain)
-        await stored_memory("episode: debugged caching issue", memory_type="episodic", domain=test_domain)
+        await stored_memory(
+            "Redis uses sorted sets to maintain elements ordered by score",
+            memory_type="semantic",
+            domain=test_domain,
+        )
+        await stored_memory(
+            "Yesterday I debugged a broken SSH tunnel to the homelab",
+            memory_type="episodic",
+            domain=test_domain,
+        )
         await asyncio.sleep(EMBED_DELAY)
 
         r = await api_client.post(
             f"{API_BASE}/search/query",
             json={
-                "query": "caching",
+                "query": "Redis sorted sets ordering",
                 "memory_types": ["semantic"],
                 "domains": [test_domain],
+                "expand_relationships": False,
             },
         )
         results = r.json()["results"]
@@ -120,16 +123,25 @@ class TestSearchQuery:
         assert len(alpha_results) >= 1
 
     async def test_filter_by_min_importance(self, stored_memory, api_client, test_domain):
-        await stored_memory("low importance item", importance=0.1, domain=test_domain)
-        await stored_memory("high importance item", importance=0.9, domain=test_domain)
+        await stored_memory(
+            "Ephemeral trivia about butterfly migration patterns across continents",
+            importance=0.1,
+            domain=test_domain,
+        )
+        await stored_memory(
+            "Critical production incident: database failover procedure for PostgreSQL",
+            importance=0.9,
+            domain=test_domain,
+        )
         await asyncio.sleep(EMBED_DELAY)
 
         r = await api_client.post(
             f"{API_BASE}/search/query",
             json={
-                "query": "importance item",
+                "query": "database failover procedure",
                 "min_importance": 0.5,
                 "domains": [test_domain],
+                "expand_relationships": False,
             },
         )
         results = r.json()["results"]

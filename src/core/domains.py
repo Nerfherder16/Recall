@@ -198,6 +198,10 @@ def normalize_domain(raw: str) -> str:
     if not cleaned:
         return "general"
 
+    # 0. Preserve test isolation domains (used by integration tests)
+    if cleaned.startswith("test-integration-"):
+        return cleaned
+
     # 1. Already canonical
     if cleaned in _CANONICAL_SET:
         return cleaned

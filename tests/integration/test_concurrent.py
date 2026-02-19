@@ -8,6 +8,20 @@ import pytest
 
 from tests.integration.conftest import API_BASE
 
+# Semantically distinct content to avoid dedup (cosine > 0.95 threshold)
+_DISTINCT_CONTENT = [
+    "Python asyncio event loop processes coroutines for concurrent IO-bound tasks",
+    "Docker containers isolate processes using Linux namespaces and cgroups",
+    "PostgreSQL MVCC enables non-blocking reads during write transactions",
+    "Redis pub/sub channels deliver messages to all connected subscribers",
+    "Neo4j Cypher queries traverse graph relationships with MATCH patterns",
+    "TLS 1.3 handshake completes in one round trip with forward secrecy",
+    "Qdrant HNSW index trades memory for logarithmic nearest neighbor search",
+    "FastAPI dependency injection resolves request-scoped instances automatically",
+    "Git three-way merge finds common ancestor then applies both diffs",
+    "Kubernetes horizontal pod autoscaler adjusts replicas based on CPU metrics",
+]
+
 
 @pytest.mark.slow
 class TestConcurrentOperations:
@@ -20,7 +34,7 @@ class TestConcurrentOperations:
             r = await api_client.post(
                 f"{API_BASE}/memory/store",
                 json={
-                    "content": f"concurrent store test item {i} for {test_domain}",
+                    "content": f"{_DISTINCT_CONTENT[i]} ({test_domain})",
                     "domain": test_domain,
                 },
             )
@@ -66,7 +80,7 @@ class TestConcurrentOperations:
             r = await api_client.post(
                 f"{API_BASE}/memory/store",
                 json={
-                    "content": f"mixed op store {i} {test_domain}",
+                    "content": f"mixed op {_DISTINCT_CONTENT[i]} ({test_domain})",
                     "domain": test_domain,
                 },
             )
