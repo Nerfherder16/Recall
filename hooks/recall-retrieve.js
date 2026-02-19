@@ -2,6 +2,13 @@
 /**
  * UserPromptSubmit hook: Query Recall for relevant memories before Claude responds.
  *
+ * v2.9 "Always-On Sessions":
+ * - Periodic checkpoints: every 25 prompts or 2 hours, stores a session checkpoint
+ *   summary and submits feedback — sessions no longer need to end for the feedback
+ *   loop to work.
+ * - Re-retrieval feedback: if a previously-injected memory appears again in current
+ *   results, it's marked useful. Stale entries (>2hr, never re-retrieved) are pruned.
+ *
  * v2.8 "Sharpen the Blade":
  * - Query rewriting: extracts key terms instead of raw 500-char dump
  * - Domain mapping: project-aware canonical domains (not everything → "development")
@@ -21,6 +28,11 @@ const MIN_PROMPT_LENGTH = 15;
 const MAX_RESULTS = 5;
 const MIN_SIMILARITY = 0.25;
 const CACHE_DIR = join(process.env.HOME || process.env.USERPROFILE || "/tmp", ".cache", "recall");
+
+// Checkpoint settings
+const CHECKPOINT_PROMPT_INTERVAL = 25;
+const CHECKPOINT_TIME_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
+const STALE_ENTRY_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 // Project directory → canonical domain (matches src/core/domains.py CANONICAL_DOMAINS)
 // Unknown projects → empty string (no domain filter — search everything)
@@ -95,13 +107,6 @@ function shouldSkip(prompt) {
 
 /**
  * Extract key terms from a prompt for better vector search.
- *
- * Strategy:
- * 1. Strip filler phrases ("can you", "please help me", etc.)
- * 2. Pull out quoted strings (usually specific identifiers)
- * 3. Pull out code identifiers (snake_case, camelCase, dot.paths)
- * 4. Keep remaining non-stop-word terms
- * 5. Cap at 200 chars
  */
 function extractKeyTerms(prompt) {
   let text = prompt;
@@ -187,6 +192,11 @@ function getInjectedFile(sessionId) {
   return join(CACHE_DIR, `injected-${sessionKey}.json`);
 }
 
+function getSessionStateFile(sessionId) {
+  const sessionKey = sessionId || `ppid-${process.ppid}`;
+  return join(CACHE_DIR, `session-state-${sessionKey}.json`);
+}
+
 function isFirstPrompt(injectedFile) {
   try {
     if (!existsSync(injectedFile)) return true;
@@ -195,6 +205,144 @@ function isFirstPrompt(injectedFile) {
   } catch {
     return true;
   }
+}
+
+/**
+ * Load or initialize session state (prompt counter, last checkpoint time, recent prompts).
+ */
+function loadSessionState(stateFile) {
+  try {
+    if (existsSync(stateFile)) {
+      return JSON.parse(readFileSync(stateFile, "utf8"));
+    }
+  } catch {}
+  return {
+    prompt_count: 0,
+    last_checkpoint: new Date().toISOString(),
+    recent_prompts: [],
+  };
+}
+
+function saveSessionState(stateFile, state) {
+  try {
+    if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+    writeFileSync(stateFile, JSON.stringify(state));
+  } catch {}
+}
+
+/**
+ * Check if it's time for a checkpoint (every N prompts or M hours).
+ */
+function needsCheckpoint(state) {
+  if (state.prompt_count > 0 && state.prompt_count % CHECKPOINT_PROMPT_INTERVAL === 0) {
+    return true;
+  }
+  const elapsed = Date.now() - new Date(state.last_checkpoint).getTime();
+  if (elapsed >= CHECKPOINT_TIME_INTERVAL_MS && state.prompt_count > 0) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Submit feedback for stale injected entries using re-retrieval heuristic.
+ *
+ * Logic: memories that appear in current search results AND were previously
+ * injected = useful (they keep being relevant). Entries older than 2 hours
+ * that were never re-retrieved = pruned without penalty.
+ */
+async function submitPeriodicFeedback(injectedFile, currentResultIds, headers) {
+  let injected;
+  try {
+    injected = JSON.parse(readFileSync(injectedFile, "utf8"));
+  } catch {
+    return;
+  }
+  if (!injected || injected.length === 0) return;
+
+  const now = Date.now();
+  const currentIds = new Set(currentResultIds);
+  const reRetrievedIds = [];
+  const keepEntries = [];
+
+  for (const entry of injected) {
+    if (entry.source === "rehydrate") continue; // Skip rehydrate for feedback
+
+    const age = now - new Date(entry.timestamp).getTime();
+
+    if (age > STALE_ENTRY_AGE_MS) {
+      // Old entry — check if it was re-retrieved (still relevant)
+      if (currentIds.has(entry.memory_id)) {
+        reRetrievedIds.push(entry.memory_id);
+      }
+      // Either way, don't keep stale entries
+    } else {
+      keepEntries.push(entry);
+    }
+  }
+
+  // Also keep rehydrate entries that are recent
+  for (const entry of injected) {
+    if (entry.source === "rehydrate") {
+      const age = now - new Date(entry.timestamp).getTime();
+      if (age <= STALE_ENTRY_AGE_MS) keepEntries.push(entry);
+    }
+  }
+
+  // Submit re-retrieved memories as useful (they keep coming back = genuinely relevant)
+  if (reRetrievedIds.length > 0) {
+    const uniqueIds = [...new Set(reRetrievedIds)];
+    try {
+      await fetch(`${RECALL_HOST}/memory/feedback`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          injected_ids: uniqueIds,
+          // Use the memory IDs themselves as context — the feedback endpoint
+          // will boost these since they appear in the "assistant text"
+          assistant_text: `Re-retrieved memories still relevant: ${uniqueIds.join(", ")}`,
+        }),
+        signal: AbortSignal.timeout(3000),
+      });
+    } catch {}
+  }
+
+  // Write back only recent entries (prune stale)
+  try {
+    writeFileSync(injectedFile, JSON.stringify(keepEntries));
+  } catch {}
+}
+
+/**
+ * Store a checkpoint summary — captures what the user has been working on.
+ */
+async function storeCheckpointSummary(cwd, recentPrompts, domain, headers) {
+  if (recentPrompts.length < 3) return;
+
+  const projectName = cwd.split(/[/\\]/).filter(Boolean).pop() || "unknown";
+  const promptSummary = recentPrompts
+    .slice(-15) // Last 15 prompts
+    .map((p, i) => `${i + 1}. ${p.slice(0, 100)}`)
+    .join("\n");
+
+  const content = `Session checkpoint in ${projectName} (${new Date().toISOString().slice(0, 16)}): ` +
+    `${recentPrompts.length} prompts. Recent work:\n${promptSummary}`;
+
+  try {
+    await fetch(`${RECALL_HOST}/memory/store`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        content: content.slice(0, 2000),
+        domain: domain || "general",
+        source: "system",
+        memory_type: "episodic",
+        tags: ["session-checkpoint", projectName],
+        importance: 0.4,
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch {}
 }
 
 async function main() {
@@ -226,6 +374,15 @@ async function main() {
 
   const injectedFile = getInjectedFile(parsed.session_id);
   const firstPrompt = isFirstPrompt(injectedFile);
+
+  // Update session state
+  const stateFile = getSessionStateFile(parsed.session_id);
+  const state = loadSessionState(stateFile);
+  state.prompt_count += 1;
+  state.recent_prompts.push(prompt.slice(0, 200));
+  if (state.recent_prompts.length > 50) {
+    state.recent_prompts = state.recent_prompts.slice(-50);
+  }
 
   try {
     // Build concurrent requests
@@ -272,9 +429,13 @@ async function main() {
       } catch {}
     }
 
-    if (results.length === 0 && rehydrateEntries.length === 0) process.exit(0);
+    if (results.length === 0 && rehydrateEntries.length === 0) {
+      saveSessionState(stateFile, state);
+      process.exit(0);
+    }
 
     // Track injected memory IDs for feedback loop
+    const currentResultIds = results.map((r) => r.id);
     try {
       if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
       let injected = [];
@@ -293,6 +454,18 @@ async function main() {
       if (injected.length > 500) injected = injected.slice(-500);
       writeFileSync(injectedFile, JSON.stringify(injected));
     } catch {} // Never block retrieval
+
+    // Periodic checkpoint: feedback + summary for long-running sessions
+    if (needsCheckpoint(state)) {
+      // Fire-and-forget — don't delay the response
+      submitPeriodicFeedback(injectedFile, currentResultIds, headers).catch(() => {});
+      storeCheckpointSummary(cwd, state.recent_prompts, domain, headers).catch(() => {});
+      state.last_checkpoint = new Date().toISOString();
+      state.recent_prompts = []; // Reset after checkpoint
+    }
+
+    // Save updated state
+    saveSessionState(stateFile, state);
 
     // Build context: rehydrate briefing first, then search results
     const parts = [];

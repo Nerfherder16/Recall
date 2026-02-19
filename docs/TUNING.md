@@ -63,6 +63,10 @@ Read this before adjusting any threshold, rate, or weight.
 | Rehydrate max entries | 10 | v2.8 |
 | Browse timeout | 3.5s | v2.8 |
 | Injected entry source tag | "search" or "rehydrate" | 2026-02-19 |
+| **Checkpoint prompt interval** | **25 prompts** | 2026-02-19 |
+| **Checkpoint time interval** | **2 hours** | 2026-02-19 |
+| **Stale entry age** | **2 hours** | 2026-02-19 |
+| Checkpoint summary importance | 0.4 | 2026-02-19 |
 
 ### Session Summary Hook (`hooks/recall-session-summary.js`)
 
@@ -102,6 +106,23 @@ Read this before adjusting any threshold, rate, or weight.
 ---
 
 ## Change History
+
+### 2026-02-19: Periodic checkpoints for long-running sessions
+
+**Problem:** Sessions run 24/7 during development. The Stop hook (session summary + feedback submission) never fires. Result: no session summaries stored, no feedback submitted, feedback loop is dead for the primary workflow. 3 days of active development across codevv/uiagent/autopilot produced zero session summaries.
+
+**Changes:** `hooks/recall-retrieve.js` — added periodic checkpoint system:
+1. Session state tracking: prompt counter + last checkpoint time per session (persisted to `~/.cache/recall/session-state-{id}.json`)
+2. Every 25 prompts OR every 2 hours (whichever hits first):
+   - Stores a "session-checkpoint" memory with recent user prompts (episodic, importance 0.4)
+   - Submits feedback for stale injected entries using re-retrieval heuristic (if a memory keeps appearing in results → useful)
+3. Prunes injected entries older than 2 hours to prevent unbounded growth
+
+**Expected effect:** Long-running sessions now produce checkpoint summaries every ~25 prompts, keeping episodic memory current. Feedback loop fires periodically instead of never. The Stop hook still works as before if a session does end.
+
+**What to watch:** If checkpoints are too frequent (noisy), increase to 50 prompts / 4 hours. If too infrequent, reduce to 15 prompts / 1 hour.
+
+---
 
 ### 2026-02-19: Deduplication system
 
