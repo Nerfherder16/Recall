@@ -12,7 +12,7 @@ Read this before adjusting any threshold, rate, or weight.
 | Parameter | Value | File:Line | Last Changed |
 |-----------|-------|-----------|--------------|
 | Base decay rate | 0.01/hr | `src/core/config.py:51` | Original |
-| Decay schedule | Every 30min (:15, :45) | `src/workers/main.py:232-236` | Original |
+| Decay schedule | **Every 6hr** (0:15, 6:15, 12:15, 18:15) | `src/workers/main.py:232-236` | 2026-02-19 |
 | Importance floor | **0.05** | `decay.py:136, 247` | 2026-02-19 |
 | Durability modifiers | permanent=immune, durable=0.15x, ephemeral=1.0x | `decay.py:87-130` | v2.2 |
 | Null durability default | Treated as "durable" (0.15x) | `decay.py:92-93` | v2.3 |
@@ -93,6 +93,18 @@ Read this before adjusting any threshold, rate, or weight.
 ---
 
 ## Change History
+
+### 2026-02-19: Reduce decay frequency from 48x/day to 4x/day
+
+**Problem:** Decay ran every 30 min (48x/day), applying relentless downward pressure. Combined with the now-rebalanced feedback loop, this was overkill — memories that get one useful retrieval per day only gain +0.11, but decay at 48x/day could remove ~0.05-0.10/day for low-stability durable memories.
+
+**Change:** `src/workers/main.py:232-236` — `minute={15, 45}` → `hour={0, 6, 12, 18}, minute=15`
+
+**Expected effect:** 12x less decay pressure. Durable memories at importance 0.30 should now lose ~0.002/day instead of ~0.024/day. One useful retrieval per day (+0.10) easily overwhelms decay.
+
+**What to watch:** If memories start accumulating above 0.8 without being genuinely useful, consider bumping back to every 4 hours (6x/day).
+
+---
 
 ### 2026-02-19: Fix importance collapse (commit bcd1648)
 

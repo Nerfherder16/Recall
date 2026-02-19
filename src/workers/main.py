@@ -228,11 +228,11 @@ class WorkerSettings:
             hour=None,
             minute=0,
         ),
-        # Run decay every 30 minutes at :15/:45 (staggered from consolidation)
+        # Run decay every 6 hours at :15 past (4x/day, staggered from consolidation)
         cron(
             run_decay,
-            hour=None,
-            minute={15, 45},
+            hour={0, 6, 12, 18},
+            minute=15,
         ),
         # Save metrics snapshot every hour at :30 (staggered from consolidation)
         cron(
