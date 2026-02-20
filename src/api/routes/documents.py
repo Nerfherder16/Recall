@@ -21,7 +21,7 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
-ALLOWED_TYPES = {"pdf", "markdown", "text"}
+ALLOWED_TYPES = {"pdf", "markdown", "text", "docx"}
 
 
 # =============================================================
@@ -86,6 +86,8 @@ async def ingest_file(
         fname = (file.filename or "").lower()
         if fname.endswith(".pdf"):
             ft = "pdf"
+        elif fname.endswith((".docx",)):
+            ft = "docx"
         elif fname.endswith((".md", ".markdown")):
             ft = "markdown"
         elif fname.endswith((".txt", ".text", ".log", ".csv", ".json", ".yaml", ".yml")):

@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Most recent first.
 
 ---
 
+## v2.9.1 — DOCX Support (2026-02-20)
+
+### Added
+- **DOCX document ingestion**: `.docx` files now parsed via `python-docx`, chunked by paragraphs, and extracted through the LLM memory pipeline — same as PDF/markdown/text.
+- `parse_docx()` in `document_ingest.py` using `python-docx` (lazy import).
+- `python-docx>=1.1.0` added to dependencies.
+
+### Files Changed
+- `src/core/document_ingest.py` — `parse_docx()` + "docx" dispatch in `ingest_document()`
+- `src/api/routes/documents.py` — "docx" in `ALLOWED_TYPES` + `.docx` extension detection
+- `pyproject.toml` — `python-docx>=1.1.0`
+
+---
+
 ## v2.9 — "Observer Intelligence" (2026-02-19)
 
 Observer memories get LLM-assigned importance, test payloads are filtered out,

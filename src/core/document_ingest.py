@@ -1,7 +1,7 @@
 """
 Document ingestion pipeline.
 
-Parses uploaded files (PDF, markdown, text), chunks them,
+Parses uploaded files (PDF, DOCX, markdown, text), chunks them,
 extracts memories via LLM, embeds, stores, and creates
 EXTRACTED_FROM edges in Neo4j.
 """
@@ -107,6 +107,17 @@ def chunk_pdf_pages(pages: list[str]) -> list[str]:
     return chunks
 
 
+def parse_docx(file_bytes: bytes) -> str:
+    """Parse DOCX into plain text using python-docx."""
+    import io
+
+    import docx
+
+    doc = docx.Document(io.BytesIO(file_bytes))
+    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+    return "\n\n".join(paragraphs)
+
+
 def parse_pdf(file_bytes: bytes) -> list[str]:
     """Parse PDF into page texts using pymupdf."""
     import pymupdf
@@ -147,10 +158,7 @@ async def extract_memories_from_chunk(
         if not isinstance(data, list):
             return []
 
-        return [
-            m for m in data
-            if isinstance(m, dict) and m.get("content")
-        ]
+        return [m for m in data if isinstance(m, dict) and m.get("content")]
     except (json.JSONDecodeError, LLMError) as e:
         logger.warning("chunk_extraction_failed", chunk=chunk_index, error=str(e))
         return []
@@ -179,6 +187,9 @@ async def ingest_document(
     if file_type == "pdf":
         pages = parse_pdf(file_bytes)
         chunks = chunk_pdf_pages(pages)
+    elif file_type == "docx":
+        text = parse_docx(file_bytes)
+        chunks = chunk_plaintext(text)
     elif file_type == "markdown":
         text = file_bytes.decode("utf-8", errors="replace")
         chunks = chunk_markdown(text)
@@ -207,7 +218,10 @@ async def ingest_document(
     for i, chunk in enumerate(chunks):
         async with sem:
             extracted = await extract_memories_from_chunk(
-                chunk, i, len(chunks), filename,
+                chunk,
+                i,
+                len(chunks),
+                filename,
             )
             all_extractions.extend(extracted)
             if i < len(chunks) - 1:
