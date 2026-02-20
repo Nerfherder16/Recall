@@ -46,6 +46,30 @@ Importance scale:
 
 Return [] if nothing worth remembering."""
 
+HIGH_VALUE_PROMPT = """\
+This is a HIGH-VALUE config/infrastructure file change. \
+Extract facts with extra care.
+
+File: {file_path}
+Change type: {tool_name}
+{change_description}
+
+Extract facts focusing on:
+- WHAT was changed (specific settings, values, features added/removed)
+- WHY it likely matters (impact on system behavior, performance, stability)
+- Troubleshooting value (if this looks like a fix, what problem did it solve?)
+- Dependencies and side effects (what else might this affect?)
+
+Domain must be one of: general, infrastructure, development, testing, security, api,
+database, frontend, devops, networking, ai-ml, tooling, configuration, documentation, sessions
+
+Return JSON array: [{{"fact": "...", "domain": "...", "tags": ["..."], "importance": 1-10}}]
+
+Importance for high-value files should be 6+ unless trivially small. Be generous — config
+changes are often the most important memories for troubleshooting.
+
+Return [] if nothing worth remembering."""
+
 
 async def extract_and_store_observations(observation: dict):
     """
@@ -99,7 +123,9 @@ async def _run_extraction(observation: dict):
         logger.debug("observer_no_content", file=file_path)
         return
 
-    prompt = OBSERVER_PROMPT.format(
+    high_value = observation.get("high_value", False)
+    template = HIGH_VALUE_PROMPT if high_value else OBSERVER_PROMPT
+    prompt = template.format(
         file_path=file_path,
         tool_name=tool_name,
         change_description=change_desc,
@@ -131,14 +157,15 @@ async def _run_extraction(observation: dict):
 
         # Parse LLM-assigned importance (1-10 → 0.1-1.0)
         raw_imp = fact_data.get("importance")
+        default_imp = 0.6 if high_value else 0.4
         if raw_imp is not None:
             try:
                 imp_val = max(1.0, min(10.0, float(raw_imp)))
                 importance = imp_val / 10.0
             except (ValueError, TypeError):
-                importance = 0.4
+                importance = default_imp
         else:
-            importance = 0.4
+            importance = default_imp
 
         chash = content_hash(fact_text)
 

@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Most recent first.
 
 ---
 
+## v2.9.3 — Smarter Memory Capture (2026-02-20)
+
+### Problem
+High-value changes (config edits, troubleshooting fixes, hook optimizations) weren't being captured by the observer because it treated all files equally and the session-summary hook compressed everything into one episodic blob.
+
+### Added
+- **High-value file detection** (`observe-edit.js`): Config files, hooks, docker-compose, Dockerfiles, settings, and CI/CD pipelines are flagged as `high_value: true`.
+- **Enhanced observer prompt** (`observer.py`): High-value files get a richer LLM prompt asking for impact, root cause, and troubleshooting context. Default importance boosted from 0.4 to 0.6.
+- **Session decision extraction** (`recall-session-summary.js`): For sessions with 10+ messages, a second LLM call extracts 2-5 key decisions/troubleshooting findings as separate **semantic** memories (not just one episodic summary). Includes both user AND assistant messages for full context.
+
+### Files Changed
+- `hooks/observe-edit.js` — HIGH_VALUE_PATTERNS list + `high_value` flag in request body
+- `hooks/recall-session-summary.js` — `extractMessages()` (both roles), `extractKeyDecisions()`, stores semantic decision memories
+- `src/api/routes/observe.py` — `high_value: bool` field on `FileChangeObservation`
+- `src/workers/observer.py` — `HIGH_VALUE_PROMPT`, prompt selection by flag, importance boost
+
+---
+
 ## v2.9.2 — Health Dashboard Tooltips & Scales (2026-02-20)
 
 ### Added

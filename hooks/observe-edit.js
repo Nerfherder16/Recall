@@ -21,6 +21,23 @@ const SKIP_EXTENSIONS = new Set([
 ]);
 const SKIP_DIRS = ["node_modules", ".git", "__pycache__", "dist", "build", ".next", ".venv", "__tests__", ".autopilot"];
 
+// Files matching these patterns get flagged as high-value — observer uses
+// a richer prompt and sets higher default importance
+const HIGH_VALUE_PATTERNS = [
+  /\/\.claude\/hooks\//,        // Claude hook files
+  /\/\.claude\/settings/,       // Claude settings
+  /\/\.claude\/CLAUDE\.md$/,    // Project instructions
+  /docker-compose\.(ya?ml)$/,   // Docker config
+  /Dockerfile$/,                // Docker images
+  /\.env(\.\w+)?$/,             // Environment files
+  /nginx\.conf/,                // Reverse proxy
+  /pyproject\.toml$/,           // Python project config
+  /package\.json$/,             // Node project config
+  /tsconfig.*\.json$/,          // TypeScript config
+  /\.github\/workflows\//,     // CI/CD pipelines
+  /hooks\/.*\.js$/,             // Any hooks directory
+];
+
 function shouldSkipFile(filePath) {
   if (!filePath) return true;
   const lower = filePath.replace(/\\/g, "/").toLowerCase();
@@ -62,9 +79,13 @@ async function main() {
 
   if (!filePath || shouldSkipFile(filePath)) process.exit(0);
 
+  const normalized = filePath.replace(/\\/g, "/");
+  const highValue = HIGH_VALUE_PATTERNS.some((p) => p.test(normalized));
+
   const body = {
     file_path: filePath,
     tool_name: toolName,
+    high_value: highValue,
   };
 
   if (toolName === "Edit" || toolName === "edit") {

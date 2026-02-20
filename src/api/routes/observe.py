@@ -25,6 +25,7 @@ class FileChangeObservation(BaseModel):
     old_string: str | None = Field(None, max_length=5000)
     new_string: str | None = Field(None, max_length=5000)
     tool_name: str = "Write"
+    high_value: bool = False
 
 
 class GitDiffRequest(BaseModel):
