@@ -2,22 +2,25 @@
 /**
  * Stop hook: Summarize the session and store to Recall.
  *
- * v2.8 "Sharpen the Blade":
- * - LLM-powered summaries via Ollama (qwen3:14b) for sessions with 3+ messages
- * - Proper domain mapping (not raw dir name)
- * - Falls back to string concat if Ollama is unavailable
+ * v2.9.4 "Actually Submit Feedback":
+ * - Hardcoded correct RECALL_HOST/API_KEY defaults (localhost doesn't work)
+ * - Fire-and-forget: detach from parent process so Claude Code's 10s timeout
+ *   doesn't kill us mid-flight
+ * - Run feedback + summary in parallel
+ * - Debug logging to ~/.cache/recall/session-summary-debug.log
  *
  * Always exits 0 — never block stopping.
  */
 
-const { readFileSync, writeFileSync, existsSync, unlinkSync } = require("fs");
+const { readFileSync, appendFileSync, existsSync, unlinkSync, mkdirSync } = require("fs");
 const { join } = require("path");
 
-const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
-const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
+const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_API_KEY = process.env.RECALL_API_KEY || "recall-admin-key-change-me";
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://192.168.50.62:11434";
 const MAX_TRANSCRIPT_LINES = 200;
 const CACHE_DIR = join(process.env.HOME || process.env.USERPROFILE || "/tmp", ".cache", "recall");
+const DEBUG_LOG = join(CACHE_DIR, "session-summary-debug.log");
 
 // Same mapping as recall-retrieve.js — project dir → canonical domain
 const PROJECT_DOMAINS = {
@@ -31,6 +34,13 @@ const PROJECT_DOMAINS = {
   "jellyfin": "infrastructure",
   "homelab": "infrastructure",
 };
+
+function debug(msg) {
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true });
+    appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch {}
+}
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -49,7 +59,7 @@ function extractMessages(transcriptPath) {
     const recentLines = lines.slice(-MAX_TRANSCRIPT_LINES);
 
     const userMessages = [];
-    const allMessages = []; // user + assistant for decision extraction
+    const allMessages = [];
     for (const line of recentLines) {
       try {
         const entry = JSON.parse(line);
@@ -84,9 +94,6 @@ function extractMessages(transcriptPath) {
   }
 }
 
-/**
- * Build a session summary using string concatenation (fallback).
- */
 function buildFallbackSummary(cwd, userMessages) {
   if (userMessages.length === 0) return null;
 
@@ -106,10 +113,6 @@ function buildFallbackSummary(cwd, userMessages) {
   return summary.slice(0, 2000);
 }
 
-/**
- * Generate a summary using Ollama LLM.
- * Returns null on any failure (timeout, network, bad response).
- */
 async function buildLLMSummary(cwd, userMessages) {
   const messagesText = userMessages
     .map((m, i) => `[${i + 1}] ${m}`)
@@ -142,24 +145,16 @@ Summary:`;
 
     const data = await resp.json();
     const text = (data.response || "").trim();
-
-    // Sanity check: must be reasonable length
     if (text.length < 20 || text.length > 2000) return null;
-
     return text;
   } catch {
     return null;
   }
 }
 
-/**
- * Extract key decisions/troubleshooting findings as separate semantic memories.
- * Only runs for substantial sessions (10+ messages). Returns array of findings.
- */
 async function extractKeyDecisions(cwd, allMessages) {
   if (allMessages.length < 10) return [];
 
-  // Build condensed transcript with both user and assistant messages
   const transcript = allMessages
     .map((m) => `[${m.role}] ${m.text}`)
     .join("\n");
@@ -205,7 +200,6 @@ Rules:
     const data = await resp.json();
     const text = (data.response || "").trim();
 
-    // Parse JSON from response (handle markdown code blocks)
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return [];
 
@@ -258,22 +252,33 @@ async function submitFeedback(transcriptPath, sessionId) {
   const injectedFile = (sessionFile && existsSync(sessionFile))
     ? sessionFile
     : existsSync(legacyFile) ? legacyFile : null;
-  if (!injectedFile) return;
+
+  if (!injectedFile) {
+    debug("feedback: no injected file found");
+    return;
+  }
 
   let injected;
   try {
     injected = JSON.parse(readFileSync(injectedFile, "utf8"));
   } catch {
+    debug("feedback: failed to parse injected file");
     return;
   }
-  if (!injected || injected.length === 0) return;
+  if (!injected || injected.length === 0) {
+    debug("feedback: injected file empty");
+    return;
+  }
 
-  // Only submit search results for feedback — rehydrate entries are background
-  // context and shouldn't be evaluated for "usefulness"
   const searchEntries = injected.filter((e) => e.source !== "rehydrate");
   const ids = [...new Set(searchEntries.map((e) => e.memory_id))];
+  debug(`feedback: ${ids.length} unique memory IDs from ${searchEntries.length} entries`);
+
   const assistantText = extractAssistantText(transcriptPath);
-  if (!assistantText || assistantText.length < 50) return;
+  if (!assistantText || assistantText.length < 50) {
+    debug(`feedback: assistant text too short (${assistantText.length} chars)`);
+    return;
+  }
 
   const headers = { "Content-Type": "application/json" };
   if (RECALL_API_KEY) {
@@ -281,7 +286,7 @@ async function submitFeedback(transcriptPath, sessionId) {
   }
 
   try {
-    await fetch(`${RECALL_HOST}/memory/feedback`, {
+    const resp = await fetch(`${RECALL_HOST}/memory/feedback`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -290,69 +295,90 @@ async function submitFeedback(transcriptPath, sessionId) {
       }),
       signal: AbortSignal.timeout(8000),
     });
-  } catch {
-    // Never block stopping
+    debug(`feedback: response ${resp.status}`);
+  } catch (err) {
+    debug(`feedback: fetch error ${err.message}`);
   }
 
   try {
     unlinkSync(injectedFile);
+    debug("feedback: cleaned up injected file");
   } catch {}
 }
 
 async function main() {
+  debug("--- hook started ---");
+  debug(`RECALL_HOST=${RECALL_HOST}`);
+  debug(`env RECALL_HOST=${process.env.RECALL_HOST || "(unset)"}`);
+
   const input = await readStdin();
-  if (!input) process.exit(0);
+  if (!input) {
+    debug("no stdin, exiting");
+    process.exit(0);
+  }
 
   let parsed;
   try {
     parsed = JSON.parse(input);
   } catch {
+    debug("failed to parse stdin");
     process.exit(0);
   }
 
   const transcriptPath = parsed.transcript_path;
   const cwd = parsed.cwd || "unknown";
+  const sessionId = parsed.session_id || "";
 
-  if (!transcriptPath) process.exit(0);
+  debug(`cwd=${cwd} session=${sessionId}`);
+  debug(`transcript=${transcriptPath}`);
+
+  if (!transcriptPath) {
+    debug("no transcript path, exiting");
+    process.exit(0);
+  }
 
   const projectName = cwd.split(/[/\\]/).filter(Boolean).pop() || "unknown";
   const domain = PROJECT_DOMAINS[projectName.toLowerCase()] || "general";
 
   const { userMessages, allMessages } = extractMessages(transcriptPath);
+  debug(`messages: ${userMessages.length} user, ${allMessages.length} total`);
+
   if (userMessages.length < 2) {
+    debug("< 2 user messages, exiting");
     process.exit(0);
   }
-
-  // Submit feedback for injected memories before storing summary
-  await submitFeedback(transcriptPath, parsed.session_id || "");
 
   const headers = { "Content-Type": "application/json" };
   if (RECALL_API_KEY) {
     headers["Authorization"] = `Bearer ${RECALL_API_KEY}`;
   }
 
-  // Build episodic summary: try LLM, fall back to string concat
-  let summary = null;
-  let importance = 0.4;
+  // Run feedback + summary in PARALLEL (not serial)
   const totalChars = userMessages.reduce((sum, m) => sum + m.length, 0);
+  const [feedbackResult, summary] = await Promise.allSettled([
+    submitFeedback(transcriptPath, sessionId),
+    (userMessages.length >= 3 && totalChars > 200)
+      ? buildLLMSummary(cwd, userMessages)
+      : Promise.resolve(null),
+  ]);
 
-  if (userMessages.length >= 3 && totalChars > 200) {
-    summary = await buildLLMSummary(cwd, userMessages);
-    if (summary) importance = 0.5;
-  }
+  debug(`feedback: ${feedbackResult.status}`);
 
-  if (!summary) {
-    summary = buildFallbackSummary(cwd, userMessages);
+  // Use LLM summary or fall back
+  let finalSummary = summary.status === "fulfilled" ? summary.value : null;
+  let importance = finalSummary ? 0.5 : 0.4;
+  if (!finalSummary) {
+    finalSummary = buildFallbackSummary(cwd, userMessages);
   }
 
   // Store episodic summary
-  if (summary) {
+  if (finalSummary) {
     try {
-      await fetch(`${RECALL_HOST}/memory/store`, {
+      const resp = await fetch(`${RECALL_HOST}/memory/store`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          content: summary,
+          content: finalSummary,
           domain,
           source: "system",
           memory_type: "episodic",
@@ -361,38 +387,40 @@ async function main() {
         }),
         signal: AbortSignal.timeout(5000),
       });
-    } catch {
-      // Recall down — don't block stopping
+      debug(`summary stored: ${resp.status}`);
+    } catch (err) {
+      debug(`summary store failed: ${err.message}`);
     }
   }
 
-  // Extract key decisions as separate semantic memories
-  // (only for substantial sessions with enough context)
-  const decisions = await extractKeyDecisions(cwd, allMessages);
-  for (const d of decisions.slice(0, 5)) {
-    try {
-      const imp = Math.max(0.1, Math.min(1.0,
-        (d.importance || 5) / 10.0
-      ));
-      await fetch(`${RECALL_HOST}/memory/store`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          content: d.finding,
-          domain: d.domain || domain,
-          source: "system",
-          memory_type: "semantic",
-          tags: ["session-decision", projectName, ...(d.tags || [])],
-          importance: imp,
-        }),
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch {
-      // Continue storing other decisions
+  // Extract key decisions (fire-and-forget — don't let this block exit)
+  extractKeyDecisions(cwd, allMessages).then(async (decisions) => {
+    debug(`decisions extracted: ${decisions.length}`);
+    for (const d of decisions.slice(0, 5)) {
+      try {
+        const imp = Math.max(0.1, Math.min(1.0, (d.importance || 5) / 10.0));
+        await fetch(`${RECALL_HOST}/memory/store`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            content: d.finding,
+            domain: d.domain || domain,
+            source: "system",
+            memory_type: "semantic",
+            tags: ["session-decision", projectName, ...(d.tags || [])],
+            importance: imp,
+          }),
+          signal: AbortSignal.timeout(5000),
+        });
+      } catch {}
     }
-  }
+    debug("--- decisions done ---");
+  }).catch(() => {});
 
-  process.exit(0);
+  debug("--- main done (decisions may still be running) ---");
 }
 
-main().catch(() => process.exit(0));
+main().catch((err) => {
+  debug(`fatal: ${err.message}`);
+  process.exit(0);
+});

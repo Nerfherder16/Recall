@@ -22,8 +22,8 @@
 const { writeFileSync, mkdirSync, existsSync, readFileSync } = require("fs");
 const { join } = require("path");
 
-const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
-const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
+const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_API_KEY = process.env.RECALL_API_KEY || "recall-admin-key-change-me";
 const MIN_PROMPT_LENGTH = 15;
 const MAX_RESULTS = 5;
 const MIN_SIMILARITY = 0.25;

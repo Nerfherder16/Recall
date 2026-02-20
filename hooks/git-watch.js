@@ -12,8 +12,8 @@
 
 const { execSync } = require("child_process");
 
-const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
-const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
+const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_API_KEY = process.env.RECALL_API_KEY || "recall-admin-key-change-me";
 
 // Pattern: git commit output like "[branch abc1234] message"
 const COMMIT_HASH_PATTERN = /\[[\w/.-]+\s+([a-f0-9]{7,40})\]/;

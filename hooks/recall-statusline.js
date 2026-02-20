@@ -15,9 +15,9 @@ const { existsSync, writeFileSync, readFileSync, mkdirSync } = require("fs");
 const { join, dirname } = require("path");
 const { spawn } = require("child_process");
 
-const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
-const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
-const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://localhost:11434";
+const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_API_KEY = process.env.RECALL_API_KEY || "recall-admin-key-change-me";
+const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://192.168.50.62:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:14b";
 const THRESHOLD = 65;
 const MAX_TRANSCRIPT_LINES = 300;

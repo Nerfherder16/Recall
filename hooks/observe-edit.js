@@ -8,8 +8,8 @@
 
 const { extname } = require("path");
 
-const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
-const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
+const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_API_KEY = process.env.RECALL_API_KEY || "recall-admin-key-change-me";
 const MAX_CONTENT_SIZE = 10000;
 
 // Skip binary, generated, and irrelevant file types

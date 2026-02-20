@@ -5,6 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Most recent first.
 
 ---
 
+## v2.9.4 — Fix Feedback Loop (2026-02-20)
+
+### Problem
+Session feedback never reached Recall. All hooks had `localhost:8200` as fallback default, but Recall runs on CasaOS (`192.168.50.19:8200`). The `settings.json` `env` block sets the correct host, but environment variable inheritance to hooks is unreliable on Windows. The session-summary hook also had a 10s timeout — too tight for feedback + LLM summary + decision extraction (~60s total).
+
+### Fixed
+- **All 6 hooks** now hardcode correct defaults: `RECALL_HOST=http://192.168.50.19:8200`, `RECALL_API_KEY=recall-admin-key-change-me`, `OLLAMA_HOST=http://192.168.50.62:11434`
+- **Session-summary timeout** bumped from 10s to 30s in `settings.json`
+- **Feedback + summary run in parallel** (was serial) — saves ~8s
+- **Decision extraction** runs fire-and-forget (doesn't block hook exit)
+- **Debug logging** added to session-summary hook: `~/.cache/recall/session-summary-debug.log`
+
+### Hooks Fixed
+- `hooks/recall-retrieve.js`
+- `hooks/recall-session-summary.js`
+- `hooks/observe-edit.js`
+- `hooks/session-save.js`
+- `hooks/recall-statusline.js`
+- `hooks/git-watch.js`
+
+---
+
 ## v2.9.3 — Smarter Memory Capture (2026-02-20)
 
 ### Problem
