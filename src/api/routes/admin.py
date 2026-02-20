@@ -55,7 +55,6 @@ class DecayRequest(BaseModel):
 class DecayResponse(BaseModel):
     processed: int
     decayed: int
-    archived: int
     stable: int
 
 

@@ -1063,6 +1063,10 @@ async def batch_delete_memories(
 
                 await qdrant.delete(memory_id)
                 await neo4j.delete_memory(memory_id)
+                try:
+                    await qdrant.delete_facts_for_memory(memory_id)
+                except Exception:
+                    pass  # Facts collection might not exist yet
 
                 await pg.log_audit(
                     "delete",

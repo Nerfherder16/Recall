@@ -57,21 +57,21 @@ class DecayWorker:
         stats = {
             "processed": 0,
             "decayed": 0,
-            "archived": 0,
             "stable": 0,
         }
 
         # Load feedback stats once for the entire run
         if feedback_stats is None:
             feedback_stats = await self._load_feedback_stats()
+        logger.debug("decay_feedback_loaded", count=len(feedback_stats))
 
         # Scroll through ALL memories (unbiased, no limit)
         results = await self.qdrant.scroll_all(
             include_superseded=False,
         )
+        logger.debug("decay_scroll_done", count=len(results))
 
         now = datetime.utcnow()
-        archive_threshold = 0.05
         base_decay_rate = self.settings.importance_decay_rate
 
         # Load graph connectivity for all memory IDs (one Neo4j call)
@@ -81,118 +81,101 @@ class DecayWorker:
         except Exception as e:
             logger.debug("decay_graph_strengths_unavailable", error=str(e))
             graph_strengths = {}
+        logger.debug("decay_graph_loaded", count=len(graph_strengths))
 
         for memory_id, payload in results:
-            stats["processed"] += 1
+            try:
+                stats["processed"] += 1
 
-            # Pinned memories are immune to decay
-            if payload.get("pinned") == "true":
-                stats["stable"] += 1
-                continue
+                # Pinned memories are immune to decay
+                if payload.get("pinned") == "true":
+                    stats["stable"] += 1
+                    continue
 
-            # Permanent memories never decay
-            durability = payload.get("durability")
-            if durability == "permanent":
-                stats["stable"] += 1
-                continue
+                # Permanent memories never decay
+                durability = payload.get("durability")
+                if durability == "permanent":
+                    stats["stable"] += 1
+                    continue
 
-            # Null durability defaults to durable (safe default)
-            if durability is None:
-                durability = "durable"
+                # Null durability defaults to durable (safe default)
+                if durability is None:
+                    durability = "durable"
 
-            importance = payload.get("importance", 0.5)
-            stability = payload.get("stability", 0.1)
-            last_accessed_str = payload.get("last_accessed")
-            access_count = payload.get("access_count", 0)
+                importance = payload.get("importance", 0.5)
+                stability = payload.get("stability", 0.1)
+                last_accessed_str = payload.get("last_accessed")
+                access_count = payload.get("access_count", 0)
 
-            if not last_accessed_str:
-                continue
+                if not last_accessed_str:
+                    continue
 
-            last_accessed = datetime.fromisoformat(
-                last_accessed_str,
-            )
-            hours_since = (now - last_accessed).total_seconds() / 3600 + hours_offset
-
-            # Base decay modulated by stability
-            effective_decay = base_decay_rate * (1 - stability)
-
-            # Access frequency: more accesses = slower decay
-            # 10 accesses → 0.5x, 20 → 0.33x, 0 → 1.0x
-            access_mod = 1.0 / (1.0 + 0.1 * access_count)
-            effective_decay *= access_mod
-
-            # Feedback ratio: useful memories decay slower
-            fb = feedback_stats.get(memory_id)
-            if fb:
-                useful = fb.get("useful", 0)
-                not_useful = fb.get("not_useful", 0)
-                total_fb = useful + not_useful
-                if total_fb > 0:
-                    ratio = useful / total_fb
-                    # 100% useful → 0.5x decay, 0% → 1.0x
-                    feedback_mod = 1.0 - (0.5 * ratio)
-                    effective_decay *= feedback_mod
-
-            # Durable memories decay 85% slower
-            if durability == "durable":
-                effective_decay *= 0.15
-
-            # Apply decay
-            new_importance = importance * ((1 - effective_decay) ** hours_since)
-
-            # Graph-aware floor: well-connected memories get a higher minimum
-            total_strength = graph_strengths.get(memory_id, 0)
-            if total_strength >= 6.0:
-                floor = 0.3  # Hub memory — preserve
-            elif total_strength >= 3.0:
-                floor = 0.15  # Moderately connected
-            else:
-                floor = 0.05  # Default floor
-            new_importance = max(floor, new_importance)
-
-            if abs(new_importance - importance) > 0.001:
-                await self.qdrant.update_importance(
-                    memory_id,
-                    new_importance,
+                last_accessed = datetime.fromisoformat(
+                    last_accessed_str,
                 )
-                await self.neo4j.update_importance(
-                    memory_id,
-                    new_importance,
+                hours_since = (now - last_accessed).total_seconds() / 3600 + hours_offset
+
+                # Base decay modulated by stability
+                effective_decay = base_decay_rate * (1 - stability)
+
+                # Access frequency: more accesses = slower decay
+                # 10 accesses → 0.5x, 20 → 0.33x, 0 → 1.0x
+                access_mod = 1.0 / (1.0 + 0.1 * access_count)
+                effective_decay *= access_mod
+
+                # Feedback ratio: useful memories decay slower
+                fb = feedback_stats.get(memory_id)
+                if fb:
+                    useful = fb.get("useful", 0)
+                    not_useful = fb.get("not_useful", 0)
+                    total_fb = useful + not_useful
+                    if total_fb > 0:
+                        ratio = useful / total_fb
+                        # 100% useful → 0.5x decay, 0% → 1.0x
+                        feedback_mod = 1.0 - (0.5 * ratio)
+                        effective_decay *= feedback_mod
+
+                # Durable memories decay 85% slower
+                if durability == "durable":
+                    effective_decay *= 0.15
+
+                # Apply decay
+                new_importance = importance * ((1 - effective_decay) ** hours_since)
+
+                # Graph-aware floor: well-connected memories get a higher minimum
+                total_strength = graph_strengths.get(memory_id, 0)
+                if total_strength >= 6.0:
+                    floor = 0.3  # Hub memory — preserve
+                elif total_strength >= 3.0:
+                    floor = 0.15  # Moderately connected
+                else:
+                    floor = 0.05  # Default floor
+                new_importance = max(floor, new_importance)
+
+                if abs(new_importance - importance) > 0.001:
+                    await self.qdrant.update_importance(
+                        memory_id,
+                        new_importance,
+                    )
+                    await self.neo4j.update_importance(
+                        memory_id,
+                        new_importance,
+                    )
+                    stats["decayed"] += 1
+                else:
+                    stats["stable"] += 1
+            except Exception as e:
+                logger.warning(
+                    "decay_memory_error",
+                    memory_id=memory_id,
+                    error=str(e),
                 )
-                stats["decayed"] += 1
-
-                # Archive audit on significant decay
-                if new_importance < archive_threshold and stability < 0.3:
-                    stats["archived"] += 1
-                    try:
-                        from src.storage import get_postgres_store
-
-                        pg = await get_postgres_store()
-                        await pg.log_audit(
-                            "decay",
-                            memory_id,
-                            actor="decay",
-                            details={
-                                "old_importance": round(
-                                    importance,
-                                    4,
-                                ),
-                                "new_importance": round(
-                                    new_importance,
-                                    4,
-                                ),
-                            },
-                        )
-                    except Exception:
-                        pass  # Fire-and-forget
-            else:
-                stats["stable"] += 1
+                continue
 
         logger.info(
             "decay_completed",
             processed=stats["processed"],
             decayed=stats["decayed"],
-            archived=stats["archived"],
         )
 
         return stats
@@ -215,69 +198,3 @@ class DecayWorker:
                 error=str(e),
             )
             return {}
-
-
-async def apply_decay_to_memory(
-    memory_id: str,
-    qdrant_store,
-    neo4j_store,
-    hours_since_access: float,
-    current_importance: float,
-    stability: float,
-    access_count: int = 0,
-    durability: str | None = None,
-    feedback_stats: dict[str, int] | None = None,
-    graph_strength: float = 0.0,
-) -> float:
-    """
-    Apply decay to a single memory and return new importance.
-
-    Mirrors the full DecayWorker.run() formula including v2.8
-    access/feedback/durability modifiers and v2.9 graph-aware floor.
-    """
-    settings = get_settings()
-    base_decay_rate = settings.importance_decay_rate
-
-    # Stability reduces decay rate
-    effective_decay = base_decay_rate * (1 - stability)
-
-    # Access frequency modifier (v2.8)
-    access_mod = 1.0 / (1.0 + 0.1 * access_count)
-    effective_decay *= access_mod
-
-    # Feedback ratio modifier (v2.8)
-    if feedback_stats:
-        useful = feedback_stats.get("useful", 0)
-        not_useful = feedback_stats.get("not_useful", 0)
-        total_fb = useful + not_useful
-        if total_fb > 0:
-            feedback_mod = 1.0 - (0.5 * (useful / total_fb))
-            effective_decay *= feedback_mod
-
-    # Durability modifier
-    if durability == "durable" or durability is None:
-        effective_decay *= 0.15
-
-    # Apply exponential decay
-    new_importance = current_importance * ((1 - effective_decay) ** hours_since_access)
-
-    # Graph-aware floor (v2.9)
-    if graph_strength >= 6.0:
-        floor = 0.3
-    elif graph_strength >= 3.0:
-        floor = 0.15
-    else:
-        floor = 0.05
-    new_importance = max(floor, new_importance)
-
-    if abs(new_importance - current_importance) > 0.001:
-        await qdrant_store.update_importance(
-            memory_id,
-            new_importance,
-        )
-        await neo4j_store.update_importance(
-            memory_id,
-            new_importance,
-        )
-
-    return new_importance

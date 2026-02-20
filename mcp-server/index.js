@@ -21,8 +21,9 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Configuration - can override with env vars
-const RECALL_HOST = process.env.RECALL_HOST || "http://localhost:8200";
-const RECALL_API_KEY = process.env.RECALL_API_KEY || "";
+const RECALL_HOST = process.env.RECALL_HOST || "http://192.168.50.19:8200";
+const RECALL_API_KEY =
+  process.env.RECALL_API_KEY || "recall-admin-key-change-me";
 
 // Helper for API calls
 async function recallAPI(endpoint, method = "GET", body = null) {

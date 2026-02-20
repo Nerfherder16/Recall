@@ -6,12 +6,10 @@ Qwen3-Embedding produces 1024-dimensional vectors with MTEB ~68-70.
 """
 
 import hashlib
-import struct
 import time
 from collections import OrderedDict
 
 import httpx
-import numpy as np
 import structlog
 
 from .config import get_settings
@@ -164,67 +162,6 @@ class EmbeddingService:
                 value=time.time() - start,
             )
 
-    async def embed_batch(self, texts: list[str], prefix: str = "passage") -> list[list[float]]:
-        """
-        Generate embeddings for multiple texts using native batch API.
-
-        Sends all texts in a single /api/embed request.
-        Falls back to sequential on error.
-        """
-        if not texts:
-            return []
-
-        # Apply query prefix if needed
-        if prefix == "query":
-            processed = [
-                "Instruct: Given a web search query, retrieve relevant "
-                "passages that answer the query\n"
-                f"Query:{t}"
-                for t in texts
-            ]
-        else:
-            processed = texts
-
-        try:
-            response = await self.client.post(
-                f"{self.settings.ollama_host}/api/embed",
-                json={
-                    "model": self.settings.embedding_model,
-                    "input": processed,
-                },
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                embeddings = data.get("embeddings", [])
-                if len(embeddings) == len(texts):
-                    return embeddings
-
-                logger.warning(
-                    "batch_embedding_count_mismatch",
-                    expected=len(texts),
-                    actual=len(embeddings),
-                )
-
-        except Exception as e:
-            logger.warning("batch_embedding_failed_falling_back", error=str(e))
-
-        # Fallback: sequential
-        embeddings = []
-        for text in texts:
-            embedding = await self.embed(text, prefix)
-            embeddings.append(embedding)
-        return embeddings
-
-    async def similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        """Compute cosine similarity between two vectors."""
-        a = np.array(vec1)
-        b = np.array(vec2)
-        norm_a, norm_b = np.linalg.norm(a), np.linalg.norm(b)
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-        return float(np.dot(a, b) / (norm_a * norm_b))
-
     async def close(self):
         """Close the HTTP client."""
         await self.client.aclose()
@@ -246,16 +183,6 @@ def content_hash(text: str) -> str:
     """Generate a hash for deduplication."""
     normalized = " ".join(text.lower().split())
     return hashlib.sha256(normalized.encode()).hexdigest()[:16]
-
-
-def compress_embedding(embedding: list[float]) -> bytes:
-    """Compress embedding for efficient storage."""
-    return struct.pack(f"{len(embedding)}f", *embedding)
-
-
-def decompress_embedding(data: bytes, dimensions: int = 1024) -> list[float]:
-    """Decompress embedding from storage."""
-    return list(struct.unpack(f"{dimensions}f", data))
 
 
 # Singleton instance

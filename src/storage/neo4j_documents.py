@@ -129,16 +129,20 @@ class Neo4jDocumentStore:
             node = record["d"]
             return dict(node)
 
+    _ALLOWED_FIELDS = frozenset({"domain", "durability", "pinned", "memory_count", "filename"})
+
     async def update_document(self, doc_id: str, **fields):
         """Update document properties."""
-        set_clauses = ", ".join(f"d.{k} = ${k}" for k in fields)
-        if not set_clauses:
+        # Validate field names to prevent Cypher injection
+        safe_fields = {k: v for k, v in fields.items() if k in self._ALLOWED_FIELDS}
+        if not safe_fields:
             return
+        set_clauses = ", ".join(f"d.{k} = ${k}" for k in safe_fields)
         async with self.driver.session() as session:
             await session.run(
                 f"MATCH (d:Document {{id: $id}}) SET {set_clauses}",
                 id=doc_id,
-                **fields,
+                **safe_fields,
             )
 
     async def get_document_by_hash(self, file_hash: str) -> dict[str, Any] | None:

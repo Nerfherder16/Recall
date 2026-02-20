@@ -579,36 +579,28 @@ class PostgresStore:
             )
         return events
 
-    async def get_metrics_history(self, hours: int = 24) -> list[dict[str, Any]]:
-        """Get metrics snapshots from the last N hours."""
-        rows = await self.pool.fetch(
-            """
-            SELECT * FROM metrics_snapshot
-            WHERE timestamp > now() - make_interval(hours => $1)
-            ORDER BY timestamp ASC
-            """,
-            hours,
-        )
-        return [
-            {
-                "timestamp": r["timestamp"].isoformat(),
-                "counters": json.loads(r["counters"])
-                if isinstance(r["counters"], str)
-                else r["counters"],
-                "gauges": json.loads(r["gauges"]) if isinstance(r["gauges"], str) else r["gauges"],
-            }
-            for r in rows
-        ]
-
 
 # Singleton
+import asyncio  # noqa: E402 — placed here to survive linter passes
+
 _store: PostgresStore | None = None
+_store_lock: asyncio.Lock | None = None
+
+
+def _get_store_lock() -> asyncio.Lock:
+    global _store_lock
+    if _store_lock is None:
+        _store_lock = asyncio.Lock()
+    return _store_lock
 
 
 async def get_postgres_store() -> PostgresStore:
     """Get or create PostgreSQL store singleton."""
     global _store
-    if _store is None:
-        _store = PostgresStore()
-        await _store.connect()
-    return _store
+    if _store is not None:
+        return _store
+    async with _get_store_lock():
+        if _store is None:
+            _store = PostgresStore()
+            await _store.connect()
+        return _store

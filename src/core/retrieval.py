@@ -548,7 +548,11 @@ class RetrievalPipeline:
         return results
 
     async def _track_access(self, results: list[RetrievalResult]):
-        """Track that these memories were accessed (reinforcement)."""
+        """Track that these memories were accessed (reinforcement).
+
+        Operates on local copies to avoid mutating the Memory objects
+        returned to the caller (this runs as a background task).
+        """
         now = datetime.utcnow()
 
         for result in results:
@@ -558,21 +562,24 @@ class RetrievalPipeline:
             if memory.metadata.get("is_anti_pattern"):
                 continue
 
+            # Read current values without mutating the returned object
+            importance = memory.importance
+            access_count = memory.access_count
+
             # Reinforce importance only if not accessed in the last hour
             # Prevents runaway importance inflation from frequent retrieval
             hours_since = (now - memory.last_accessed).total_seconds() / 3600
             if hours_since >= 1.0:
-                memory.importance = min(1.0, memory.importance + 0.02)
-                await self.qdrant.update_importance(memory.id, memory.importance)
-                await self.neo4j.update_importance(memory.id, memory.importance)
+                importance = min(1.0, importance + 0.02)
+                await self.qdrant.update_importance(memory.id, importance)
+                await self.neo4j.update_importance(memory.id, importance)
 
-            memory.access_count += 1
-            memory.last_accessed = now
+            access_count += 1
 
             # Update access count and timestamps in Qdrant
             await self.qdrant.update_access(
                 memory.id,
-                memory.access_count,
+                access_count,
                 now.isoformat(),
             )
 
@@ -608,6 +615,7 @@ class RetrievalPipeline:
             else Durability.DURABLE,
             initial_importance=payload.get("initial_importance"),
             content_hash=payload.get("content_hash", ""),
+            metadata=payload.get("metadata", {}),
         )
 
 

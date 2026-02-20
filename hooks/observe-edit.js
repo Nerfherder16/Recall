@@ -94,9 +94,12 @@ async function main() {
   } else {
     const content = toolInput.content || "";
     if (content.length > MAX_CONTENT_SIZE) {
-      process.exit(0);
+      // Truncate large files instead of dropping — observer still gets useful context
+      body.content = content.slice(0, MAX_CONTENT_SIZE);
+      body.truncated = true;
+    } else {
+      body.content = content;
     }
-    body.content = content;
   }
 
   const headers = { "Content-Type": "application/json" };

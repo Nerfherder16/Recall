@@ -61,6 +61,7 @@ class TestEmbeddingPassthrough:
 
         qdrant = AsyncMock()
         qdrant.find_by_content_hash = AsyncMock(return_value=None)
+        qdrant.search = AsyncMock(return_value=[])
         qdrant.store = AsyncMock()
 
         neo4j = AsyncMock()

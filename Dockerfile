@@ -23,8 +23,8 @@ COPY src/ ./src/
 # Copy built dashboard from stage 1
 COPY --from=dashboard /src/api/static/dashboard ./src/api/static/dashboard/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir .
+# Install Python dependencies (deps only, source is volume-mounted at runtime)
+RUN pip install --no-cache-dir . && pip uninstall -y recall
 
 # Create non-root user
 RUN useradd --create-home appuser

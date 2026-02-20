@@ -123,27 +123,6 @@ def test_empty_diff():
     assert extract_values("\n\n") == []
 
 
-def test_parse_changed_files():
-    """Extract changed file paths from diff header."""
-    from src.core.diff_parser import parse_changed_files
-
-    diff = """\
-diff --git a/src/config.py b/src/config.py
-index abc1234..def5678 100644
---- a/src/config.py
-+++ b/src/config.py
-@@ -1,3 +1,3 @@
-+HOST = "10.0.0.1"
-diff --git a/docker-compose.yml b/docker-compose.yml
---- a/docker-compose.yml
-+++ b/docker-compose.yml
-+  port: 8200
-"""
-    files = parse_changed_files(diff)
-    assert "src/config.py" in files
-    assert "docker-compose.yml" in files
-
-
 def test_deduplication():
     """Same value appearing multiple times is deduplicated."""
     from src.core.diff_parser import extract_values

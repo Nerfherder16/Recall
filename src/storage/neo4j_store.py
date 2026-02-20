@@ -7,6 +7,7 @@ Neo4j handles:
 - Finding connected concepts
 """
 
+import asyncio
 import re
 from typing import Any
 
@@ -264,72 +265,6 @@ class Neo4jStore:
             records = await result.data()
             return [(r["id_a"], r["id_b"]) for r in records]
 
-    async def find_path(
-        self, source_id: str, target_id: str, max_depth: int = 5
-    ) -> list[dict[str, Any]] | None:
-        """Find shortest path between two memories."""
-        # Clamp max_depth to a safe range (Cypher literal, not parameterized)
-        max_depth = max(1, min(max_depth, 15))
-
-        async with self.driver.session() as session:
-            result = await session.run(
-                f"""
-                MATCH path = shortestPath(
-                    (source:Memory {{id: $source_id}})
-                    -[*..{max_depth}]-
-                    (target:Memory {{id: $target_id}})
-                )
-                RETURN [node in nodes(path) | node.id] as node_ids,
-                       [rel in relationships(path) | type(rel)] as rel_types,
-                       length(path) as distance
-                """,
-                source_id=source_id,
-                target_id=target_id,
-            )
-
-            record = await result.single()
-            if record:
-                return {
-                    "node_ids": record["node_ids"],
-                    "relationship_types": record["rel_types"],
-                    "distance": record["distance"],
-                }
-            return None
-
-    async def get_subgraph(
-        self,
-        memory_ids: list[str],
-        include_relationships: bool = True,
-    ) -> dict[str, Any]:
-        """Get a subgraph containing specified memories and their connections."""
-        async with self.driver.session() as session:
-            result = await session.run(
-                """
-                MATCH (m:Memory)
-                WHERE m.id IN $ids
-                OPTIONAL MATCH (m)-[r]-(connected:Memory)
-                WHERE connected.id IN $ids
-                RETURN collect(DISTINCT m) as memories,
-                       collect(DISTINCT r) as relationships
-                """,
-                ids=memory_ids,
-            )
-
-            record = await result.single()
-            if record:
-                return {
-                    "memories": [dict(m) for m in record["memories"]],
-                    "relationships": [
-                        {
-                            "type": type(r).__name__,
-                            "strength": r.get("strength", 0.5),
-                        }
-                        for r in record["relationships"]
-                        if r is not None
-                    ],
-                }
-            return {"memories": [], "relationships": []}
-
     async def mark_superseded(self, memory_id: str, superseded_by: str):
         """Mark a memory node as superseded in the graph."""
         async with self.driver.session() as session:
@@ -523,12 +458,23 @@ class Neo4jStore:
 
 # Singleton
 _store: Neo4jStore | None = None
+_store_lock: asyncio.Lock | None = None
+
+
+def _get_store_lock() -> asyncio.Lock:
+    global _store_lock
+    if _store_lock is None:
+        _store_lock = asyncio.Lock()
+    return _store_lock
 
 
 async def get_neo4j_store() -> Neo4jStore:
     """Get or create Neo4j store singleton."""
     global _store
-    if _store is None:
-        _store = Neo4jStore()
-        await _store.connect()
-    return _store
+    if _store is not None:
+        return _store
+    async with _get_store_lock():
+        if _store is None:
+            _store = Neo4jStore()
+            await _store.connect()
+        return _store

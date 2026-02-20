@@ -56,8 +56,8 @@ class HealthComputer:
             "feedback_similarity": similarity_dist,
         }
 
-    async def compute_forces(self, memory_id: str) -> dict[str, Any]:
-        """Compute per-memory force profile."""
+    async def compute_forces(self, memory_id: str) -> dict[str, Any] | None:
+        """Compute per-memory force profile. Returns None if memory not found."""
         # Get memory data
         result = await self.qdrant.get(memory_id)
         if not result:

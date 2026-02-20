@@ -7,6 +7,7 @@ Redis handles:
 - Caching for hot memories
 """
 
+import asyncio
 import json
 from datetime import timedelta
 from typing import Any
@@ -14,7 +15,7 @@ from typing import Any
 import redis.asyncio as redis
 import structlog
 
-from src.core import Memory, Session, get_settings
+from src.core import Session, get_settings
 
 logger = structlog.get_logger()
 
@@ -107,84 +108,6 @@ class RedisStore:
         await self.client.delete(key)
 
     # =============================================================
-    # HOT MEMORY CACHE
-    # =============================================================
-
-    def _cache_key(self, memory_id: str) -> str:
-        return f"recall:cache:{memory_id}"
-
-    async def cache_memory(self, memory: Memory, ttl_minutes: int = 60):
-        """Cache a frequently accessed memory."""
-        key = self._cache_key(memory.id)
-        await self.client.set(
-            key,
-            memory.model_dump_json(),
-            ex=timedelta(minutes=ttl_minutes),
-        )
-
-    async def get_cached_memory(self, memory_id: str) -> Memory | None:
-        """Get a memory from cache."""
-        key = self._cache_key(memory_id)
-        data = await self.client.get(key)
-        if data:
-            return Memory.model_validate_json(data)
-        return None
-
-    async def invalidate_cache(self, memory_id: str):
-        """Remove memory from cache."""
-        key = self._cache_key(memory_id)
-        await self.client.delete(key)
-
-    # =============================================================
-    # EVENT BUS (for background workers)
-    # =============================================================
-
-    async def publish_event(self, event_type: str, payload: dict[str, Any]):
-        """Publish an event for background processing."""
-        event = {
-            "type": event_type,
-            "payload": payload,
-        }
-        await self.client.xadd(
-            "recall:events",
-            {"data": json.dumps(event)},
-            maxlen=10000,  # Keep last 10k events
-        )
-        logger.debug("published_event", type=event_type)
-
-    async def get_events(
-        self,
-        last_id: str = "0",
-        count: int = 100,
-        block_ms: int = 5000,
-    ) -> list[tuple[str, dict[str, Any]]]:
-        """
-        Get events from the stream.
-
-        Returns list of (event_id, event_data).
-        """
-        result = await self.client.xread(
-            {"recall:events": last_id},
-            count=count,
-            block=block_ms,
-        )
-
-        events = []
-        if result:
-            for stream_name, messages in result:
-                for msg_id, data in messages:
-                    event = json.loads(data["data"])
-                    events.append((msg_id, event))
-
-        return events
-
-    async def ack_event(self, event_id: str, consumer_group: str = "workers"):
-        """Acknowledge an event as processed."""
-        # For simple setup, we don't use consumer groups
-        # In production, use XACK with consumer groups
-        pass
-
-    # =============================================================
     # TURN STORAGE (for signal detection)
     # =============================================================
 
@@ -271,18 +194,28 @@ class RedisStore:
     # =============================================================
 
     async def get_active_sessions(self) -> int:
-        """Count active sessions using SCAN (non-blocking, unlike KEYS)."""
-        count = 0
+        """Count active (not ended) sessions using SCAN."""
+        session_keys = []
         cursor = 0
         while True:
             cursor, keys = await self.client.scan(
                 cursor=cursor, match="recall:session:*", count=100
             )
             # Filter out sub-keys (working, turns)
-            count += sum(1 for k in keys if ":working" not in k and ":turns" not in k)
+            session_keys.extend(k for k in keys if ":working" not in k and ":turns" not in k)
             if cursor == 0:
                 break
-        return count
+
+        if not session_keys:
+            return 0
+
+        # Check which sessions have ended_at set (pipeline for efficiency)
+        pipe = self.client.pipeline()
+        for key in session_keys:
+            pipe.hget(key, "ended_at")
+        ended_values = await pipe.execute()
+
+        return sum(1 for v in ended_values if v is None)
 
     async def close(self):
         """Close the connection."""
@@ -292,12 +225,23 @@ class RedisStore:
 
 # Singleton
 _store: RedisStore | None = None
+_store_lock: asyncio.Lock | None = None
+
+
+def _get_store_lock() -> asyncio.Lock:
+    global _store_lock
+    if _store_lock is None:
+        _store_lock = asyncio.Lock()
+    return _store_lock
 
 
 async def get_redis_store() -> RedisStore:
     """Get or create Redis store singleton."""
     global _store
-    if _store is None:
-        _store = RedisStore()
-        await _store.connect()
-    return _store
+    if _store is not None:
+        return _store
+    async with _get_store_lock():
+        if _store is None:
+            _store = RedisStore()
+            await _store.connect()
+        return _store

@@ -300,6 +300,7 @@ async def pin_document(
             payload={"pinned": "true"},
             points=[cid],
         )
+        await neo4j.update_pinned(cid, True)
 
     return {"pinned": True, "document_id": doc_id, "children_pinned": len(child_ids)}
 
@@ -327,6 +328,7 @@ async def unpin_document(
             payload={"pinned": "false"},
             points=[cid],
         )
+        await neo4j.update_pinned(cid, False)
 
     return {"pinned": False, "document_id": doc_id, "children_unpinned": len(child_ids)}
 

@@ -11,7 +11,7 @@ from datetime import datetime
 
 import structlog
 
-from .reranker import DURABILITY_SCORES, FEATURE_NAMES, REDIS_KEY
+from .reranker import FEATURE_NAMES, REDIS_KEY
 
 logger = structlog.get_logger()
 
@@ -92,23 +92,6 @@ def _durability_score(durability_str: str | None) -> float:
     return mapping.get(durability_str, 0.5)
 
 
-def _features_from_payload(payload: dict, similarity: float) -> list[float]:
-    """Extract feature vector from Qdrant payload."""
-    return [
-        float(payload.get("importance", 0.5)),
-        float(payload.get("stability", 0.5)),
-        float(payload.get("confidence", 0.5)),
-        math.log1p(int(payload.get("access_count", 0))),
-        0.0,  # hours_since_last_access — snapshot not available
-        0.0,  # hours_since_creation — snapshot not available
-        1.0 if payload.get("pinned") == "true" else 0.0,
-        _durability_score(payload.get("durability")),
-        float(similarity),
-        0.0,  # has_graph_path
-        0.0,  # retrieval_path_len
-    ]
-
-
 async def train_reranker(pg, qdrant, redis_store) -> dict:
     """
     Train reranker from feedback data and store weights in Redis.
@@ -116,17 +99,16 @@ async def train_reranker(pg, qdrant, redis_store) -> dict:
     Returns metadata dict with n_samples, cv_score, trained_at.
     Raises ValueError if insufficient training data.
     """
+    import numpy as np
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import cross_val_score
     from sklearn.preprocessing import StandardScaler
-    import numpy as np
 
     X_list, y_list = await collect_training_data(pg, qdrant)
 
     if len(X_list) < MIN_SAMPLES:
         raise ValueError(
-            f"Insufficient training data: {len(X_list)} samples "
-            f"(minimum {MIN_SAMPLES} required)"
+            f"Insufficient training data: {len(X_list)} samples (minimum {MIN_SAMPLES} required)"
         )
 
     X = np.array(X_list, dtype=np.float64)

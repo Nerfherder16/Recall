@@ -62,9 +62,7 @@ async def event_stream(request: Request):
 
                 try:
                     pg = await get_postgres_store()
-                    data["audit_count"] = await pg.pool.fetchval(
-                        "SELECT count(*) FROM audit_log"
-                    )
+                    data["audit_count"] = await pg.pool.fetchval("SELECT count(*) FROM audit_log")
                     data["postgres"] = "ok"
                 except Exception:
                     data["postgres"] = "error"
@@ -73,7 +71,7 @@ async def event_stream(request: Request):
 
             except Exception as e:
                 logger.error("sse_error", error=str(e))
-                yield {"event": "error", "data": json.dumps({"error": str(e)})}
+                yield {"event": "error", "data": json.dumps({"error": "Internal server error"})}
 
             await asyncio.sleep(5)
 

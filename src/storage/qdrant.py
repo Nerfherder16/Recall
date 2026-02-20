@@ -7,6 +7,7 @@ Qdrant handles:
 - Filtered retrieval
 """
 
+import asyncio
 from typing import Any
 
 import structlog
@@ -352,35 +353,6 @@ class QdrantStore:
             )
             bands.append({"range": label, "count": result.count})
         return bands
-
-    async def scroll_by_document_id(
-        self,
-        doc_id: str,
-    ) -> list[tuple[str, dict[str, Any]]]:
-        """Scroll all memories belonging to a document."""
-        all_points = []
-        offset = None
-        while True:
-            points, next_offset = await self.client.scroll(
-                collection_name=self.collection,
-                scroll_filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="document_id",
-                            match=MatchValue(value=doc_id),
-                        )
-                    ]
-                ),
-                limit=100,
-                offset=offset,
-                with_payload=True,
-            )
-            for point in points:
-                all_points.append((str(point.id), point.payload or {}))
-            if next_offset is None:
-                break
-            offset = next_offset
-        return all_points
 
     async def mark_superseded(self, memory_id: str, superseded_by: str):
         """Mark a memory as superseded by another."""
@@ -868,12 +840,23 @@ class QdrantStore:
 
 # Singleton
 _store: QdrantStore | None = None
+_store_lock: asyncio.Lock | None = None
+
+
+def _get_store_lock() -> asyncio.Lock:
+    global _store_lock
+    if _store_lock is None:
+        _store_lock = asyncio.Lock()
+    return _store_lock
 
 
 async def get_qdrant_store() -> QdrantStore:
     """Get or create Qdrant store singleton."""
     global _store
-    if _store is None:
-        _store = QdrantStore()
-        await _store.connect()
-    return _store
+    if _store is not None:
+        return _store
+    async with _get_store_lock():
+        if _store is None:
+            _store = QdrantStore()
+            await _store.connect()
+        return _store

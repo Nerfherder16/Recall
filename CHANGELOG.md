@@ -5,6 +5,78 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Most recent first.
 
 ---
 
+## v2.9.6 — Bug Hunt: 23 Bugs Fixed (2026-02-20)
+
+### Summary
+Full systems audit found 23 bugs (3 CRITICAL, 5 HIGH, 8 MEDIUM, 7 LOW). All actionable bugs fixed. Dead code audit also removed 408 lines across 13 files.
+
+### CRITICAL Fixes
+- **patterns.py**: Division by zero in `_cosine_similarity` when vector norm is 0
+- **memory.py**: Batch delete didn't clean up facts sub-embeddings (single delete did)
+- **documents.py**: Document pin/unpin propagated to Qdrant but skipped Neo4j Memory nodes
+
+### HIGH Fixes
+- **All 4 storage singletons** (qdrant, neo4j, redis, postgres): Added `asyncio.Lock` double-checked locking to prevent race conditions during concurrent init
+- **retrieval.py**: `_payload_to_memory` never set `metadata` field — broke document-sibling boost entirely (document_id always None)
+- **events.py**: SSE error events leaked internal exception details to clients
+- **health.py**: `compute_forces` return type annotation was wrong (`dict` vs `dict | None`)
+- **neo4j_documents.py**: `update_document` used f-string interpolation for field names — added `_ALLOWED_FIELDS` whitelist
+
+### MEDIUM Fixes
+- **mcp-server/index.js**: Default RECALL_HOST was `localhost:8200` (unreachable) — matched to hooks' default `192.168.50.19:8200`
+- **redis_store.py**: `get_active_sessions` counted ended sessions — now checks `ended_at` via pipeline
+- **observe-edit.js**: Write content >10KB was silently dropped — now truncated with flag
+
+### LOW Fixes
+- **decay.py**: Single bad memory (e.g., invalid datetime) aborted entire decay run — wrapped loop body in try/except
+- **retrieval.py**: `_track_access` mutated returned Memory objects via background task (race condition) — now uses local copies
+- **context-monitor.js**: Output format missing `hookSpecificOutput` wrapper — context was silently ignored
+
+### By Design (Not Fixed)
+- #10 (default credentials): Dev defaults, overridden by env vars in production
+- #12 (readStdin timeout): Returns partial data by design for non-blocking hooks
+- #13 (session-summary timeout): Key decisions are fire-and-forget; summary completes before 10s
+- #14 (consolidation lock): Single-process deployment doesn't need distributed locks
+- #17 (checkpoint feedback dupes): Each checkpoint is an independent signal
+- #22 (CORS wildcard): Configurable via env var; `*` is appropriate for self-hosted homelab
+
+### Dead Code Removed (408 lines across 13 files)
+- Unused imports, unreachable branches, commented-out code, dead helper functions
+- See commit for full diff
+
+### Files Changed
+- `src/workers/patterns.py`, `src/api/routes/memory.py`, `src/api/routes/documents.py`
+- `src/storage/qdrant.py`, `src/storage/neo4j_store.py`, `src/storage/redis_store.py`, `src/storage/postgres_store.py`
+- `src/core/retrieval.py`, `src/core/health.py`, `src/api/routes/events.py`
+- `src/storage/neo4j_documents.py`, `src/workers/decay.py`
+- `hooks/observe-edit.js`, `hooks/context-monitor.js`, `mcp-server/index.js`
+
+---
+
+## v2.9.5 — Fix Stale Package Shadowing Worker (2026-02-20)
+
+### Problem
+ARQ worker `run_decay` and `run_consolidation` crashed every cycle with `3 validation errors for MatchValue` (value=None). Manual Python runs succeeded but cron-triggered runs consistently failed. Logs also showed `pulling_embedding_model model=bge-large` despite settings using `qwen3-embedding:0.6b`.
+
+### Root Cause
+The Dockerfile's `pip install --no-cache-dir .` installed the `recall` package into `/usr/local/lib/python3.11/site-packages/src/`. This stale copy — baked into the Docker image at build time — shadowed the volume-mounted `/app/src/` for the ARQ worker process. The old code had MatchValue(value=None) bugs and `bge-large` as the default embedding model. All source edits deployed via SCP + restart were invisible to the worker because it imported from site-packages.
+
+### Fixed
+- **Dockerfile**: Changed `RUN pip install --no-cache-dir .` to `RUN pip install --no-cache-dir . && pip uninstall -y recall` — installs dependencies but removes the package itself so site-packages never shadows the volume mount.
+- **Running containers**: Ran `pip uninstall recall -y` as root on both worker and API containers.
+- **Cleaned up debug instrumentation**: Removed MatchValue monkey-patch, marker file writes, and pathlib import from `src/workers/main.py`.
+
+### Result
+- Decay: processed 1287 memories, decayed 761 — first successful cron run in production.
+- Consolidation: 51 clusters merged, 135 memories consolidated.
+- Correct embedding model (`qwen3-embedding:0.6b`) now used.
+
+### Files Changed
+- `Dockerfile` — `pip uninstall -y recall` after install
+- `src/workers/main.py` — removed debug instrumentation
+
+---
+
 ## v2.9.4 — Fix Feedback Loop (2026-02-20)
 
 ### Problem

@@ -83,7 +83,13 @@ async def run_consolidation(ctx: dict):
             )
 
         except Exception as e:
-            logger.error("consolidation_error", error=str(e))
+            import traceback
+
+            logger.error(
+                "consolidation_error",
+                error=str(e),
+                tb=traceback.format_exc(),
+            )
             raise
 
 
@@ -94,26 +100,40 @@ async def run_decay(ctx: dict):
     Decreases importance of memories that haven't been accessed recently.
     Memories with high stability decay slower.
     """
-    logger.info("running_decay")
+    logger.info(
+        "running_decay",
+        embedding_model=settings.embedding_model,
+        has_qdrant=ctx.get("qdrant") is not None,
+        has_neo4j=ctx.get("neo4j") is not None,
+    )
     metrics = get_metrics()
     metrics.increment("recall_decay_runs_total")
 
     try:
         from src.workers.decay import DecayWorker
 
-        worker = DecayWorker(ctx["qdrant"], ctx["neo4j"])
-        stats = await worker.run()
+        logger.debug("decay_step_1_import_done")
 
-        metrics.increment("recall_decay_archived_total", value=stats["archived"])
+        worker = DecayWorker(ctx["qdrant"], ctx["neo4j"])
+        logger.debug("decay_step_2_worker_created")
+
+        stats = await worker.run()
+        logger.debug("decay_step_3_run_complete")
 
         logger.info(
             "decay_complete",
             memories_processed=stats["processed"],
-            memories_archived=stats["archived"],
+            memories_decayed=stats["decayed"],
         )
 
     except Exception as e:
-        logger.error("decay_error", error=str(e))
+        import traceback
+
+        logger.error(
+            "decay_error",
+            error=str(e),
+            tb=traceback.format_exc(),
+        )
         raise
 
 

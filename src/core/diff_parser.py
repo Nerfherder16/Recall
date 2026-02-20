@@ -16,7 +16,6 @@ _URL_PATTERN = re.compile(r"(https?://[^\s\"'`,;)}\]]+)")
 _ENV_VAR_PATTERN = re.compile(r"([A-Z][A-Z0-9_]{2,}=[^\s]+)")
 _PATH_PATTERN = re.compile(r"(/[a-zA-Z0-9_./-]{4,})")
 _VERSION_PATTERN = re.compile(r"(\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9]+)?)")
-_CHANGED_FILE_PATTERN = re.compile(r"^diff --git a/(.+?) b/", re.MULTILINE)
 
 
 def _is_changed_line(line: str) -> bool:
@@ -104,8 +103,3 @@ def extract_values(diff_text: str) -> list[dict]:
                 results.append({"type": "version", "value": ver})
 
     return results
-
-
-def parse_changed_files(diff_text: str) -> list[str]:
-    """Extract file paths from diff --git headers."""
-    return _CHANGED_FILE_PATTERN.findall(diff_text)

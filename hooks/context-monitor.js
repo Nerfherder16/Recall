@@ -38,7 +38,10 @@ async function main() {
 
     if (estimatedTokens > 150000) {
       const warning = JSON.stringify({
-        additionalContext: `WARNING: Context window ~${Math.round(estimatedTokens / 1000)}K tokens estimated. Consider committing work and starting a fresh session to avoid degraded output quality.`,
+        hookSpecificOutput: {
+          hookEventName: "PostToolUse",
+          additionalContext: `WARNING: Context window ~${Math.round(estimatedTokens / 1000)}K tokens estimated. Consider committing work and starting a fresh session to avoid degraded output quality.`,
+        },
       });
       process.stdout.write(warning);
     }
