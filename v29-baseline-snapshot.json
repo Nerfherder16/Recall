@@ -1,0 +1,41 @@
+{
+  "snapshot": "v2.9 deploy baseline",
+  "timestamp": "2026-02-20T00:22:00Z",
+  "check_after": "2026-02-21T00:22:00Z",
+  "health": {
+    "memories": 995,
+    "neo4j_nodes": 995,
+    "sessions": 122,
+    "audit_entries": 29463
+  },
+  "conflicts": {
+    "total": 27,
+    "orphan_hub": 24,
+    "feedback_starved": 3,
+    "noisy": 0
+  },
+  "feedback": {
+    "positive_rate": 0.5018,
+    "total_positive": 1372,
+    "total_negative": 1362,
+    "daily_feb19": { "positive": 54, "negative": 16, "total": 70 }
+  },
+  "importance_distribution": {
+    "0.0-0.2": 612,
+    "0.2-0.4": 82,
+    "0.4-0.6": 266,
+    "0.6-0.8": 10,
+    "0.8-1.0": 25
+  },
+  "graph": {
+    "avg_edge_strength": 0.8702,
+    "edge_count": 1610
+  },
+  "what_to_check": {
+    "orphan_hubs": "Should drop from 24 → near 0 after next decay run (graph-aware floor)",
+    "feedback_starved": "Should drop from 3 — now filtered by access_count >= 5",
+    "feedback_positive_rate": "Should increase above 0.50 — force_useful fixes re-retrieval",
+    "importance_0.0-0.2_bucket": "Should shrink as hub memories get lifted above 0.3",
+    "observer_importance_variance": "New observer memories should NOT all be 0.4 — check for spread"
+  }
+}
