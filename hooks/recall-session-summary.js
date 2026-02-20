@@ -63,15 +63,17 @@ function extractMessages(transcriptPath) {
     for (const line of recentLines) {
       try {
         const entry = JSON.parse(line);
-        const isUser = entry.type === "human" || entry.role === "user";
-        const isAssistant = entry.type === "assistant" || entry.role === "assistant";
+        const isUser = entry.type === "human" || entry.type === "user";
+        const isAssistant = entry.type === "assistant";
         if (!isUser && !isAssistant) continue;
 
+        // Content can be at entry.content OR entry.message.content (nested format)
+        const raw = entry.message?.content ?? entry.content;
         const text =
-          typeof entry.content === "string"
-            ? entry.content
-            : Array.isArray(entry.content)
-              ? entry.content
+          typeof raw === "string"
+            ? raw
+            : Array.isArray(raw)
+              ? raw
                   .filter((c) => c.type === "text")
                   .map((c) => c.text)
                   .join(" ")
@@ -222,12 +224,13 @@ function extractAssistantText(transcriptPath) {
     for (const line of lines) {
       try {
         const entry = JSON.parse(line);
-        if (entry.type === "assistant" || entry.role === "assistant") {
+        if (entry.type === "assistant") {
+          const raw = entry.message?.content ?? entry.content;
           const text =
-            typeof entry.content === "string"
-              ? entry.content
-              : Array.isArray(entry.content)
-                ? entry.content
+            typeof raw === "string"
+              ? raw
+              : Array.isArray(raw)
+                ? raw
                     .filter((c) => c.type === "text")
                     .map((c) => c.text)
                     .join(" ")
