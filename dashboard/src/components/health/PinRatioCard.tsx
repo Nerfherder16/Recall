@@ -1,5 +1,6 @@
 import { PushPin, Warning } from "@phosphor-icons/react";
 import type { PinRatio } from "../../api/types";
+import { HealthScale } from "./HealthScale";
 
 interface Props {
   pins: PinRatio;
@@ -28,6 +29,14 @@ export function PinRatioCard({ pins }: Props) {
         {pins.pinned} pinned / {pins.total} total
         {pins.warning && " (high \u2014 consider unpinning some)"}
       </p>
+      <HealthScale
+        value={pins.ratio}
+        ranges={[
+          { max: 0.1, label: "<10% good", color: "bg-emerald-400" },
+          { max: 0.3, label: "10–30%", color: "bg-amber-400" },
+          { max: 1.0, label: ">30% high", color: "bg-red-400" },
+        ]}
+      />
     </div>
   );
 }

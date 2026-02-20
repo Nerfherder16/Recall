@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Warning, Info } from "@phosphor-icons/react";
+import { Warning, Info, CheckCircle } from "@phosphor-icons/react";
 import type { Conflict } from "../../api/types";
 import { GlassCard } from "../common/GlassCard";
 import { Select } from "../common/Input";
@@ -10,6 +10,7 @@ import {
   TableRow,
   TableCell,
 } from "../common/Table";
+import { InfoTip } from "./InfoTip";
 
 interface Props {
   conflicts: Conflict[];
@@ -29,6 +30,19 @@ const TYPE_LABELS: Record<string, string> = {
   stale_anti_pattern: "Stale Anti-Pattern",
 };
 
+const TYPE_TIPS: Record<string, string> = {
+  noisy:
+    "Retrieved often but rarely marked useful. Consider deleting or rewording.",
+  feedback_starved:
+    "High access count but zero feedback. Use the memory in a session so the feedback loop can score it.",
+  orphan_hub:
+    "Many graph edges but low importance — decay should eventually prune it, or delete manually.",
+  decay_vs_feedback:
+    "Decay is pushing importance down while feedback says it's useful. Pin it to protect from decay.",
+  stale_anti_pattern:
+    "An anti-pattern that hasn't triggered in a while. Review whether it's still relevant.",
+};
+
 export function ConflictsTable({ conflicts }: Props) {
   const [typeFilter, setTypeFilter] = useState<string>("");
 
@@ -43,6 +57,7 @@ export function ConflictsTable({ conflicts }: Props) {
         <h3 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
           <Warning size={16} className="text-amber-400" />
           Conflicts ({conflicts.length})
+          <InfoTip text="Memories where competing forces disagree — e.g. decay pulling importance down while feedback says it's useful, or a memory retrieved often but never marked helpful. Zero conflicts means the system's forces are balanced." />
         </h3>
         {types.length > 1 && (
           <Select
@@ -61,9 +76,10 @@ export function ConflictsTable({ conflicts }: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-xs text-zinc-400 py-4 text-center">
-          No conflicts detected
-        </p>
+        <div className="py-4 text-center">
+          <CheckCircle size={24} className="text-emerald-400 mx-auto mb-2" />
+          <p className="text-xs text-zinc-400">No conflicts detected</p>
+        </div>
       ) : (
         <Table>
           <TableHead>
@@ -76,8 +92,9 @@ export function ConflictsTable({ conflicts }: Props) {
             {filtered.map((c, i) => (
               <TableRow key={i}>
                 <TableCell>
-                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 inline-flex items-center gap-1">
                     {TYPE_LABELS[c.type] || c.type}
+                    {TYPE_TIPS[c.type] && <InfoTip text={TYPE_TIPS[c.type]} />}
                   </span>
                 </TableCell>
                 <TableCell>

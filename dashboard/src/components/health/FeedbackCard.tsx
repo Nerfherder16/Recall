@@ -1,5 +1,6 @@
 import { ThumbsUp } from "@phosphor-icons/react";
 import type { FeedbackMetrics } from "../../api/types";
+import { HealthScale } from "./HealthScale";
 
 interface Props {
   feedback: FeedbackMetrics;
@@ -27,6 +28,14 @@ export function FeedbackCard({ feedback }: Props) {
       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
         {feedback.total_positive} positive / {total} total (30d)
       </p>
+      <HealthScale
+        value={feedback.positive_rate}
+        ranges={[
+          { max: 0.4, label: "<40%", color: "bg-red-400" },
+          { max: 0.7, label: "40–70%", color: "bg-amber-400" },
+          { max: 1.0, label: ">70%", color: "bg-emerald-400" },
+        ]}
+      />
     </div>
   );
 }

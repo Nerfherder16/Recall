@@ -1,5 +1,6 @@
 import { Graph } from "@phosphor-icons/react";
 import type { GraphCohesion } from "../../api/types";
+import { HealthScale } from "./HealthScale";
 
 interface Props {
   graph: GraphCohesion;
@@ -20,6 +21,14 @@ export function GraphCohesionCard({ graph }: Props) {
       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
         Avg edge strength across {graph.edge_count} edges
       </p>
+      <HealthScale
+        value={graph.avg_edge_strength}
+        ranges={[
+          { max: 0.3, label: "<0.3 weak", color: "bg-red-400" },
+          { max: 0.6, label: "0.3–0.6", color: "bg-amber-400" },
+          { max: 1.0, label: ">0.6 strong", color: "bg-emerald-400" },
+        ]}
+      />
     </div>
   );
 }

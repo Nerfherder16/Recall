@@ -5,6 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Most recent first.
 
 ---
 
+## v2.9.2 — Health Dashboard Tooltips & Scales (2026-02-20)
+
+### Added
+- **HealthScale component**: Segmented color bar showing where the current value falls within defined ranges. Added to FeedbackCard (positive rate), GraphCohesionCard, and PinRatioCard.
+- **InfoTip component**: Hover/click tooltip on an info icon — replaces inline explanation text for cleaner UI.
+- **Tooltips on health cards**: PopulationCard, ImportanceChart, FeedbackHistogram, StaleAuditSection, and ConflictsTable title all have InfoTip with contextual guidance.
+- **Per-conflict-type tooltips**: Each conflict type (noisy, feedback_starved, orphan_hub, decay_vs_feedback, stale_anti_pattern) shows a remediation tip via InfoTip on the type label.
+
+### Files Changed
+- `dashboard/src/components/health/HealthScale.tsx` — NEW
+- `dashboard/src/components/health/InfoTip.tsx` — NEW
+- `dashboard/src/components/health/FeedbackCard.tsx` — HealthScale added
+- `dashboard/src/components/health/PopulationCard.tsx` — InfoTip
+- `dashboard/src/components/health/GraphCohesionCard.tsx` — HealthScale
+- `dashboard/src/components/health/PinRatioCard.tsx` — HealthScale
+- `dashboard/src/components/health/ImportanceChart.tsx` — InfoTip
+- `dashboard/src/components/health/FeedbackHistogram.tsx` — InfoTip
+- `dashboard/src/components/health/ConflictsTable.tsx` — InfoTip on title + per-type tips
+- `dashboard/src/components/StaleAuditSection.tsx` — InfoTip
+
+---
+
 ## v2.9.1 — DOCX Support (2026-02-20)
 
 ### Added

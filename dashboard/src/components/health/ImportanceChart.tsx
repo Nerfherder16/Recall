@@ -8,6 +8,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { ImportanceBand } from "../../api/types";
+import { InfoTip } from "./InfoTip";
 
 interface Props {
   bands: ImportanceBand[];
@@ -16,8 +17,9 @@ interface Props {
 export function ImportanceChart({ bands }: Props) {
   return (
     <div className="rounded-2xl border border-zinc-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-zinc-800/40 backdrop-blur-xl p-6">
-      <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+      <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
         Importance Distribution
+        <InfoTip text="How memories spread across importance (0–1). Healthy = bell curve around 0.3–0.6. Too many at 0.0–0.2 = aggressive decay. Spike at 0.8+ = importance inflation. Decay pushes unused memories left; retrieval and feedback push useful ones right." />
       </h3>
       {bands.length === 0 ? (
         <p className="text-xs text-zinc-400">No data available</p>

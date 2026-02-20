@@ -1,5 +1,6 @@
 import { TrendUp, TrendDown } from "@phosphor-icons/react";
 import type { PopulationBalance } from "../../api/types";
+import { InfoTip } from "./InfoTip";
 
 interface Props {
   population: PopulationBalance;
@@ -19,6 +20,7 @@ export function PopulationCard({ population }: Props) {
         <span className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">
           Population
         </span>
+        <InfoTip text="Net memory growth over 30 days. Growing = healthy (new memories outpace decay). Mild shrinkage is normal — decay prunes low-value memories. If rapidly shrinking, pin important memories or check decay settings." />
       </div>
       <p
         className={`font-display text-3xl font-bold ${isGrowing ? "text-emerald-400" : "text-red-400"}`}

@@ -12,6 +12,7 @@ import {
   TableCell,
 } from "./common/Table";
 import { useToastContext } from "../context/ToastContext";
+import { InfoTip } from "./health/InfoTip";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -98,13 +99,15 @@ export function StaleAuditSection({ onViewMemory }: Props) {
         <h3 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
           <Warning size={16} className="text-amber-400" />
           Stale Memories ({stale.length})
+          <InfoTip text="Flagged when source code a memory references has changed (tracked via git commits). When a file edit invalidates a stored fact, it appears here so you can review, resolve, or delete it." />
         </h3>
       </div>
 
       {stale.length === 0 ? (
-        <p className="text-xs text-zinc-400 py-4 text-center">
-          No stale memories detected.
-        </p>
+        <div className="py-4 text-center">
+          <CheckCircle size={24} className="text-emerald-400 mx-auto mb-2" />
+          <p className="text-xs text-zinc-400">No stale memories detected</p>
+        </div>
       ) : (
         <Table>
           <TableHead>

@@ -8,6 +8,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { SimilarityBucket } from "../../api/types";
+import { InfoTip } from "./InfoTip";
 
 interface Props {
   buckets: SimilarityBucket[];
@@ -21,8 +22,9 @@ export function FeedbackHistogram({ buckets }: Props) {
 
   return (
     <div className="rounded-2xl border border-zinc-200/80 dark:border-white/[0.06] bg-white/60 dark:bg-zinc-800/40 backdrop-blur-xl p-6">
-      <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+      <h3 className="text-sm font-semibold mb-3 text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
         Feedback Similarity Distribution
+        <InfoTip text="How closely retrieved memories matched what you used. Bars at 0.7–1.0 = surfacing relevant content. Concentration at 0.0–0.3 = memories aren't matching needs. The 0.35 threshold separates 'useful' from 'not useful' in the feedback loop." />
       </h3>
       {data.length === 0 ? (
         <p className="text-xs text-zinc-400">No feedback data yet</p>
