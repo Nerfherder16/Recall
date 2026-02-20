@@ -221,11 +221,15 @@ function extractAssistantText(transcriptPath) {
     const content = readFileSync(transcriptPath, "utf8");
     const lines = content.trim().split("\n").slice(-MAX_TRANSCRIPT_LINES);
     const texts = [];
+    let assistantEntries = 0;
+    let rawEmpty = 0;
     for (const line of lines) {
       try {
         const entry = JSON.parse(line);
         if (entry.type === "assistant") {
+          assistantEntries++;
           const raw = entry.message?.content ?? entry.content;
+          if (!raw) { rawEmpty++; continue; }
           const text =
             typeof raw === "string"
               ? raw
@@ -241,8 +245,11 @@ function extractAssistantText(transcriptPath) {
         // Skip malformed lines
       }
     }
-    return texts.join(" ").toLowerCase();
-  } catch {
+    const result = texts.join(" ").toLowerCase();
+    debug(`extractAssistantText: ${lines.length} lines, ${assistantEntries} assistant entries, ${rawEmpty} empty raw, ${texts.length} text blocks, ${result.length} chars`);
+    return result;
+  } catch (err) {
+    debug(`extractAssistantText error: ${err.message}`);
     return "";
   }
 }
